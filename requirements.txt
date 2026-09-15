@@ -1,0 +1,7 @@
+# Phase 1 — Detection + Tracking baseline
+ultralytics>=8.3.0
+opencv-python>=4.10.0
+numpy>=1.26.0
+
+# Sẽ bổ sung ở Phase 2-3: torchreid/fastreid (Re-ID), faiss-cpu (vector search),
+# fastapi + uvicorn (backend demo), khi bắt đầu các phần đó.
