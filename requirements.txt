@@ -2,6 +2,7 @@
 ultralytics>=8.3.0
 opencv-python>=4.10.0
 numpy>=1.26.0
+lap>=0.5.12  # can cho BoT-SORT (ultralytics model.track)
 
 # Sẽ bổ sung ở Phase 2-3: torchreid/fastreid (Re-ID), faiss-cpu (vector search),
 # fastapi + uvicorn (backend demo), khi bắt đầu các phần đó.

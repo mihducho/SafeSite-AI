@@ -1,0 +1,18 @@
+# Cau hinh BoT-SORT tuy chinh cho LostLens (dua tren default cua Ultralytics).
+# Tang track_buffer de tracker giu track song lau hon khi 1 nguoi bi che khuat
+# hoac YOLO mat detect vai frame — giam tinh trang bi cap ID moi (ID switch).
+
+tracker_type: botsort
+track_high_thresh: 0.25
+track_low_thresh: 0.1
+new_track_thresh: 0.3 # tang nhe so voi mac dinh 0.25 de bot tao track moi tu detection nhieu/that thuong
+track_buffer: 60 # gap doi mac dinh (30) — giu track qua khoang che khuat dai hon
+match_thresh: 0.8
+fuse_score: True
+
+gmc_method: sparseOptFlow
+
+proximity_thresh: 0.5
+appearance_thresh: 0.8
+with_reid: False
+model: auto
