@@ -1,6 +1,7 @@
 # Bien the cua botsort_tracking.yaml, bat with_reid de dung dac trung ngoai
 # hinh khi noi lai track sau khi mat detect — muc dich giam ID switch
 # (1 nguoi bi danh nhieu ID) manh hon so voi chi dua vao motion/IoU.
+# Chi dung trong pham vi 1 camera, KHONG phai Re-ID xuyen camera.
 
 tracker_type: botsort
 track_high_thresh: 0.25
