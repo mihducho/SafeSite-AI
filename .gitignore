@@ -15,6 +15,7 @@ data/processed/*
 *.onnx
 runs/
 weights/
+_archive_lostlens/
 
 # Notebooks checkpoints
 .ipynb_checkpoints/

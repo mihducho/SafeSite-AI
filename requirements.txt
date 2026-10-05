@@ -3,6 +3,6 @@ ultralytics>=8.3.0
 opencv-python>=4.10.0
 numpy>=1.26.0
 lap>=0.5.12  # can cho BoT-SORT (ultralytics model.track)
+pyyaml>=6.0  # doc/ghi configs/zones.yaml, data_ppe.yaml
 
-# Sẽ bổ sung ở Phase 2-3: torchreid/fastreid (Re-ID), faiss-cpu (vector search),
-# fastapi + uvicorn (backend demo), khi bắt đầu các phần đó.
+# Se bo sung o Phase 3 neu can: fastapi + uvicorn (dashboard canh bao demo).
