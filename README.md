@@ -57,18 +57,36 @@ tests/
 # 2. Định nghĩa vùng nguy hiểm cho 1 camera (click chuột, không gõ tay toạ độ)
 .venv\Scripts\python.exe scripts\define_zone.py --source data\raw\ten_video.mp4 --camera camera_1
 
-# 3. Chạy demo an toàn lao động đầy đủ (PPE + vùng nguy hiểm)
-.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\ten_video.mp4 --camera camera_1 --weights best_ppe.pt --person-cls 5 --ppe-classes 0
+# 3a. Demo vùng nguy hiểm với model gốc COCO (chưa cần model PPE).
+#     Video kết quả (vùng cấm, khung xanh/đỏ) lưu ở runs\safety\; thêm --show để xem trực tiếp
+.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\ten_video.mp4 --camera camera_1
+
+# 3b. Demo đầy đủ PPE + vùng nguy hiểm với model PPE đã fine-tune (class theo configs\data_ppe.yaml)
+.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\ten_video.mp4 --camera camera_1 --weights best_ppe.pt --person-cls 5 --hardhat-cls 0 --vest-cls 6
+
+# Chạy test logic PPE + vùng nguy hiểm
+.venv\Scripts\python.exe -m unittest discover -s tests -v
 
 # (Chuẩn bị fine-tune PPE) Trích frame để gán nhãn, rồi train trên Colab
 .venv\Scripts\python.exe scripts\extract_frames.py --source data\raw\ten_video.mp4
-python scripts\train.py --data configs\data_ppe.yaml --weights yolo11n.pt --epochs 100
+python scripts\train.py --data configs\data_ppe.yaml --weights yolo11s.pt --epochs 100
 ```
 
 ## Trạng thái
 
+Hạn bảo vệ: tháng 1/2027.
+
 - [x] Khảo sát related work, chốt phạm vi đề tài (An toàn lao động — PPE + vùng nguy hiểm)
 - [x] Phase 1: Detection + Tracking baseline chạy trên video mẫu (tái dùng từ đề tài cũ)
 - [ ] Phase 2: Fine-tune detection PPE (nón bảo hộ, áo phản quang) trên dataset công khai + dữ liệu riêng
-- [ ] Phase 3: Logic vùng nguy hiểm + tích hợp cảnh báo PPE + vùng, demo multi-camera
+  - [x] Logic gán PPE cho từng người theo vùng đầu/thân (có unit test)
+  - [ ] Chọn dataset, train từ yolo11s trên Colab, chạy thử trên video thật
+- [ ] Phase 3: Hệ thống cảnh báo + demo multi-camera
+  - [x] Vẽ vùng nguy hiểm, phát hiện xâm nhập theo điểm chân, xuất video có vẽ kết quả
+  - [ ] Làm mượt theo thời gian + chống báo lặp, nhiều vùng/camera, chạy song song 2-3 camera, dashboard
 - [ ] Phase 4: Đánh giá, viết luận văn
+
+Ghi chú thử nghiệm trên video camera gia đình (chỉ để kiểm tra detect + tracking người):
+yolo11n nhận nhầm vật thể thành người và cấp quá nhiều ID (13-22 ID cho ~2-3 người);
+yolo11m chỉ còn 5 ID nhưng chậm (~2.6 FPS trên CPU). Bật ReID không cải thiện.
+→ Fine-tune PPE từ yolo11s; chỉnh tracker sau khi có model PPE + video công trường.

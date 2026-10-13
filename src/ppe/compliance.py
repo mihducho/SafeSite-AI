@@ -1,49 +1,83 @@
-"""Kiem tra tuan thu PPE (trang bi bao ho ca nhan): 1 nguoi duoc xem la vi
-pham neu khong co box PPE bat buoc (non bao ho, ao phan quang...) chong lan
-du nhieu len vung box cua ho.
+"""Kiem tra tuan thu PPE (trang bi bao ho ca nhan): gan tung box PPE (non bao
+ho, ao phan quang...) cho dung nguoi, roi xem moi nguoi con thieu mon nao.
 
-Day la cach lam chung, dung khi model chi co class PPE "duong tinh" (Hardhat,
-Safety Vest...) + person. Neu dataset/model ban dung da co san class "vi pham"
-rieng (NO-Hardhat, NO-Safety Vest...), khong can dung ham nay — chi can doc
-thang cac box thuoc class do tu ket qua detect.
+Moi mon PPE chi duoc tinh khi nam dung VUNG co the tuong ung tren box nguoi:
+non o vung dau, ao o vung than. Ti le chong lan tinh theo dien tich box PPE
+(bao nhieu phan cai non nam trong vung dau), KHONG theo dien tich box nguoi —
+vi non chi chiem ~3-5% box nguoi, chia theo box nguoi thi khong bao gio dat
+nguong va moi nguoi deu bi bao vi pham.
+
+Neu dataset co class "vi pham" rieng (NO-Hardhat...), khong can dua vao day:
+nguoi khong duoc gan box PPE "duong tinh" nao da duoc tinh la thieu.
 """
-import torch
+from dataclasses import dataclass
+
+import numpy as np
+
+# Vung tinh theo ti le chieu cao box nguoi, tinh tu canh tren (0) xuong canh
+# duoi (1). Vung dau bat dau tu -0.1 vi non hay nho ra khoi canh tren box nguoi.
+HEAD_REGION = (-0.1, 0.35)
+TORSO_REGION = (0.15, 0.7)
 
 
-def check_ppe_compliance(
-    boxes,
-    person_cls: int,
-    required_cls: list[int],
-    overlap_thresh: float = 0.1,
-) -> dict[int, bool]:
-    """Tra ve dict {chi so box nguoi (trong boxes): True neu vi pham (thieu PPE)}.
+@dataclass(frozen=True)
+class PPERule:
+    name: str  # ten mon PPE, vd "hardhat"
+    cls_id: int  # class id cua mon PPE trong model
+    region: tuple[float, float]  # (tu, den) theo ti le chieu cao box nguoi
 
-    overlap_thresh thap (mac dinh 0.1) vi non bao ho/ao phan quang thuong chi
-    chiem 1 phan nho dien tich box nguoi (vung dau, vai) — khac voi nguong loc
-    trung lap vat the toan than (vd 0.5) dung o noi khac trong project.
+
+def _region_boxes(person_xyxy: np.ndarray, region: tuple[float, float]) -> np.ndarray:
+    """Cat box nguoi theo chieu doc thanh vung con (dau/than), giu nguyen chieu ngang."""
+    x1, y1, x2, y2 = person_xyxy.T
+    h = y2 - y1
+    return np.stack([x1, y1 + h * region[0], x2, y1 + h * region[1]], axis=1)
+
+
+def _inside_ratio(regions: np.ndarray, ppe_xyxy: np.ndarray) -> np.ndarray:
+    """Ma tran (so vung, so PPE): ti le dien tich moi box PPE nam trong moi vung."""
+    ix1 = np.maximum(regions[:, None, 0], ppe_xyxy[None, :, 0])
+    iy1 = np.maximum(regions[:, None, 1], ppe_xyxy[None, :, 1])
+    ix2 = np.minimum(regions[:, None, 2], ppe_xyxy[None, :, 2])
+    iy2 = np.minimum(regions[:, None, 3], ppe_xyxy[None, :, 3])
+    inter = np.clip(ix2 - ix1, 0, None) * np.clip(iy2 - iy1, 0, None)
+    ppe_area = (ppe_xyxy[:, 2] - ppe_xyxy[:, 0]) * (ppe_xyxy[:, 3] - ppe_xyxy[:, 1])
+    return np.divide(inter, ppe_area[None, :], out=np.zeros_like(inter), where=ppe_area[None, :] > 0)
+
+
+def assign_ppe(
+    person_xyxy: np.ndarray,
+    det_xyxy: np.ndarray,
+    det_cls: np.ndarray,
+    rules: list[PPERule],
+    min_inside: float = 0.5,
+) -> list[dict[str, bool]]:
+    """Tra ve list (cung thu tu person_xyxy) cac dict {ten PPE: True neu co}.
+
+    Moi box PPE chi duoc gan cho 1 nguoi — nguoi co vung tuong ung chua phan
+    lon box do nhat — de khi 2 nguoi dung sat nhau, non cua nguoi nay khong bi
+    tinh luon cho nguoi kia.
     """
-    if boxes is None or len(boxes) == 0:
-        return {}
+    person_xyxy = np.asarray(person_xyxy, dtype=np.float32).reshape(-1, 4)
+    det_xyxy = np.asarray(det_xyxy, dtype=np.float32).reshape(-1, 4)
+    det_cls = np.asarray(det_cls).reshape(-1)
 
-    cls, xyxy = boxes.cls, boxes.xyxy
-    person_idx = (cls == person_cls).nonzero(as_tuple=True)[0]
+    status = [{rule.name: False for rule in rules} for _ in range(len(person_xyxy))]
+    if len(person_xyxy) == 0:
+        return status
 
-    ppe_mask = torch.zeros_like(cls, dtype=torch.bool)
-    for c in required_cls:
-        ppe_mask |= cls == c
-    ppe_idx = ppe_mask.nonzero(as_tuple=True)[0]
+    for rule in rules:
+        ppe_xyxy = det_xyxy[det_cls == rule.cls_id]
+        if len(ppe_xyxy) == 0:
+            continue
+        ratio = _inside_ratio(_region_boxes(person_xyxy, rule.region), ppe_xyxy)
+        best_person = ratio.argmax(axis=0)
+        best_ratio = ratio.max(axis=0)
+        for p in best_person[best_ratio >= min_inside]:
+            status[p][rule.name] = True
+    return status
 
-    result: dict[int, bool] = {}
-    for i in person_idx:
-        box = xyxy[i]
-        area = (box[2] - box[0]) * (box[3] - box[1])
-        has_ppe = False
-        if area > 0 and len(ppe_idx) > 0:
-            ix1 = torch.maximum(box[0], xyxy[ppe_idx, 0])
-            iy1 = torch.maximum(box[1], xyxy[ppe_idx, 1])
-            ix2 = torch.minimum(box[2], xyxy[ppe_idx, 2])
-            iy2 = torch.minimum(box[3], xyxy[ppe_idx, 3])
-            inter = (ix2 - ix1).clamp(min=0) * (iy2 - iy1).clamp(min=0)
-            has_ppe = bool((inter / area).max() > overlap_thresh)
-        result[int(i)] = not has_ppe
-    return result
+
+def missing_ppe(status: dict[str, bool]) -> list[str]:
+    """Ten cac mon PPE con thieu cua 1 nguoi, tu 1 phan tu ket qua assign_ppe()."""
+    return [name for name, ok in status.items() if not ok]
