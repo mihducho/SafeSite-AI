@@ -62,7 +62,7 @@ tests/
 .venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\ten_video.mp4 --camera camera_1
 
 # 3b. Demo đầy đủ PPE + vùng nguy hiểm với model PPE đã fine-tune (class theo configs\data_ppe.yaml)
-.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\ten_video.mp4 --camera camera_1 --weights best_ppe.pt --person-cls 5 --hardhat-cls 0 --vest-cls 6
+.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\ten_video.mp4 --camera camera_1 --weights weights\ppe_s\weights\best.pt --person-cls 3 --hardhat-cls 7 --vest-cls 1
 
 # Chạy test logic PPE + vùng nguy hiểm
 .venv\Scripts\python.exe -m unittest discover -s tests -v
@@ -80,7 +80,9 @@ Hạn bảo vệ: tháng 1/2027.
 - [x] Phase 1: Detection + Tracking baseline chạy trên video mẫu (tái dùng từ đề tài cũ)
 - [ ] Phase 2: Fine-tune detection PPE (nón bảo hộ, áo phản quang) trên dataset công khai + dữ liệu riêng
   - [x] Logic gán PPE cho từng người theo vùng đầu/thân (có unit test)
-  - [ ] Chọn dataset, train từ yolo11s trên Colab, chạy thử trên video thật
+  - [x] Train yolo11s trên Colab (Roboflow construction-site-safety v3): mAP50 test 0.833;
+        Person 0.910, Safety-Vest 0.852, Hardhat 0.810 — chi tiết `docs/ket_qua_model_ppe.md`
+  - [ ] Chạy thử trên video có người đội nón / mặc áo phản quang
 - [ ] Phase 3: Hệ thống cảnh báo + demo multi-camera
   - [x] Vẽ vùng nguy hiểm, phát hiện xâm nhập theo điểm chân, xuất video có vẽ kết quả
   - [ ] Làm mượt theo thời gian + chống báo lặp, nhiều vùng/camera, chạy song song 2-3 camera, dashboard

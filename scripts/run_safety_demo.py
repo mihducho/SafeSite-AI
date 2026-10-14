@@ -6,7 +6,7 @@ Chay voi model goc COCO (chi kiem tra vung nguy hiem, chua co PPE):
     .venv\\Scripts\\python.exe scripts\\run_safety_demo.py --source data\\raw\\ten_video.mp4 --camera camera_1
 Chay voi model PPE da fine-tune (class theo configs/data_ppe.yaml):
     .venv\\Scripts\\python.exe scripts\\run_safety_demo.py --source data\\raw\\ten_video.mp4 --camera camera_1 \\
-        --weights best_ppe.pt --person-cls 5 --hardhat-cls 0 --vest-cls 6
+        --weights weights\\ppe_s\\weights\\best.pt --person-cls 3 --hardhat-cls 7 --vest-cls 1
 """
 import argparse
 import sys
@@ -51,7 +51,7 @@ def main():
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--tracker", type=str, default=str(DEFAULT_TRACKER))
     parser.add_argument("--zones-file", type=str, default=str(DEFAULT_ZONES))
-    parser.add_argument("--person-cls", type=int, default=0, help="Class id cua nguoi (COCO: 0, data_ppe.yaml: 5).")
+    parser.add_argument("--person-cls", type=int, default=0, help="Class id cua nguoi (COCO: 0, data_ppe.yaml: 3).")
     parser.add_argument("--hardhat-cls", type=int, default=None, help="Class id non bao ho. Bo trong = khong kiem tra non.")
     parser.add_argument("--vest-cls", type=int, default=None, help="Class id ao phan quang. Bo trong = khong kiem tra ao.")
     parser.add_argument("--show", action="store_true", help="Hien cua so xem truc tiep (bam q de dung).")

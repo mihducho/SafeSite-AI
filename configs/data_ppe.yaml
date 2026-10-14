@@ -1,32 +1,29 @@
 # Cau hinh dataset de fine-tune YOLO phat hien PPE (trang bi bao ho ca nhan).
 #
-# Khuyen nghi: thay vi gan nhan tu dau, tim dataset PPE co san tren Roboflow
-# Universe (vd tu khoa "construction site safety" / "PPE detection" /
-# "hard hat workers") — da co san hang nghin anh gan nhan, xuat thang duoc
-# dinh dang YOLOv11. Chi gan nhan them du lieu cua ban (Buoc 1-2 trong huong
-# dan) de bo sung cac truong hop dac thu (goc camera, moi truong rieng).
+# Dataset dang dung: Roboflow Universe "construction-site-safety-rmep1" v3
+# (workspace 007-kd2zw, license CC BY 4.0):
+#   https://universe.roboflow.com/007-kd2zw/construction-site-safety-rmep1/dataset/3
+# Huong dan train tren Colab: docs/huong_dan_train_ppe.md
+# Model da train (yolo11s, 100 epoch): weights/ppe_s/weights/best.pt (khong commit)
 #
-# Sau khi tai/gan nhan xong, giai nen vao data/processed/dataset_ppe/ theo
-# cau truc:
-#   data/processed/dataset_ppe/train/images/*.jpg
-#   data/processed/dataset_ppe/train/labels/*.txt
-#   data/processed/dataset_ppe/val/images/*.jpg
-#   data/processed/dataset_ppe/val/labels/*.txt
-# roi train: python scripts/train.py --data configs/data_ppe.yaml --weights yolo11n.pt
+# Khi train local, tai dataset dinh dang YOLOv11 va giai nen vao
+# data/processed/dataset_ppe/ (train/, valid/, test/ moi thu muc co images/ + labels/).
 
 path: ../data/processed/dataset_ppe # thu muc goc dataset, tuong doi so voi file yaml nay
 train: train/images
-val: val/images
+val: valid/images
+test: test/images
 
-# Danh sach class vi du theo dataset "Construction Site Safety" pho bien tren
-# Roboflow Universe — doi lai dung theo dataset ban thuc te su dung.
+# Thu tu class PHAI giu dung nhu luc train — run_safety_demo.py dung class id:
+#   --person-cls 3 --hardhat-cls 7 --vest-cls 1
 names:
-  0: Hardhat
-  1: Mask
-  2: NO-Hardhat
-  3: NO-Mask
-  4: NO-Safety Vest
-  5: Person
-  6: Safety Vest
-  7: machinery
-  8: vehicle
+  0: Mask
+  1: Safety-Vest
+  2: NO-Safety-Vest
+  3: Person
+  4: machinery
+  5: Safety-Cone
+  6: vehicle
+  7: Hardhat
+  8: NO-Mask
+  9: NO-Hardhat
