@@ -3,7 +3,33 @@ tracker gan ID. Dung nhu callback 'on_predict_postprocess_end' cua Ultralytics â
 callback nay chay ngay sau khi model detect xong va truoc khi tracker/luu video,
 nen sua boxes o day se anh huong ca ket qua tracking lan video luu ra.
 """
+import numpy as np
 import torch
+
+
+def suppress_contained(xyxy: np.ndarray, contain_thresh: float = 0.8) -> np.ndarray:
+    """Mask giu lai cac box KHONG nam gan tron trong 1 box lon hon cung class.
+
+    Model hay ve 2 box "Person" cho 1 nguoi dang cui/bi che (1 box ca nguoi +
+    1 box nho ben trong). NMS cua YOLO khong loai duoc vi IoU giua 2 box chi
+    ~0.5. Neu khong loai, non bi gan cho box nay, ao cho box kia -> ca 2 "nguoi"
+    deu bi bao thieu PPE, va tracker cap them ID.
+
+    Box bi bo neu >= contain_thresh dien tich cua no nam trong 1 box khac co
+    dien tich lon hon. Nguong cao (0.8) de nguoi dung sau, bi che 1 phan, van
+    duoc giu.
+    """
+    xyxy = np.asarray(xyxy, dtype=np.float32).reshape(-1, 4)
+    area = (xyxy[:, 2] - xyxy[:, 0]) * (xyxy[:, 3] - xyxy[:, 1])
+    ix1 = np.maximum(xyxy[:, None, 0], xyxy[None, :, 0])
+    iy1 = np.maximum(xyxy[:, None, 1], xyxy[None, :, 1])
+    ix2 = np.minimum(xyxy[:, None, 2], xyxy[None, :, 2])
+    iy2 = np.minimum(xyxy[:, None, 3], xyxy[None, :, 3])
+    inter = np.clip(ix2 - ix1, 0, None) * np.clip(iy2 - iy1, 0, None)
+    # contained[i, j]: ti le dien tich box i nam trong box j
+    contained = np.divide(inter, area[:, None], out=np.zeros_like(inter), where=area[:, None] > 0)
+    inside_bigger = (contained >= contain_thresh) & (area[None, :] > area[:, None])
+    return ~inside_bigger.any(axis=1)
 
 
 def make_class_overlap_filter(keep_class: int, ref_classes: list[int], overlap_thresh: float = 0.5):

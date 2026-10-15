@@ -14,12 +14,14 @@ import time
 from pathlib import Path
 
 import cv2
+import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.detection.detect import load_model
+from src.detection.detect import detect, load_model
 from src.ppe.compliance import HEAD_REGION, TORSO_REGION, PPERule, assign_ppe, missing_ppe
-from src.tracking.tracker import track
+from src.tracking.tracker import PersonTracker
+from src.utils.postprocess import suppress_contained
 from src.utils.visualize import draw_header, draw_person, draw_zone
 from src.zone.zone import load_zones, person_feet_point, point_in_zone
 
@@ -48,7 +50,9 @@ def main():
     parser.add_argument("--camera", type=str, default=None, help="Ten camera, de lay dung vung nguy hiem trong zones.yaml.")
     parser.add_argument("--weights", type=str, default=None, help="Weight model. Mac dinh yolo11n.pt (COCO, chua co PPE).")
     parser.add_argument("--conf", type=float, default=0.35)
-    parser.add_argument("--imgsz", type=int, default=640)
+    # 960 thay vi 640: video 720p tro len bi thu nho it hon, nguoi o xa va ao phan quang
+    # duoc phat hien tot hon (thu tren video cong truong), doi lai cham hon.
+    parser.add_argument("--imgsz", type=int, default=960, help="Kich thuoc anh dua vao model (mac dinh 960).")
     parser.add_argument("--tracker", type=str, default=str(DEFAULT_TRACKER))
     parser.add_argument("--zones-file", type=str, default=str(DEFAULT_ZONES))
     parser.add_argument("--person-cls", type=int, default=0, help="Class id cua nguoi (COCO: 0, data_ppe.yaml: 3).")
@@ -82,7 +86,9 @@ def main():
 
     model = load_model(args.weights) if args.weights else load_model()
     classes = [args.person_cls] + [r.cls_id for r in rules]
-    results = track(model, source=args.source, tracker=args.tracker, conf=args.conf, imgsz=args.imgsz, classes=classes, verbose=False)
+    # Detect tung frame (giu nguyen moi box PPE), chi box nguoi duoc dua vao tracker.
+    results = detect(model, source=args.source, conf=args.conf, classes=classes, imgsz=args.imgsz, stream=True, verbose=False)
+    tracker = PersonTracker(args.tracker)
 
     n_frames = 0
     ppe_ids: set[int] = set()
@@ -98,14 +104,14 @@ def main():
             draw_zone(frame, zone_polygon)
 
         boxes = r.boxes
-        if boxes is not None and len(boxes) > 0:
+        person_boxes = boxes[boxes.cls == args.person_cls]
+        keep = suppress_contained(person_boxes.xyxy.cpu().numpy())  # bo box nguoi trung lap
+        person_boxes = person_boxes[torch.as_tensor(keep, device=person_boxes.data.device)]
+        person_ids = tracker.update(person_boxes, r.orig_img)
+        if len(person_boxes) > 0:
             xyxy = boxes.xyxy.cpu().numpy()
             cls = boxes.cls.cpu().numpy().astype(int)
-            ids = boxes.id.int().cpu().tolist() if boxes.id is not None else [None] * len(boxes)
-
-            person_mask = cls == args.person_cls
-            person_xyxy = xyxy[person_mask]
-            person_ids = [i for i, m in zip(ids, person_mask) if m]
+            person_xyxy = person_boxes.xyxy.cpu().numpy()
             ppe_status = assign_ppe(person_xyxy, xyxy, cls, rules) if rules else [{}] * len(person_xyxy)
 
             for box, tid, status in zip(person_xyxy, person_ids, ppe_status):

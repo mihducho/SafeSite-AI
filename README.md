@@ -82,10 +82,13 @@ Hạn bảo vệ: tháng 1/2027.
   - [x] Logic gán PPE cho từng người theo vùng đầu/thân (có unit test)
   - [x] Train yolo11s trên Colab (Roboflow construction-site-safety v3): mAP50 test 0.833;
         Person 0.910, Safety-Vest 0.852, Hardhat 0.810 — chi tiết `docs/ket_qua_model_ppe.md`
-  - [ ] Chạy thử trên video có người đội nón / mặc áo phản quang
+  - [x] Chạy thử trên video công trường; sửa pipeline (tracker chỉ theo dõi người, bỏ box
+        người trùng, xử lý tư thế cúi): báo nhầm trên test6 giảm 28.4% → 8.1%
+  - [ ] Bổ sung dữ liệu (nón trắng, áo cam/đỏ, người ở xa/quay lưng) và train tiếp
 - [ ] Phase 3: Hệ thống cảnh báo + demo multi-camera
   - [x] Vẽ vùng nguy hiểm, phát hiện xâm nhập theo điểm chân, xuất video có vẽ kết quả
-  - [ ] Làm mượt theo thời gian + chống báo lặp, nhiều vùng/camera, chạy song song 2-3 camera, dashboard
+  - [ ] **Tiếp theo:** làm mượt theo thời gian + đếm theo sự kiện; ngưỡng conf riêng cho nón/áo
+  - [ ] Chống báo lặp, nhiều vùng/camera, chạy song song 2-3 camera, dashboard
 - [ ] Phase 4: Đánh giá, viết luận văn
 
 Ghi chú thử nghiệm trên video camera gia đình (chỉ để kiểm tra detect + tracking người):

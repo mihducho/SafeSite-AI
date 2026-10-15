@@ -1,13 +1,40 @@
-# Dinh nghia vung nguy hiem theo tung camera. Moi camera la 1 danh sach diem
-# (x, y) theo pixel cua khung hinh, noi lai thanh da giac khep kin.
-#
-# Dung scripts/define_zone.py de click chuot tren 1 frame mau va tu dong
-# sinh toa do, thay vi go tay:
+# Dinh nghia vung nguy hiem theo tung camera: danh sach diem (x, y) theo pixel
+# cua khung hinh goc, noi lai thanh da giac khep kin. File nay duoc ghi tu dong
+# boi scripts/define_zone.py (click chuot tren 1 frame mau), khong can go tay:
 #   .venv\Scripts\python.exe scripts\define_zone.py --source data\raw\ten_video.mp4 --camera camera_1
-#
-# Vi du dinh dang sau khi luu:
-# camera_1:
-#   - [100, 400]
-#   - [500, 400]
-#   - [500, 600]
-#   - [100, 600]
+camera_1:
+- - 529
+  - 206
+- - 469
+  - 339
+- - 662
+  - 360
+- - 689
+  - 230
+camera_5:
+- - 2098
+  - 1342
+- - 2942
+  - 1402
+- - 2915
+  - 1822
+- - 2263
+  - 1951
+camera_6:
+- - 2913
+  - 966
+- - 3015
+  - 1638
+- - 3528
+  - 1200
+- - 3462
+  - 966
+camera_7:
+- - 2662
+  - 1099
+- - 2413
+  - 1714
+- - 3146
+  - 1729
+- - 3326
+  - 1402

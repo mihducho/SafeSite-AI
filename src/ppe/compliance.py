@@ -18,6 +18,12 @@ import numpy as np
 # duoi (1). Vung dau bat dau tu -0.1 vi non hay nho ra khoi canh tren box nguoi.
 HEAD_REGION = (-0.1, 0.35)
 TORSO_REGION = (0.15, 0.7)
+# Box nguoi co cao/rong duoi nguong nay (nguoi cui gap, ngoi xom, bo) thi dau
+# va than khong con nam theo chieu doc nhu khi dung — vd nguoi cui: dau o giua
+# canh ben. Khi do bo vung dau/than, dung ca box nguoi. Nguoi dung thang co ti
+# le ~2-3 nen van giu quy tac chat (non cam o chan khong duoc tinh).
+UPRIGHT_MIN_RATIO = 1.0
+WHOLE_BOX_REGION = (-0.1, 1.0)
 
 
 @dataclass(frozen=True)
@@ -66,11 +72,17 @@ def assign_ppe(
     if len(person_xyxy) == 0:
         return status
 
+    h = person_xyxy[:, 3] - person_xyxy[:, 1]
+    w = person_xyxy[:, 2] - person_xyxy[:, 0]
+    not_upright = h < UPRIGHT_MIN_RATIO * w
+
     for rule in rules:
         ppe_xyxy = det_xyxy[det_cls == rule.cls_id]
         if len(ppe_xyxy) == 0:
             continue
-        ratio = _inside_ratio(_region_boxes(person_xyxy, rule.region), ppe_xyxy)
+        regions = _region_boxes(person_xyxy, rule.region)
+        regions[not_upright] = _region_boxes(person_xyxy[not_upright], WHOLE_BOX_REGION)
+        ratio = _inside_ratio(regions, ppe_xyxy)
         best_person = ratio.argmax(axis=0)
         best_ratio = ratio.max(axis=0)
         for p in best_person[best_ratio >= min_inside]:

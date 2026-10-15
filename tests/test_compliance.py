@@ -63,6 +63,19 @@ class AssignPPETest(unittest.TestCase):
         status = run([left, right], [(HAT_ON_HEAD, HARDHAT), (right_hat, HARDHAT)])
         self.assertEqual([s["hardhat"] for s in status], [True, True])
 
+    def test_bending_person_hardhat_counts(self):
+        # Truong hop thuc te (test6): nguoi cui gap, box rong hon cao, dau o giua
+        # canh phai — non nam y 0.11..0.63, x 0.75..1.00 cua box nguoi.
+        bending = [100, 100, 500, 330]
+        hat = [400, 125, 500, 245]
+        vest = [220, 150, 380, 300]
+        status = run([bending], [(hat, HARDHAT), (vest, VEST)])
+        self.assertEqual(status, [{"hardhat": True, "vest": True}])
+
+    def test_bending_person_without_ppe_still_flagged(self):
+        status = run([[100, 100, 500, 330]], [])
+        self.assertEqual(missing_ppe(status[0]), ["hardhat", "vest"])
+
     def test_no_person(self):
         self.assertEqual(run(np.zeros((0, 4)), [(HAT_ON_HEAD, HARDHAT)]), [])
 

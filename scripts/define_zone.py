@@ -15,6 +15,16 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ZONES = ROOT / "configs" / "zones.yaml"
+# Frame lon hon khung nay (vd video 4K) duoc thu nho khi hien thi de vua man hinh;
+# toa do click duoc quy doi nguoc ve kich thuoc goc truoc khi luu.
+MAX_DISPLAY = (1280, 720)
+# yaml.safe_dump xoa het comment trong file, nen ghi lai phan huong dan moi lan luu.
+ZONES_HEADER = """\
+# Dinh nghia vung nguy hiem theo tung camera: danh sach diem (x, y) theo pixel
+# cua khung hinh goc, noi lai thanh da giac khep kin. File nay duoc ghi tu dong
+# boi scripts/define_zone.py (click chuot tren 1 frame mau), khong can go tay:
+#   .venv\\Scripts\\python.exe scripts\\define_zone.py --source data\\raw\\ten_video.mp4 --camera camera_1
+"""
 
 
 def save_zone(path: Path, camera: str, points: list[list[int]]) -> None:
@@ -22,8 +32,9 @@ def save_zone(path: Path, camera: str, points: list[list[int]]) -> None:
     if path.exists():
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
-    data[camera] = [[int(x), int(y)] for x, y in points]
+    data[camera] = [[round(x), round(y)] for x, y in points]
     with open(path, "w", encoding="utf-8") as f:
+        f.write(ZONES_HEADER)
         yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
 
 
@@ -42,7 +53,11 @@ def main():
     if not ok:
         raise RuntimeError(f"Khong doc duoc frame {args.frame_idx} tu {args.source}")
 
-    points: list[list[int]] = []
+    h, w = frame.shape[:2]
+    scale = min(MAX_DISPLAY[0] / w, MAX_DISPLAY[1] / h, 1.0)
+    frame = cv2.resize(frame, (round(w * scale), round(h * scale))) if scale < 1 else frame
+
+    points: list[list[int]] = []  # toa do tren frame hien thi (da thu nho)
 
     def on_click(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
@@ -67,7 +82,7 @@ def main():
             if len(points) < 3:
                 print("Can toi thieu 3 diem de tao thanh 1 vung.")
                 continue
-            save_zone(Path(args.zones_file), args.camera, points)
+            save_zone(Path(args.zones_file), args.camera, [[x / scale, y / scale] for x, y in points])
             print(f"Da luu vung '{args.camera}' voi {len(points)} diem vao {args.zones_file}")
             break
         elif key == ord("q"):
