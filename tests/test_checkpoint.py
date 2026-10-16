@@ -13,62 +13,12 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src.checkpoint.detector import Detections
 from src.checkpoint.evaluate import DAT, KHONG_CO_NGUOI, KHONG_DAT, KHONG_XAC_DINH, NHIEU_NGUOI, evaluate_frames
-from src.config import load_settings
-
-MODEL_NAMES = {0: "Mask", 1: "Safety-Vest", 2: "NO-Safety-Vest", 3: "Person", 4: "machinery",
-               5: "Safety-Cone", 6: "vehicle", 7: "Hardhat", 8: "NO-Mask", 9: "NO-Hardhat"}
-CLS = {name: idx for idx, name in MODEL_NAMES.items()}
-
-# Co dinh cac nguong test dua vao (bang gia tri mac dinh trong DE_TAI.md muc 5), de
-# hieu chinh settings.yaml o Giai doan 2 khong lam hong test cua thuat toan.
-SETTINGS = copy.deepcopy(load_settings())
-SETTINGS["checkpoint"].update(min_person_height_px=150, top_edge_margin_px=2, min_valid_frames=3,
-                              present_ratio=0.6, absent_ratio=0.2)
-REQUIRED = ["hardhat", "vest"]
-
-FRAME = np.zeros((720, 1280, 3), dtype=np.uint8)
-# Vung kiem tra ti le 0-1 -> pixel: x 320..960, y 360..720 (nua duoi, o giua khung).
-ZONE = [[0.25, 0.5], [0.75, 0.5], [0.75, 1.0], [0.25, 1.0]]
-
-# 1 nguoi dung thang trong vung: cao 550px, diem chan (600, 650) nam trong vung.
-PERSON = [500, 100, 700, 650]
-HAT = [560, 80, 640, 150]  # vung dau
-VEST = [520, 220, 680, 450]  # vung than
-PERSON_2 = [750, 120, 900, 650]  # nguoi thu 2 cung trong vung (chan (825, 650))
-HEAD_CUT = [500, 0, 700, 650]  # mep tren cham mep tren khung
-SMALL = [600, 520, 640, 660]  # cao 140px < 150
-OUTSIDE = [50, 100, 200, 300]  # chan (125, 300) ngoai vung
-
-
-def dets(*boxes) -> Detections:
-    """boxes: cac cap (xyxy, ten lop)."""
-    if not boxes:
-        return Detections(np.zeros((0, 4), np.float32), np.zeros(0, int))
-    return Detections(np.array([b for b, _ in boxes], np.float32), np.array([CLS[n] for _, n in boxes]))
-
-
-FULL = dets((PERSON, "Person"), (HAT, "Hardhat"), (VEST, "Safety-Vest"))
-NO_HAT = dets((PERSON, "Person"), (VEST, "Safety-Vest"))
-NO_VEST = dets((PERSON, "Person"), (HAT, "Hardhat"))
-BARE = dets((PERSON, "Person"))
-TWO = dets((PERSON, "Person"), (HAT, "Hardhat"), (VEST, "Safety-Vest"), (PERSON_2, "Person"))
-EMPTY = dets()
-
-
-class FakeDetector:
-    """Tra ve lan luot cac Detections trong script, moi lan goi la 1 khung."""
-
-    def __init__(self, script, names=MODEL_NAMES):
-        self.script, self.names, self.i = list(script), names, 0
-
-    def __call__(self, frame):
-        d = self.script[self.i]
-        self.i += 1
-        return d
-
+# Box gia, bo phat hien gia, nguong co dinh: dung chung voi test_check.py (tests/fakes.py).
+from fakes import (BARE, EMPTY, FRAME, FULL, HAT, HEAD_CUT, NO_HAT, NO_VEST, OUTSIDE, PERSON, REQUIRED,
+                   SETTINGS, SMALL, TWO, VEST, ZONE, FakeDetector, dets)
 
 def run(script, zone=ZONE, required=REQUIRED, settings=SETTINGS):
     return evaluate_frames([FRAME] * len(script), zone, required, settings, detector=FakeDetector(script))

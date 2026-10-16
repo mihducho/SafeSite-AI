@@ -6,7 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.zone.zone import load_zones, person_feet_point, point_in_zone, zone_to_pixels
+from src.zone.zone import (clicks_to_ratio, load_gate_zone, load_gates, load_zones, person_feet_point,
+                           point_in_zone, save_gate_zone, zone_to_pixels)
 
 ZONE_YAML = """
 camera_1:
@@ -42,6 +43,51 @@ class ZoneTest(unittest.TestCase):
     def test_comment_only_file_returns_empty(self):
         self.path.write_text("# chi co comment\n", encoding="utf-8")
         self.assertEqual(load_zones(self.path), {})
+
+
+class GateZoneFileTest(unittest.TestCase):
+    """Doc/ghi vung ti le 0-1 trong file cong (configs/gates.yaml)."""
+
+    ZONE = [[0.25, 0.5], [0.75, 0.5], [0.75, 1.0], [0.25, 1.0]]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "gates.yaml"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_save_then_load(self):
+        save_gate_zone(self.path, "cong_1", self.ZONE)
+        self.assertEqual(load_gate_zone(self.path, "cong_1"), self.ZONE)
+
+    def test_header_comment_kept(self):
+        save_gate_zone(self.path, "cong_1", self.ZONE)
+        save_gate_zone(self.path, "cong_1", self.ZONE)
+        self.assertTrue(self.path.read_text(encoding="utf-8").startswith("# Vung kiem tra"))
+
+    def test_other_gates_kept_and_overwrite(self):
+        save_gate_zone(self.path, "cong_1", self.ZONE)
+        save_gate_zone(self.path, "cong_2", [[0, 0], [1, 0], [1, 1]])
+        save_gate_zone(self.path, "cong_1", [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]])
+        gates = load_gates(self.path)
+        self.assertEqual(set(gates), {"cong_1", "cong_2"})
+        self.assertEqual(gates["cong_1"]["zone"], [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]])
+
+    def test_pixel_coordinates_not_saved(self):
+        with self.assertRaises(ValueError):
+            save_gate_zone(self.path, "cong_1", [[100, 400], [500, 400], [500, 600]])
+        self.assertFalse(self.path.exists())
+
+    def test_missing_gate_lists_available(self):
+        save_gate_zone(self.path, "cong_1", self.ZONE)
+        with self.assertRaisesRegex(KeyError, "cong_1"):
+            load_gate_zone(self.path, "cong_9")
+
+    def test_clicks_to_ratio(self):
+        # Click tren anh hien thi 1280x720 (anh 4K da thu nho): ti le khong phu thuoc do phan giai goc.
+        self.assertEqual(clicks_to_ratio([[320, 360], [960, 720], [1290, -5]], 1280, 720),
+                         [[0.25, 0.5], [0.75, 1.0], [1.0, 0.0]])  # click lo ra ngoai anh bi kep ve 0-1
 
 
 class ZoneToPixelsTest(unittest.TestCase):

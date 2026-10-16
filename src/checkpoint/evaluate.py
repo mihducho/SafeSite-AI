@@ -138,31 +138,82 @@ def aggregate(results: list[FrameResult], required: list[str], settings: dict) -
     return out
 
 
-def _snapshot(frames: list, results: list[FrameResult], zone_px_list: list, items: dict, quality: int) -> bytes:
-    """Anh JPEG: khung hop le co nguoi lon nhat (khong co thi khung co nguoi lon nhat,
-    khong co nua thi khung cuoi), ve vung kiem tra va khung nhan dien."""
-    def area(b):
-        return float((b[2] - b[0]) * (b[3] - b[1]))
+class SnapshotPicker:
+    """Chon khung de chup anh khi duyet lan luot tung khung, chi giu 1 khung trong bo nho:
+    khung hop le co nguoi lon nhat; khong co thi khung co nguoi lon nhat; khong co nua thi khung cuoi."""
 
-    valid = [i for i, r in enumerate(results) if r.kind == HOP_LE]
-    with_person = [i for i, r in enumerate(results) if len(r.zone_persons)]
-    pool = valid or with_person
-    idx = max(pool, key=lambda i: max(area(b) for b in results[i].zone_persons)) if pool else len(frames) - 1
+    def __init__(self):
+        self.key = None
+        self.frame = self.result = self.zone_px = None
 
-    img = frames[idx].copy()
-    r = results[idx]
-    if zone_px_list[idx] is not None:
-        draw_zone(img, zone_px_list[idx], color=YELLOW)
-    for box in r.zone_persons:
-        if r.kind == HOP_LE:
-            labels = [items[name]["missing_code"].replace("_", " ").upper() for name, ok in r.ppe.items() if not ok]
-        elif r.kind == KHONG_HOP_LE:
-            labels = [r.reason.replace("_", " ").upper()]
-        else:
-            labels = ["NHIEU NGUOI"] if r.kind == NHIEU else []
-        draw_person(img, box, "", labels)
-    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
-    return buf.tobytes() if ok else b""
+    def offer(self, frame: np.ndarray, result: FrameResult, zone_px: np.ndarray | None) -> None:
+        priority = 2 if result.kind == HOP_LE else (1 if len(result.zone_persons) else 0)
+        area = max((float((b[2] - b[0]) * (b[3] - b[1])) for b in result.zone_persons), default=0.0)
+        key = (priority, area)
+        # Bang nhau thi giu khung den truoc; rieng khung khong co nguoi thi lay khung sau cung.
+        if self.key is None or key > self.key or (priority == 0 and self.key[0] == 0):
+            self.key, self.frame, self.result, self.zone_px = key, frame, result, zone_px
+
+    def jpeg(self, items: dict, quality: int) -> bytes | None:
+        """Anh JPEG cua khung da chon, ve vung kiem tra va khung nhan dien."""
+        if self.frame is None:
+            return None
+        img, r = self.frame.copy(), self.result
+        if self.zone_px is not None:
+            draw_zone(img, self.zone_px, color=YELLOW)
+        for box in r.zone_persons:
+            if r.kind == HOP_LE:
+                labels = [items[name]["missing_code"].replace("_", " ").upper() for name, ok in r.ppe.items() if not ok]
+            elif r.kind == KHONG_HOP_LE:
+                labels = [r.reason.replace("_", " ").upper()]
+            else:
+                labels = ["NHIEU NGUOI"] if r.kind == NHIEU else []
+            draw_person(img, box, "", labels)
+        ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
+        return buf.tobytes() if ok else b""
+
+
+class FrameEvaluator:
+    """Phan dung chung cua evaluate_frames() va check() (DE_TAI muc 5): chuan bi luat 1 lan,
+    xet tung khung bang classify_frame ngay khi nhan, chon anh, roi tong hop bang aggregate.
+    Hai duong chay goi cung cac buoc nay nen cho ket qua giong nhau."""
+
+    def __init__(self, zone, required_ppe: list[str] | None, settings: dict, detector=None):
+        ppe_cfg = settings["ppe"]
+        self.required = list(ppe_cfg["required"] if required_ppe is None else required_ppe)
+        unknown = [name for name in self.required if name not in ppe_cfg["items"]]
+        if unknown:
+            raise ValueError(f"Mon bao ho chua khai bao trong ppe.items: {unknown}")
+        self.settings, self.zone = settings, zone
+        self.detector = detector if detector is not None else get_detector(settings)
+        person_class = settings["model"]["person_class"]
+        ids = find_class_ids(self.detector.names,
+                             [person_class] + [ppe_cfg["items"][n]["class_name"] for n in self.required])
+        self.person_cls = ids[person_class]
+        self.rules = rules_from_config(ppe_cfg, ids, self.required)
+        self.results: list[FrameResult] = []
+        self.picker = SnapshotPicker()
+        self._frame_ms: list[float] = []
+
+    def add(self, frame: np.ndarray) -> FrameResult:
+        """Buoc 1 cho 1 khung (detect + classify_frame), luu ket qua va ung vien anh chup."""
+        t = time.perf_counter()
+        h, w = frame.shape[:2]
+        zone_px = None if self.zone is None else zone_to_pixels(self.zone, w, h)
+        result = classify_frame(self.detector(frame), frame.shape, zone_px, self.person_cls, self.rules, self.settings)
+        self.results.append(result)
+        self.picker.offer(frame, result, zone_px)
+        self._frame_ms.append((time.perf_counter() - t) * 1000)
+        return result
+
+    def finish(self, t0: float) -> dict:
+        """Buoc 2 + anh JPEG + thoi gian (tinh tu t0 = luc bat dau luot kiem tra)."""
+        out = aggregate(self.results, self.required, self.settings)
+        out["anh_jpeg"] = self.picker.jpeg(self.settings["ppe"]["items"],
+                                           self.settings["checkpoint"]["snapshot_jpeg_quality"])
+        out["ms_moi_khung"] = round(sum(self._frame_ms) / len(self._frame_ms), 1) if self._frame_ms else None
+        out["thoi_gian_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        return out
 
 
 def evaluate_frames(
@@ -180,7 +231,8 @@ def evaluate_frames(
     detector: bo phat hien (xem detector.py); None = model YOLO trong cau hinh.
 
     Tra ve dict: ket_qua, thieu, ty_le_co_mat, so_khung, so_khung_hop_le,
-    dem_khung, ly_do, thoi_gian_ms, anh_jpeg (bytes; None neu khong co khung nao).
+    dem_khung, ly_do, thoi_gian_ms, ms_moi_khung (thoi gian TB xu ly 1 khung),
+    anh_jpeg (bytes; None neu khong co khung nao).
     """
     t0 = time.perf_counter()
     bad = [i for i, f in enumerate(frames) if not isinstance(f, np.ndarray) or f.ndim != 3]
@@ -188,26 +240,7 @@ def evaluate_frames(
         # Vd doc camera/video loi tra ve None: bao ro thay vi loi kho hieu ben trong.
         raise ValueError(f"Khung hinh khong hop le (None hoac khong phai anh BGR) o vi tri {bad}")
     settings = config if config is not None else load_settings()
-    ppe_cfg = settings["ppe"]
-    required = list(ppe_cfg["required"] if required_ppe is None else required_ppe)
-    unknown = [name for name in required if name not in ppe_cfg["items"]]
-    if unknown:
-        raise ValueError(f"Mon bao ho chua khai bao trong ppe.items: {unknown}")
-
-    detector = detector if detector is not None else get_detector(settings)
-    person_class = settings["model"]["person_class"]
-    ids = find_class_ids(detector.names, [person_class] + [ppe_cfg["items"][n]["class_name"] for n in required])
-    rules = rules_from_config(ppe_cfg, ids, required)
-
-    results, zone_px_list = [], []
+    evaluator = FrameEvaluator(zone, required_ppe, settings, detector)
     for frame in frames:
-        h, w = frame.shape[:2]
-        zone_px = None if zone is None else zone_to_pixels(zone, w, h)
-        zone_px_list.append(zone_px)
-        results.append(classify_frame(detector(frame), frame.shape, zone_px, ids[person_class], rules, settings))
-
-    out = aggregate(results, required, settings)
-    out["anh_jpeg"] = (_snapshot(frames, results, zone_px_list, ppe_cfg["items"],
-                                 settings["checkpoint"]["snapshot_jpeg_quality"]) if frames else None)
-    out["thoi_gian_ms"] = round((time.perf_counter() - t0) * 1000, 1)
-    return out
+        evaluator.add(frame)
+    return evaluator.finish(t0)

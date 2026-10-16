@@ -1,0 +1,16 @@
+# Vung kiem tra cua tung cong (luu tam, cho toi khi co bang `gates` trong co so du lieu).
+# zone: danh sach diem [x, y] dang TI LE 0-1 so voi chieu rong/chieu cao khung hinh,
+# noi lai thanh da giac khep kin. Ghi tu dong boi scripts/define_zone.py, khong can go tay:
+#   .venv\Scripts\python.exe scripts\define_zone.py --source <video | so webcam | URL> --gate cong_1
+cong_1:
+  zone:
+  - [0.1898, 0.0861]
+  - [0.7156, 0.0819]
+  - [0.7562, 0.9319]
+  - [0.182, 0.9375]
+cong_dt:
+  zone:
+  - [0.0094, 0.0236]
+  - [0.0039, 0.9333]
+  - [0.9867, 0.9319]
+  - [0.9891, 0.0194]

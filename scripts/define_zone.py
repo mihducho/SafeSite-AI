@@ -1,83 +1,88 @@
-"""Cong cu click chuot de ve vung nguy hiem (polygon) tren 1 frame cua video,
-roi luu toa do vao configs/zones.yaml.
+"""Click chuot ve VUNG KIEM TRA (da giac) cua 1 cong tren 1 khung hinh, luu dang
+ti le 0-1 so voi khung hinh vao configs/gates.yaml (paths.gates_file).
 
-Chay: .venv\\Scripts\\python.exe scripts\\define_zone.py --source data\\raw\\ten_video.mp4 --camera camera_1
+Chay:
+  .venv\\Scripts\\python.exe scripts\\define_zone.py --source data\\raw\\ten_video.mp4 --gate cong_1
+  .venv\\Scripts\\python.exe scripts\\define_zone.py --source 0 --gate cong_1                          (webcam)
+  .venv\\Scripts\\python.exe scripts\\define_zone.py --source http://192.168.1.23:8080/video --gate cong_1   (dien thoai)
 
-Cach dung: click lan luot cac diem tao thanh da giac (toi thieu 3 diem).
+Cach dung: click lan luot cac diem tao thanh da giac (toi thieu 3 diem). Vung nen
+bao phan SAN noi cong nhan dung (he thong xet DIEM CHAN cua nguoi).
   s = luu va thoat | r = ve lai tu dau | q = thoat khong luu
+Vung cu cua cong (neu co) hien mau xam de tham khao.
 """
 import argparse
 import sys
+import time
 from pathlib import Path
 
 import cv2
 import numpy as np
-import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.checkpoint.camera import CameraReader, open_capture, parse_source
 from src.config import load_settings
+from src.zone.zone import clicks_to_ratio, load_gates, save_gate_zone, zone_to_pixels
 
-# Frame lon hon khung nay (vd video 4K) duoc thu nho khi hien thi de vua man hinh;
-# toa do click duoc quy doi nguoc ve kich thuoc goc truoc khi luu.
+# Khung lon hon (vd 4K) duoc thu nho khi hien thi cho vua man hinh. Luu dang ti le
+# nen khong can quy doi nguoc: ti le tren anh thu nho = ti le tren anh goc.
 MAX_DISPLAY = (1280, 720)
-# yaml.safe_dump xoa het comment trong file, nen ghi lai phan huong dan moi lan luu.
-ZONES_HEADER = """\
-# Dinh nghia vung nguy hiem theo tung camera: danh sach diem (x, y) theo pixel
-# cua khung hinh goc, noi lai thanh da giac khep kin. File nay duoc ghi tu dong
-# boi scripts/define_zone.py (click chuot tren 1 frame mau), khong can go tay:
-#   .venv\\Scripts\\python.exe scripts\\define_zone.py --source data\\raw\\ten_video.mp4 --camera camera_1
-"""
+CAMERA_WARMUP_S = 1.5  # webcam/dien thoai: cho vai khung dau de camera tu chinh sang
 
 
-def save_zone(path: Path, camera: str, points: list[list[int]]) -> None:
-    data = {}
-    if path.exists():
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
-    data[camera] = [[round(x), round(y)] for x, y in points]
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(ZONES_HEADER)
-        yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+def grab_frame(source: str, frame_idx: int, cam_cfg: dict) -> np.ndarray:
+    src = parse_source(source)
+    if src.kind == "file":
+        cap = open_capture(src, cam_cfg)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ok, frame = cap.read()
+        cap.release()
+        if not ok:
+            raise RuntimeError(f"Khong doc duoc khung {frame_idx} tu {source}")
+        return frame
+    with CameraReader(source, cam_cfg) as cam:
+        time.sleep(CAMERA_WARMUP_S)
+        return cam.latest()[1]
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ve vung nguy hiem (polygon) tren 1 frame cua video.")
-    parser.add_argument("--source", type=str, required=True, help="Duong dan video de lay frame mau.")
-    parser.add_argument("--camera", type=str, required=True, help="Ten camera, dung lam khoa trong file vung.")
-    parser.add_argument("--zones-file", type=str, default=None, help="Mac dinh: paths.zones_file trong configs/settings.yaml.")
-    parser.add_argument("--frame-idx", type=int, default=0, help="Lay frame thu may trong video de ve (mac dinh frame dau).")
+    settings = load_settings()
+    parser = argparse.ArgumentParser(description="Ve vung kiem tra (da giac, ti le 0-1) cho 1 cong.")
+    parser.add_argument("--source", type=str, required=True, help="File video, so webcam (vd 0) hoac URL camera dien thoai.")
+    parser.add_argument("--gate", type=str, required=True, help="Ten cong, dung lam khoa trong file vung (vd cong_1).")
+    parser.add_argument("--gates-file", type=str, default=str(settings["paths"]["gates_file"]))
+    parser.add_argument("--frame-idx", type=int, default=0, help="File video: lay khung thu may de ve (mac dinh khung dau).")
     args = parser.parse_args()
-    if args.zones_file is None:
-        args.zones_file = str(load_settings()["paths"]["zones_file"])
 
-    cap = cv2.VideoCapture(args.source)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, args.frame_idx)
-    ok, frame = cap.read()
-    cap.release()
-    if not ok:
-        raise RuntimeError(f"Khong doc duoc frame {args.frame_idx} tu {args.source}")
-
+    frame = grab_frame(args.source, args.frame_idx, settings["camera"])
     h, w = frame.shape[:2]
     scale = min(MAX_DISPLAY[0] / w, MAX_DISPLAY[1] / h, 1.0)
     frame = cv2.resize(frame, (round(w * scale), round(h * scale))) if scale < 1 else frame
+    disp_h, disp_w = frame.shape[:2]
+    print(f"Khung hinh goc {w}x{h}, hien thi {disp_w}x{disp_h}")
 
-    points: list[list[int]] = []  # toa do tren frame hien thi (da thu nho)
+    old = (load_gates(args.gates_file).get(args.gate) or {}).get("zone")
+    old_px = zone_to_pixels(old, disp_w, disp_h) if old else None
+
+    points: list[list[int]] = []  # toa do click tren anh dang hien thi
 
     def on_click(event, x, y, flags, param):
         if event == cv2.EVENT_LBUTTONDOWN:
             points.append([x, y])
 
-    win = "Ve vung nguy hiem - click them diem | s=luu r=ve lai q=thoat"
+    win = f"Vung kiem tra '{args.gate}' - click them diem | s=luu r=ve lai q=thoat"
     cv2.namedWindow(win)
     cv2.setMouseCallback(win, on_click)
 
     while True:
         disp = frame.copy()
+        if old_px is not None:
+            cv2.polylines(disp, [old_px], isClosed=True, color=(160, 160, 160), thickness=1)
         for p in points:
-            cv2.circle(disp, tuple(p), 4, (0, 0, 255), -1)
+            cv2.circle(disp, tuple(p), 4, (0, 220, 255), -1)
         if len(points) > 1:
-            cv2.polylines(disp, [np.array(points, dtype=np.int32)], isClosed=True, color=(0, 0, 255), thickness=2)
+            cv2.polylines(disp, [np.array(points, dtype=np.int32)], isClosed=True, color=(0, 220, 255), thickness=2)
         cv2.imshow(win, disp)
         key = cv2.waitKey(20) & 0xFF
 
@@ -87,8 +92,9 @@ def main():
             if len(points) < 3:
                 print("Can toi thieu 3 diem de tao thanh 1 vung.")
                 continue
-            save_zone(Path(args.zones_file), args.camera, [[x / scale, y / scale] for x, y in points])
-            print(f"Da luu vung '{args.camera}' voi {len(points)} diem vao {args.zones_file}")
+            zone = clicks_to_ratio(points, disp_w, disp_h)
+            save_gate_zone(args.gates_file, args.gate, zone)
+            print(f"Da luu vung '{args.gate}' ({len(zone)} diem, ti le 0-1) vao {args.gates_file}: {zone}")
             break
         elif key == ord("q"):
             print("Thoat, khong luu.")

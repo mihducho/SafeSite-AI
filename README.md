@@ -11,7 +11,12 @@ và mặc áo phản quang không (YOLO11s). Đạt thì ghi giờ vào ca. Mô 
 
 - [x] Giai đoạn 0: rà soát code cũ, xem [docs/RA_SOAT.md](docs/RA_SOAT.md)
 - [x] Giai đoạn 1a: dọn code hướng cũ vào `_old/`, file cấu hình chung, tra lớp theo tên, ghim thư viện
-- [ ] Giai đoạn 1b: dịch vụ AI chế độ cổng (`evaluate_frames`, `check`, đọc camera)
+- [ ] Giai đoạn 1b: dịch vụ AI chế độ cổng
+  - [x] 1b-1: `evaluate_frames` (thuật toán mục 5) + test bằng box giả
+  - [x] 1b-2: luồng đọc camera, `check`, vùng kiểm tra tỷ lệ 0–1, script chạy thử; chạy thật với webcam
+  - [x] Đọc được camera điện thoại qua Wi-Fi (DroidCam 1280x720: ~18 khung/lượt, ~85 ms/khung), xem
+        [docs/huong_dan_camera_dien_thoai.md](docs/huong_dan_camera_dien_thoai.md)
+  - [ ] Chạy 5 tình huống tại cổng (cần mũ, áo bảo hộ) và video tự quay
 - [ ] Giai đoạn 2–6: script đánh giá, backend, kiosk, web quản lý (xem DE_TAI.md mục 10)
 
 ## Cài đặt (Windows, Python 3.13)
@@ -37,19 +42,23 @@ vùng đầu/thân, các ngưỡng của thuật toán kiểm tra tại cổng, 
 # Kiểm thử tự động
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 
-# Chế độ cổng: chưa có, làm ở Giai đoạn 1b.
+# Chế độ cổng. Nguồn hình (--source): file video, số webcam (0) hoặc URL điện thoại (http://.../video)
+.venv\Scripts\python.exe scripts\define_zone.py --source 0 --gate cong_1                  # 1. vẽ vùng kiểm tra (tỷ lệ 0–1) -> configs\gates.yaml
+.venv\Scripts\python.exe scripts\run_checkpoint.py --source 0 --gate cong_1 --rounds 3    # 2. chạy check(), ảnh + JSON -> runs\checkpoint\
 
-# Công cụ có sẵn
-.venv\Scripts\python.exe scripts\define_zone.py --source data\raw\<video>.mp4 --camera cong_1   # vẽ vùng bằng chuột
-.venv\Scripts\python.exe scripts\extract_frames.py --source data\raw\<video>.mp4                 # cắt khung để gán nhãn
-.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\<video>.mp4               # [hướng cũ] giám sát công trường, giữ để tham khảo
+# Công cụ khác
+.venv\Scripts\python.exe scripts\extract_frames.py --source data\raw\<video>.mp4          # cắt khung để gán nhãn
+.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\<video>.mp4         # [hướng cũ] giám sát công trường, giữ để tham khảo
 ```
+
+Dùng điện thoại làm camera: [docs/huong_dan_camera_dien_thoai.md](docs/huong_dan_camera_dien_thoai.md).
 
 ## Cấu trúc
 
 ```
-configs/   settings.yaml (cấu hình chung), botsort_tracking.yaml, data_ppe.yaml (dataset)
-src/       config.py, detection/, ppe/ (luật vùng đầu/thân), zone/, tracking/, utils/
+configs/   settings.yaml (cấu hình chung), gates.yaml (vùng kiểm tra, tạo bởi define_zone), data_ppe.yaml (dataset)
+src/       config.py, checkpoint/ (chế độ cổng: camera, evaluate, check), detection/, ppe/ (luật vùng đầu/thân),
+           zone/, tracking/ (chỉ hướng cũ dùng), utils/
 scripts/   công cụ chạy thử, vẽ vùng, cắt khung, train
 tests/     kiểm thử tự động (unittest)
 docs/      rà soát, hướng dẫn train, kết quả model

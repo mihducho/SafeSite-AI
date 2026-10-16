@@ -34,6 +34,13 @@ class YoloDetector:
         boxes = self.model.predict(frame, classes=self.classes, **self.predict_kw)[0].boxes
         return Detections(boxes.xyxy.cpu().numpy(), boxes.cls.cpu().numpy().astype(int))
 
+    def warmup(self) -> None:
+        """Chay model 1 lan tren anh den luc khoi dong. Lan predict dau tien cham hon han
+        (~1.5 s tren CPU do khoi tao); khong lam truoc thi luot kiem tra dau tien chi kip
+        xu ly ~1 khung va ra KHONG_XAC_DINH."""
+        size = self.predict_kw["imgsz"]
+        self(np.zeros((size, size, 3), dtype=np.uint8))
+
 
 _cache: dict[tuple, YoloDetector] = {}
 
@@ -45,5 +52,7 @@ def get_detector(settings: dict) -> YoloDetector:
     item_classes = tuple(item["class_name"] for item in settings["ppe"]["items"].values())
     key = (Path(mcfg["weights"]), mcfg["conf"], mcfg["iou"], mcfg["imgsz"], mcfg["person_class"], item_classes)
     if key not in _cache:
-        _cache[key] = YoloDetector(settings)
+        detector = YoloDetector(settings)
+        detector.warmup()
+        _cache[key] = detector
     return _cache[key]

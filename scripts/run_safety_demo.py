@@ -26,7 +26,7 @@ from src.ppe.compliance import assign_kwargs, assign_ppe, missing_ppe, rules_fro
 from src.tracking.tracker import PersonTracker
 from src.utils.postprocess import suppress_contained
 from src.utils.visualize import draw_header, draw_person, draw_zone
-from src.zone.zone import load_zones, person_feet_point, point_in_zone
+from src.zone.zone import load_gate_zone, person_feet_point, point_in_zone, zone_to_pixels
 
 OUT_DIR = ROOT / "runs" / "safety"
 
@@ -38,9 +38,9 @@ ZONE_LABEL = "XAM NHAP"
 def main():
     parser = argparse.ArgumentParser(description="[Huong cu] Demo giam sat an toan lao dong (PPE + vung nguy hiem).")
     parser.add_argument("--source", type=str, required=True, help="Duong dan video.")
-    parser.add_argument("--camera", type=str, default=None, help="Ten camera, de lay dung vung trong file vung.")
+    parser.add_argument("--camera", type=str, default=None, help="Ten vung trong paths.gates_file (ti le 0-1).")
     parser.add_argument("--settings", type=str, default=str(DEFAULT_SETTINGS), help="File cau hinh chung.")
-    parser.add_argument("--zones-file", type=str, default=None, help="Mac dinh: paths.zones_file trong cau hinh.")
+    parser.add_argument("--zones-file", type=str, default=None, help="Mac dinh: paths.gates_file trong cau hinh.")
     parser.add_argument("--show", action="store_true", help="Hien cua so xem truc tiep (bam q de dung).")
     args = parser.parse_args()
 
@@ -53,16 +53,19 @@ def main():
     person_cls = class_ids[mcfg["person_class"]]
     rules = rules_from_config(ppe_cfg, class_ids)
 
-    zones_file = args.zones_file or settings["paths"]["zones_file"]
-    zones = load_zones(zones_file)
-    zone_polygon = zones.get(args.camera) if args.camera else None
-    if args.camera and zone_polygon is None:
-        print(f"Canh bao: khong tim thay vung cho camera '{args.camera}' trong {zones_file}.")
+    zones_file = args.zones_file or settings["paths"]["gates_file"]
+    zone_ratio = None
+    if args.camera:
+        try:
+            zone_ratio = load_gate_zone(zones_file, args.camera)
+        except KeyError as e:
+            print(f"Canh bao: {e}")
+    zone_polygon = None  # quy doi sang pixel o khung dau tien (biet kich thuoc khung)
 
     print(f"Video dau vao: {args.source}")
     print(f"Weights: {mcfg['weights']} | conf={mcfg['conf']} | iou={mcfg['iou']} | imgsz={mcfg['imgsz']} | lop: {class_ids}")
     print(f"Kiem tra PPE: {', '.join(r.name for r in rules) if rules else 'TAT (ppe.required rong)'}")
-    print(f"Kiem tra vung nguy hiem: {'BAT' if zone_polygon is not None else 'TAT'}")
+    print(f"Kiem tra vung nguy hiem: {'BAT' if zone_ratio is not None else 'TAT'}")
 
     cap = cv2.VideoCapture(args.source)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30
@@ -87,6 +90,8 @@ def main():
         if writer is None:
             h, w = frame.shape[:2]
             writer = cv2.VideoWriter(str(out_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+            if zone_ratio is not None:
+                zone_polygon = zone_to_pixels(zone_ratio, w, h)
 
         if zone_polygon is not None:
             draw_zone(frame, zone_polygon)
