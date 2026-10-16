@@ -15,9 +15,11 @@ DEFAULT_SETTINGS = ROOT / "configs" / "settings.yaml"
 REQUIRED_KEYS = {
     "model": ["weights", "imgsz", "conf", "iou", "person_class"],
     "ppe": ["items", "required", "min_inside", "upright_min_ratio", "whole_box_region", "contain_thresh"],
-    "checkpoint": ["timeout_s", "min_person_height_px", "top_edge_margin_px", "min_valid_frames", "present_ratio", "absent_ratio"],
+    "checkpoint": ["timeout_s", "min_person_height_px", "top_edge_margin_px", "min_valid_frames",
+                   "present_ratio", "absent_ratio", "snapshot_jpeg_quality"],
     "paths": ["snapshot_dir", "zones_file", "tracker_config"],
 }
+ITEM_KEYS = ["class_name", "region", "missing_code"]  # moi mon trong ppe.items
 
 
 def project_path(p: str | Path) -> Path:
@@ -37,6 +39,10 @@ def load_settings(path: str | Path = DEFAULT_SETTINGS) -> dict:
         missing = [k for k in keys if k not in settings.get(section, {})]
         if missing:
             raise KeyError(f"File cau hinh {path} thieu {section}.{', '.join(missing)}")
+    for name, item in settings["ppe"]["items"].items():
+        missing = [k for k in ITEM_KEYS if k not in item]
+        if missing:
+            raise KeyError(f"File cau hinh {path} thieu ppe.items.{name}.{', '.join(missing)}")
     unknown = [name for name in settings["ppe"]["required"] if name not in settings["ppe"]["items"]]
     if unknown:
         raise KeyError(f"ppe.required co mon chua khai bao trong ppe.items: {unknown}")

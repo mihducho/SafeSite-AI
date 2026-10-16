@@ -21,6 +21,20 @@ def load_zones(path: str | Path) -> dict[str, np.ndarray]:
     return {cam: np.array(pts, dtype=np.int32) for cam, pts in raw.items()}
 
 
+def zone_to_pixels(points, width: int, height: int) -> np.ndarray:
+    """Vung kiem tra dang ti le 0-1 [[x, y], ...] (nhu backend gui, DE_TAI muc 4)
+    -> da giac pixel int32 shape (N,2) theo kich thuoc khung hinh dang xu ly.
+
+    Bao loi neu toa do ngoai [0, 1] — thuong do truyen nham toa do pixel.
+    """
+    pts = np.asarray(points, dtype=np.float64).reshape(-1, 2)
+    if len(pts) < 3:
+        raise ValueError(f"Vung kiem tra can toi thieu 3 diem, nhan duoc {len(pts)}")
+    if pts.min() < 0 or pts.max() > 1:
+        raise ValueError("Toa do vung kiem tra phai la ti le 0-1 so voi khung hinh, khong phai pixel")
+    return np.round(pts * [width, height]).astype(np.int32)
+
+
 def point_in_zone(point: tuple[float, float], polygon: np.ndarray) -> bool:
     """point: (x, y). polygon: np.ndarray (N,2) int32, tu load_zones()."""
     return cv2.pointPolygonTest(polygon, (float(point[0]), float(point[1])), False) >= 0

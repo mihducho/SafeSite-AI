@@ -12,13 +12,16 @@ model:
 ppe:
   # Moi mon bao ho: ten lop trong model.names + vung tren box nguoi, tinh theo ti le
   # chieu cao box tu canh tren (0) xuong canh duoi (1).
+  # missing_code: ma tra ve trong danh sach thieu khi KHONG_DAT (DE_TAI.md muc 5).
   items:
     hardhat:
       class_name: Hardhat
       region: [-0.1, 0.35]     # vung dau; -0.1 vi mu hay nho ra khoi canh tren box nguoi
+      missing_code: thieu_mu
     vest:
       class_name: Safety-Vest
       region: [0.15, 0.7]      # vung than
+      missing_code: thieu_ao
   required: [hardhat, vest]    # do bao ho bat buoc mac dinh (backend co the gui danh sach khac)
   min_inside: 0.5              # ti le dien tich box mu/ao toi thieu phai nam trong vung
   upright_min_ratio: 1.0       # box nguoi cao/rong < gia tri nay (cui, ngoi xom) thi dung ca box
@@ -33,6 +36,7 @@ checkpoint:
   min_valid_frames: 3          # it hon -> KHONG_CO_NGUOI hoac KHONG_XAC_DINH
   present_ratio: 0.6           # ti le khung hop le thay mon do >= gia tri nay -> co
   absent_ratio: 0.2            # ti le <= gia tri nay -> thieu; o giua -> khong chac
+  snapshot_jpeg_quality: 90    # chat luong anh JPEG tra ve kem moi luot kiem tra (0-100)
 
 paths:
   snapshot_dir: data/snapshots              # thu muc luu anh moi luot kiem tra

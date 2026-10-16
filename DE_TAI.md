@@ -96,7 +96,9 @@ Khi ra về: quét QR để ghi giờ ra, không kiểm tra bảo hộ. Nếu ng
 Tách làm 2 hàm:
 - `evaluate_frames(frames, zone, required_ppe, config) -> dict`: **hàm thuần**, nhận danh sách khung hình,
   không đọc camera. Dùng cho cả kiểm tra thật, script chạy thử trên video, và test tự động.
-- `check(timeout)`: lấy các khung mới nhất từ luồng đọc camera trong `timeout` giây, rồi gọi `evaluate_frames`.
+- `check(timeout)`: **xử lý từng khung ngay khi lấy được** từ luồng đọc camera (không gom đủ `timeout` giây rồi mới xử lý),
+  cho đến khi hết `timeout`, rồi tổng hợp. Dùng chung `classify_frame` và `aggregate` với `evaluate_frames`
+  để hai đường chạy cho kết quả giống nhau. Tổng thời gian một lượt kiểm tra ≈ `timeout`.
 
 **Bước 1. Xét từng khung:**
 1. Detect, chỉ giữ 3 lớp Person, Hardhat, Safety-Vest; bỏ box người trùng bằng `suppress_contained`.
@@ -104,7 +106,8 @@ Tách làm 2 hàm:
 3. Phân loại khung: 0 người → `trong`; từ 2 người → `nhieu_nguoi`; đúng 1 người → xét tiếp.
 4. Khung 1 người là **không hợp lệ** nếu: chiều cao box người nhỏ hơn ngưỡng (pixel, cấu hình được),
    hoặc mép trên box chạm mép trên khung hình (đầu bị cắt, không xét được mũ).
-5. Khung 1 người hợp lệ: dùng `assign_ppe` để ghi nhận có mũ / có áo trong khung đó.
+5. Khung 1 người hợp lệ: dùng `assign_ppe` để ghi nhận có mũ / có áo trong khung đó. Khi gán, xét **tất cả người
+   trong khung** (kể cả người đứng ngoài vùng), để mũ/áo của người đứng sát bên ngoài không bị gán nhầm cho người trong vùng.
 
 **Bước 2. Tổng hợp** (các ngưỡng là giá trị ban đầu, đặt trong file cấu hình, hiệu chỉnh ở Giai đoạn 2):
 1. Quá nửa số khung là `nhieu_nguoi` → `NHIEU_NGUOI`.
@@ -117,8 +120,12 @@ Tách làm 2 hàm:
 4. Có món nào **không chắc** → `KHONG_XAC_DINH` (mời đứng yên và quét lại).
    Ngược lại, có món **thiếu** → `KHONG_DAT` kèm danh sách thiếu. Tất cả **có** → `DAT`.
 
-**Kết quả trả về** gồm: kết quả, danh sách thiếu, tỷ lệ có mặt của từng món, số khung đã xét / hợp lệ,
-thời gian xử lý (ms), và 1 ảnh JPEG (khung hợp lệ có người lớn nhất, có vẽ khung nhận diện).
+**Kết quả trả về** gồm: `ket_qua`, `thieu` (danh sách thiếu), `ty_le_co_mat` của từng món, `so_khung`, `so_khung_hop_le`,
+`dem_khung` (số khung theo từng loại), `ly_do` (`it_khung_hop_le` hoặc `khong_chac` khi KHONG_XAC_DINH, để kiosk báo đúng lý do),
+`thoi_gian_ms`, và `anh_jpeg`: khung hợp lệ có người lớn nhất, có vẽ khung nhận diện; nếu không có khung hợp lệ thì lấy
+khung có người lớn nhất; không có người nào thì lấy khung cuối.
+
+`zone=None` thì xét cả khung: **chỉ dùng khi chạy thử**. Khi chạy thật, backend luôn gửi vùng kiểm tra.
 
 Lý do có vùng "không chắc": tại cổng, quét lại rất rẻ (vài giây), còn kết luận sai thì hoặc chặn nhầm người đủ đồ,
 hoặc cho người thiếu đồ đi qua. Khi không chắc, hệ thống yêu cầu quét lại thay vì đoán.
@@ -301,3 +308,10 @@ cấu hình cổng và vẽ vùng kiểm tra.
 - J5: **imgsz mặc định 640**, so sánh với 960 ở Giai đoạn 2 rồi chốt.
 - J6: **Chuyển code hướng cũ vào `_old/` và viết lại README ngay đầu Giai đoạn 1** (Giai đoạn 1a).
 - J7: **Commit `DE_TAI.md` và `docs/RA_SOAT.md` vào git.**
+
+**2026-10-17, sau Giai đoạn 1b-1:**
+- Chấp nhận các quyết định của trợ lý: tham số `detector` không bắt buộc trong `evaluate_frames` (để test dùng bộ phát hiện giả);
+  làm sớm `zone_to_pixels`; thêm `missing_code`, `snapshot_jpeg_quality` vào cấu hình; thêm trường `dem_khung`, `ly_do`;
+  gán đồ bảo hộ có xét cả người ngoài vùng.
+- Mỗi khung mất khoảng 100 ms trên CPU. `check` phải **xử lý khung ngay khi lấy được**, không gom rồi mới xử lý.
+- Chưa làm dừng sớm (trả kết quả trước khi hết `timeout` khi đã chắc chắn). Để sau, khi có số liệu Giai đoạn 2.

@@ -10,6 +10,7 @@ import numpy as np
 
 GREEN = (0, 200, 0)
 RED = (0, 0, 255)
+YELLOW = (0, 220, 255)  # vung kiem tra o cong, khong lan voi mau do cua vi pham
 WHITE = (255, 255, 255)
 FONT = cv2.FONT_HERSHEY_SIMPLEX
 BASE_SIZE = 1280  # canh dai frame ma tai do he so = 1
@@ -25,13 +26,13 @@ def _px(value: float, s: float) -> int:
     return max(1, round(value * s))
 
 
-def draw_zone(frame: np.ndarray, polygon: np.ndarray, alpha: float = 0.25) -> None:
-    """To mo vung nguy hiem + vien do, ve truc tiep len frame."""
+def draw_zone(frame: np.ndarray, polygon: np.ndarray, alpha: float = 0.25, color: tuple = RED) -> None:
+    """To mo vung (mac dinh mau do) + vien cung mau, ve truc tiep len frame."""
     s = _scale(frame)
     overlay = frame.copy()
-    cv2.fillPoly(overlay, [polygon], RED)
+    cv2.fillPoly(overlay, [polygon], color)
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, dst=frame)
-    cv2.polylines(frame, [polygon], isClosed=True, color=RED, thickness=_px(2, s))
+    cv2.polylines(frame, [polygon], isClosed=True, color=color, thickness=_px(2, s))
 
 
 def draw_person(frame: np.ndarray, xyxy, label: str, violations: list[str]) -> None:
