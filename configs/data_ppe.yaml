@@ -14,8 +14,8 @@ train: train/images
 val: valid/images
 test: test/images
 
-# Thu tu class PHAI giu dung nhu luc train — run_safety_demo.py dung class id:
-#   --person-cls 3 --hardhat-cls 7 --vest-cls 1
+# Thu tu class PHAI giu dung nhu luc train. Code tra lop theo TEN (Person, Hardhat,
+# Safety-Vest) trong model.names, xem configs/settings.yaml.
 names:
   0: Mask
   1: Safety-Vest

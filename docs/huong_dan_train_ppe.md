@@ -156,13 +156,10 @@ Kèm theo:
 
 ## 7. Sau khi bàn giao
 
-Với thông tin trong `data.yaml`, demo được chạy với đúng class id, ví dụ:
-
-```
-.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\ten_video.mp4 --camera camera_1 --weights weights\ppe_s\weights\best.pt --person-cls 3 --hardhat-cls 7 --vest-cls 1
-```
-
-(Với dataset `construction-site-safety-rmep1` v3: người = 3, nón = 7, áo = 1. Dùng dataset khác thì thay theo thứ tự class trong `data.yaml`.)
+Đặt đường dẫn model vào `model.weights` trong `configs/settings.yaml`. Lớp được tra **theo tên** trong
+`model.names` (`Person`, `Hardhat`, `Safety-Vest`, khai báo ở `model.person_class` và `ppe.items`), nên không
+cần nhập số thứ tự lớp. Model mới đặt tên lớp khác thì sửa tên trong `settings.yaml`; thiếu tên nào thì chương
+trình báo lỗi kèm danh sách lớp của model.
 
 ## Checklist
 

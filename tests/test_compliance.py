@@ -7,10 +7,19 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.ppe.compliance import HEAD_REGION, TORSO_REGION, PPERule, assign_ppe, missing_ppe
+from src.config import load_settings
+from src.detection.detect import find_class_ids
+from src.ppe.compliance import assign_kwargs, assign_ppe, missing_ppe, rules_from_config
 
-PERSON, HARDHAT, VEST = 5, 0, 6
-RULES = [PPERule("hardhat", HARDHAT, HEAD_REGION), PPERule("vest", VEST, TORSO_REGION)]
+# Danh sach lop that cua weights/ppe_s/weights/best.pt (in tu model.names), ghi lai
+# o day de test khong can file model. Lop tra theo TEN, khong ghi cung so thu tu.
+MODEL_NAMES = {0: "Mask", 1: "Safety-Vest", 2: "NO-Safety-Vest", 3: "Person", 4: "machinery",
+               5: "Safety-Cone", 6: "vehicle", 7: "Hardhat", 8: "NO-Mask", 9: "NO-Hardhat"}
+SETTINGS = load_settings()  # nguong vung dau/than... lay tu configs/settings.yaml
+IDS = find_class_ids(MODEL_NAMES, ["Person", "Hardhat", "Safety-Vest"])
+PERSON, HARDHAT, VEST = IDS["Person"], IDS["Hardhat"], IDS["Safety-Vest"]
+RULES = rules_from_config(SETTINGS["ppe"], IDS, required=["hardhat", "vest"])
+ASSIGN_KW = assign_kwargs(SETTINGS["ppe"])
 
 # Nguoi cao 300px, rong 100px. Non nho (~3% dien tich box nguoi) o dinh dau,
 # ao o giua than — dung ti le thuc te tren video.
@@ -23,7 +32,7 @@ def run(persons, dets):
     """dets: list (xyxy, cls). Tra ve ket qua assign_ppe."""
     det_xyxy = [d[0] for d in dets]
     det_cls = [d[1] for d in dets]
-    return assign_ppe(np.array(persons), np.array(det_xyxy), np.array(det_cls), RULES)
+    return assign_ppe(np.array(persons), np.array(det_xyxy), np.array(det_cls), RULES, **ASSIGN_KW)
 
 
 class AssignPPETest(unittest.TestCase):

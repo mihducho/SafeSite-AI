@@ -13,8 +13,8 @@
 | Thư viện | Ultralytics 8.4.177, torch 2.11.0 |
 | Weights | `weights/ppe_s/weights/best.pt` (không commit; epoch tốt nhất: 99) |
 
-Class id dùng khi chạy demo: người = 3, nón = 7, áo = 1
-(`--person-cls 3 --hardhat-cls 7 --vest-cls 1`).
+Chỉ số lớp trong model: người = 3, nón = 7, áo = 1. Từ Giai đoạn 1a, code tra lớp theo tên
+(`Person`, `Hardhat`, `Safety-Vest`) trong `model.names`, không nhập số thứ tự.
 
 ## Kết quả trên tập test (278 ảnh, 4.046 đối tượng)
 

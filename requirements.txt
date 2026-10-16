@@ -1,8 +1,12 @@
-# Phase 1 — Detection + Tracking baseline
-ultralytics>=8.3.0
-opencv-python>=4.10.0
-numpy>=1.26.0
-lap>=0.5.12  # can cho BoT-SORT (ultralytics model.track)
-pyyaml>=6.0  # doc/ghi configs/zones.yaml, data_ppe.yaml
+# Dich vu AI SafeSite-AI. Phien ban ghim theo moi truong da chay duoc
+# (Python 3.13.7, Windows, chi CPU) ngay 2026-10-17 — 33 test OK.
+# torch tu PyPI tren Windows la ban CPU; may co card NVIDIA thi cai ban CUDA rieng.
+ultralytics==8.4.152
+torch==2.14.0
+torchvision==0.29.0
+opencv-python==5.0.0.93
+numpy==2.5.3
+lap==0.5.13          # can cho BoT-SORT (PersonTracker)
+PyYAML==6.0.3        # doc configs/settings.yaml
 
-# Se bo sung o Phase 3 neu can: fastapi + uvicorn (dashboard canh bao demo).
+# Backend (FastAPI, SQLAlchemy, PostgreSQL...) bo sung o Giai doan 3.

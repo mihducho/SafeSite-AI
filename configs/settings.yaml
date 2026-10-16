@@ -1,0 +1,40 @@
+# Cau hinh chung SafeSite-AI. Moi tham so cua dich vu AI doc tu file nay
+# (DE_TAI.md muc 4, muc 5, quy tac 11.6), khong ghi cung trong code.
+# Duong dan tuong doi tinh tu thu muc goc du an. Doc bang src/config.py.
+
+model:
+  weights: weights/ppe_s/weights/best.pt   # YOLO11s train tren Colab (khong nam trong git)
+  imgsz: 640          # khop luc train; Giai doan 2 so sanh them 960 roi moi chot
+  conf: 0.35          # nguong tin cay chung cho moi lop
+  iou: 0.7            # nguong IoU cua NMS (bang mac dinh Ultralytics)
+  person_class: Person   # tra theo TEN trong model.names, khong dung so thu tu
+
+ppe:
+  # Moi mon bao ho: ten lop trong model.names + vung tren box nguoi, tinh theo ti le
+  # chieu cao box tu canh tren (0) xuong canh duoi (1).
+  items:
+    hardhat:
+      class_name: Hardhat
+      region: [-0.1, 0.35]     # vung dau; -0.1 vi mu hay nho ra khoi canh tren box nguoi
+    vest:
+      class_name: Safety-Vest
+      region: [0.15, 0.7]      # vung than
+  required: [hardhat, vest]    # do bao ho bat buoc mac dinh (backend co the gui danh sach khac)
+  min_inside: 0.5              # ti le dien tich box mu/ao toi thieu phai nam trong vung
+  upright_min_ratio: 1.0       # box nguoi cao/rong < gia tri nay (cui, ngoi xom) thi dung ca box
+  whole_box_region: [-0.1, 1.0]
+  contain_thresh: 0.8          # suppress_contained: bo box nguoi nam >= 80% trong box nguoi lon hon
+
+checkpoint:
+  # Thuat toan kiem tra tai cong (DE_TAI.md muc 5). Gia tri ban dau, hieu chinh o Giai doan 2.
+  timeout_s: 1.5               # thoi gian lay khung hinh cho moi lan kiem tra
+  min_person_height_px: 150    # box nguoi thap hon -> khung khong hop le (nguoi qua nho)
+  top_edge_margin_px: 2        # mep tren box cach mep tren khung <= gia tri nay -> dau bi cat, khung khong hop le
+  min_valid_frames: 3          # it hon -> KHONG_CO_NGUOI hoac KHONG_XAC_DINH
+  present_ratio: 0.6           # ti le khung hop le thay mon do >= gia tri nay -> co
+  absent_ratio: 0.2            # ti le <= gia tri nay -> thieu; o giua -> khong chac
+
+paths:
+  snapshot_dir: data/snapshots              # thu muc luu anh moi luot kiem tra
+  zones_file: configs/zones.yaml            # vung ve bang scripts/define_zone.py
+  tracker_config: configs/botsort_tracking.yaml   # chi script giam sat cu dung, che do cong khong tracking

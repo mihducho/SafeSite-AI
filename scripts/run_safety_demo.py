@@ -1,12 +1,14 @@
-"""Demo giam sat an toan lao dong: detect+track nguoi (rieng tung camera,
-khong Re-ID xuyen camera), kiem tra vi pham PPE va canh bao xam nhap vung
-nguy hiem. Ve ket qua len video va luu vao runs/safety/.
+"""[HUONG CU - giu de tham khao] Demo giam sat an toan lao dong tren video cong
+truong: detect + track nguoi, kiem tra vi pham PPE theo tung khung va xam nhap
+vung nguy hiem, ve ket qua len video va luu vao runs/safety/.
 
-Chay voi model goc COCO (chi kiem tra vung nguy hiem, chua co PPE):
-    .venv\\Scripts\\python.exe scripts\\run_safety_demo.py --source data\\raw\\ten_video.mp4 --camera camera_1
-Chay voi model PPE da fine-tune (class theo configs/data_ppe.yaml):
-    .venv\\Scripts\\python.exe scripts\\run_safety_demo.py --source data\\raw\\ten_video.mp4 --camera camera_1 \\
-        --weights weights\\ppe_s\\weights\\best.pt --person-cls 3 --hardhat-cls 7 --vest-cls 1
+Che do cong (DE_TAI.md muc 5) se la module rieng o Giai doan 1b, khong dung
+script nay. Moi tham so doc tu configs/settings.yaml; lop tra theo TEN trong
+model.names (Person, Hardhat, Safety-Vest), khong con --person-cls/--hardhat-cls/--vest-cls.
+
+Chay:
+    .venv\\Scripts\\python.exe scripts\\run_safety_demo.py --source data\\raw\\ten_video.mp4
+    .venv\\Scripts\\python.exe scripts\\run_safety_demo.py --source data\\raw\\ten_video.mp4 --camera camera_1 --show
 """
 import argparse
 import sys
@@ -18,16 +20,14 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.detection.detect import detect, load_model
-from src.ppe.compliance import HEAD_REGION, TORSO_REGION, PPERule, assign_ppe, missing_ppe
+from src.config import DEFAULT_SETTINGS, ROOT, load_settings
+from src.detection.detect import detect, find_class_ids, load_model
+from src.ppe.compliance import assign_kwargs, assign_ppe, missing_ppe, rules_from_config
 from src.tracking.tracker import PersonTracker
 from src.utils.postprocess import suppress_contained
 from src.utils.visualize import draw_header, draw_person, draw_zone
 from src.zone.zone import load_zones, person_feet_point, point_in_zone
 
-ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TRACKER = ROOT / "configs" / "botsort_tracking.yaml"
-DEFAULT_ZONES = ROOT / "configs" / "zones.yaml"
 OUT_DIR = ROOT / "runs" / "safety"
 
 # Nhan hien thi tren video cho tung loai vi pham.
@@ -35,45 +35,33 @@ MISSING_LABELS = {"hardhat": "KHONG NON", "vest": "KHONG AO"}
 ZONE_LABEL = "XAM NHAP"
 
 
-def build_rules(hardhat_cls: int | None, vest_cls: int | None) -> list[PPERule]:
-    rules = []
-    if hardhat_cls is not None:
-        rules.append(PPERule("hardhat", hardhat_cls, HEAD_REGION))
-    if vest_cls is not None:
-        rules.append(PPERule("vest", vest_cls, TORSO_REGION))
-    return rules
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Demo giam sat an toan lao dong (PPE + vung nguy hiem).")
+    parser = argparse.ArgumentParser(description="[Huong cu] Demo giam sat an toan lao dong (PPE + vung nguy hiem).")
     parser.add_argument("--source", type=str, required=True, help="Duong dan video.")
-    parser.add_argument("--camera", type=str, default=None, help="Ten camera, de lay dung vung nguy hiem trong zones.yaml.")
-    parser.add_argument("--weights", type=str, default=None, help="Weight model. Mac dinh yolo11n.pt (COCO, chua co PPE).")
-    parser.add_argument("--conf", type=float, default=0.35)
-    # 960 thay vi 640: video 720p tro len bi thu nho it hon, nguoi o xa va ao phan quang
-    # duoc phat hien tot hon (thu tren video cong truong), doi lai cham hon.
-    parser.add_argument("--imgsz", type=int, default=960, help="Kich thuoc anh dua vao model (mac dinh 960).")
-    parser.add_argument("--tracker", type=str, default=str(DEFAULT_TRACKER))
-    parser.add_argument("--zones-file", type=str, default=str(DEFAULT_ZONES))
-    parser.add_argument("--person-cls", type=int, default=0, help="Class id cua nguoi (COCO: 0, data_ppe.yaml: 3).")
-    parser.add_argument("--hardhat-cls", type=int, default=None, help="Class id non bao ho. Bo trong = khong kiem tra non.")
-    parser.add_argument("--vest-cls", type=int, default=None, help="Class id ao phan quang. Bo trong = khong kiem tra ao.")
+    parser.add_argument("--camera", type=str, default=None, help="Ten camera, de lay dung vung trong file vung.")
+    parser.add_argument("--settings", type=str, default=str(DEFAULT_SETTINGS), help="File cau hinh chung.")
+    parser.add_argument("--zones-file", type=str, default=None, help="Mac dinh: paths.zones_file trong cau hinh.")
     parser.add_argument("--show", action="store_true", help="Hien cua so xem truc tiep (bam q de dung).")
     args = parser.parse_args()
 
-    rules = build_rules(args.hardhat_cls, args.vest_cls)
-    # Neu class nguoi trung class PPE thi moi box nguoi tu duoc tinh la co PPE.
-    if args.person_cls in [r.cls_id for r in rules]:
-        parser.error(f"--person-cls ({args.person_cls}) khong duoc trung voi class PPE.")
+    settings = load_settings(args.settings)
+    mcfg, ppe_cfg = settings["model"], settings["ppe"]
 
-    zones = load_zones(args.zones_file)
+    model = load_model(mcfg["weights"])
+    item_classes = [ppe_cfg["items"][n]["class_name"] for n in ppe_cfg["required"]]
+    class_ids = find_class_ids(model.names, [mcfg["person_class"], *item_classes])  # thieu ten lop -> bao loi, dung
+    person_cls = class_ids[mcfg["person_class"]]
+    rules = rules_from_config(ppe_cfg, class_ids)
+
+    zones_file = args.zones_file or settings["paths"]["zones_file"]
+    zones = load_zones(zones_file)
     zone_polygon = zones.get(args.camera) if args.camera else None
     if args.camera and zone_polygon is None:
-        print(f"Canh bao: khong tim thay vung nguy hiem cho camera '{args.camera}' trong {args.zones_file}.")
+        print(f"Canh bao: khong tim thay vung cho camera '{args.camera}' trong {zones_file}.")
 
     print(f"Video dau vao: {args.source}")
-    print(f"Weights: {args.weights or 'yolo11n.pt (mac dinh)'} | conf={args.conf} | imgsz={args.imgsz} | person_cls={args.person_cls}")
-    print(f"Kiem tra PPE: {', '.join(r.name for r in rules) if rules else 'TAT (chua co class PPE)'}")
+    print(f"Weights: {mcfg['weights']} | conf={mcfg['conf']} | iou={mcfg['iou']} | imgsz={mcfg['imgsz']} | lop: {class_ids}")
+    print(f"Kiem tra PPE: {', '.join(r.name for r in rules) if rules else 'TAT (ppe.required rong)'}")
     print(f"Kiem tra vung nguy hiem: {'BAT' if zone_polygon is not None else 'TAT'}")
 
     cap = cv2.VideoCapture(args.source)
@@ -84,11 +72,11 @@ def main():
     out_path = OUT_DIR / f"{Path(args.source).stem}_{args.camera or 'cam'}_{time.strftime('%Y%m%d_%H%M%S')}.mp4"
     writer = None
 
-    model = load_model(args.weights) if args.weights else load_model()
-    classes = [args.person_cls] + [r.cls_id for r in rules]
+    classes = [person_cls] + [r.cls_id for r in rules]
     # Detect tung frame (giu nguyen moi box PPE), chi box nguoi duoc dua vao tracker.
-    results = detect(model, source=args.source, conf=args.conf, classes=classes, imgsz=args.imgsz, stream=True, verbose=False)
-    tracker = PersonTracker(args.tracker)
+    results = detect(model, source=args.source, conf=mcfg["conf"], classes=classes, imgsz=mcfg["imgsz"], iou=mcfg["iou"], stream=True, verbose=False)
+    tracker = PersonTracker(settings["paths"]["tracker_config"])
+    ppe_kwargs = assign_kwargs(ppe_cfg)
 
     n_frames = 0
     ppe_ids: set[int] = set()
@@ -104,15 +92,15 @@ def main():
             draw_zone(frame, zone_polygon)
 
         boxes = r.boxes
-        person_boxes = boxes[boxes.cls == args.person_cls]
-        keep = suppress_contained(person_boxes.xyxy.cpu().numpy())  # bo box nguoi trung lap
+        person_boxes = boxes[boxes.cls == person_cls]
+        keep = suppress_contained(person_boxes.xyxy.cpu().numpy(), contain_thresh=ppe_cfg["contain_thresh"])  # bo box nguoi trung lap
         person_boxes = person_boxes[torch.as_tensor(keep, device=person_boxes.data.device)]
         person_ids = tracker.update(person_boxes, r.orig_img)
         if len(person_boxes) > 0:
             xyxy = boxes.xyxy.cpu().numpy()
             cls = boxes.cls.cpu().numpy().astype(int)
             person_xyxy = person_boxes.xyxy.cpu().numpy()
-            ppe_status = assign_ppe(person_xyxy, xyxy, cls, rules) if rules else [{}] * len(person_xyxy)
+            ppe_status = assign_ppe(person_xyxy, xyxy, cls, rules, **ppe_kwargs) if rules else [{}] * len(person_xyxy)
 
             for box, tid, status in zip(person_xyxy, person_ids, ppe_status):
                 violations = [MISSING_LABELS[name] for name in missing_ppe(status)]

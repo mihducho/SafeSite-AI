@@ -7,14 +7,17 @@ Cach dung: click lan luot cac diem tao thanh da giac (toi thieu 3 diem).
   s = luu va thoat | r = ve lai tu dau | q = thoat khong luu
 """
 import argparse
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
 import yaml
 
-ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_ZONES = ROOT / "configs" / "zones.yaml"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.config import load_settings
+
 # Frame lon hon khung nay (vd video 4K) duoc thu nho khi hien thi de vua man hinh;
 # toa do click duoc quy doi nguoc ve kich thuoc goc truoc khi luu.
 MAX_DISPLAY = (1280, 720)
@@ -41,10 +44,12 @@ def save_zone(path: Path, camera: str, points: list[list[int]]) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Ve vung nguy hiem (polygon) tren 1 frame cua video.")
     parser.add_argument("--source", type=str, required=True, help="Duong dan video de lay frame mau.")
-    parser.add_argument("--camera", type=str, required=True, help="Ten camera, dung de luu vao configs/zones.yaml.")
-    parser.add_argument("--zones-file", type=str, default=str(DEFAULT_ZONES))
+    parser.add_argument("--camera", type=str, required=True, help="Ten camera, dung lam khoa trong file vung.")
+    parser.add_argument("--zones-file", type=str, default=None, help="Mac dinh: paths.zones_file trong configs/settings.yaml.")
     parser.add_argument("--frame-idx", type=int, default=0, help="Lay frame thu may trong video de ve (mac dinh frame dau).")
     args = parser.parse_args()
+    if args.zones_file is None:
+        args.zones_file = str(load_settings()["paths"]["zones_file"])
 
     cap = cv2.VideoCapture(args.source)
     cap.set(cv2.CAP_PROP_POS_FRAMES, args.frame_idx)

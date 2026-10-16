@@ -1,20 +1,23 @@
 """Test PersonTracker. Chay: .venv\\Scripts\\python.exe -m unittest discover -s tests -v"""
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 import numpy as np
 import torch
+import yaml
 from ultralytics.engine.results import Boxes
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from src.config import load_settings
 from src.tracking.tracker import PersonTracker
 
-TRACKER_CFG = ROOT / "configs" / "botsort_tracking.yaml"
+TRACKER_CFG = load_settings()["paths"]["tracker_config"]
 IMG = np.zeros((480, 640, 3), dtype=np.uint8)  # frame trong, chi de GMC co anh dau vao
-PERSON = 3
+PERSON = 3  # chi so lop gia cho box test; tracker khong phan biet lop
 
 
 def person_boxes(xyxy_list):
@@ -49,8 +52,14 @@ class PersonTrackerTest(unittest.TestCase):
         self.assertEqual(tracker.update(person_boxes([]), IMG), [])
 
     def test_reid_config_rejected(self):
-        with self.assertRaises(ValueError):
-            PersonTracker(ROOT / "configs" / "botsort_tracking_reid.yaml")
+        # Tu tao file cau hinh bat ReID (ban cu da chuyen vao _old/), khong phu thuoc _old/.
+        cfg = yaml.safe_load(Path(TRACKER_CFG).read_text(encoding="utf-8"))
+        cfg["with_reid"] = True
+        with tempfile.TemporaryDirectory() as tmp:
+            reid_cfg = Path(tmp) / "botsort_reid.yaml"
+            reid_cfg.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                PersonTracker(reid_cfg)
 
 
 if __name__ == "__main__":

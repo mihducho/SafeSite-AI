@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 
-def suppress_contained(xyxy: np.ndarray, contain_thresh: float = 0.8) -> np.ndarray:
+def suppress_contained(xyxy: np.ndarray, *, contain_thresh: float) -> np.ndarray:
     """Mask giu lai cac box KHONG nam gan tron trong 1 box lon hon cung class.
 
     Model hay ve 2 box "Person" cho 1 nguoi dang cui/bi che (1 box ca nguoi +
@@ -16,8 +16,8 @@ def suppress_contained(xyxy: np.ndarray, contain_thresh: float = 0.8) -> np.ndar
     deu bi bao thieu PPE, va tracker cap them ID.
 
     Box bi bo neu >= contain_thresh dien tich cua no nam trong 1 box khac co
-    dien tich lon hon. Nguong cao (0.8) de nguoi dung sau, bi che 1 phan, van
-    duoc giu.
+    dien tich lon hon. contain_thresh lay tu settings.yaml (ppe.contain_thresh,
+    hien la 0.8): nguong cao de nguoi dung sau, bi che 1 phan, van duoc giu.
     """
     xyxy = np.asarray(xyxy, dtype=np.float32).reshape(-1, 4)
     area = (xyxy[:, 2] - xyxy[:, 0]) * (xyxy[:, 3] - xyxy[:, 1])

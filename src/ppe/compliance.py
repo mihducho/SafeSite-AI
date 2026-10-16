@@ -7,30 +7,36 @@ non o vung dau, ao o vung than. Ti le chong lan tinh theo dien tich box PPE
 vi non chi chiem ~3-5% box nguoi, chia theo box nguoi thi khong bao gio dat
 nguong va moi nguoi deu bi bao vi pham.
 
-Neu dataset co class "vi pham" rieng (NO-Hardhat...), khong can dua vao day:
-nguoi khong duoc gan box PPE "duong tinh" nao da duoc tinh la thieu.
+Khong dung cac lop "vi pham" (NO-Hardhat...): nguoi khong duoc gan box PPE
+"duong tinh" nao thi tinh la thieu.
+
+Moi nguong (vung dau/than, ti le toi thieu...) doc tu configs/settings.yaml
+(muc ppe), truyen vao qua tham so — khong ghi cung trong file nay.
 """
 from dataclasses import dataclass
 
 import numpy as np
 
-# Vung tinh theo ti le chieu cao box nguoi, tinh tu canh tren (0) xuong canh
-# duoi (1). Vung dau bat dau tu -0.1 vi non hay nho ra khoi canh tren box nguoi.
-HEAD_REGION = (-0.1, 0.35)
-TORSO_REGION = (0.15, 0.7)
-# Box nguoi co cao/rong duoi nguong nay (nguoi cui gap, ngoi xom, bo) thi dau
-# va than khong con nam theo chieu doc nhu khi dung — vd nguoi cui: dau o giua
-# canh ben. Khi do bo vung dau/than, dung ca box nguoi. Nguoi dung thang co ti
-# le ~2-3 nen van giu quy tac chat (non cam o chan khong duoc tinh).
-UPRIGHT_MIN_RATIO = 1.0
-WHOLE_BOX_REGION = (-0.1, 1.0)
-
 
 @dataclass(frozen=True)
 class PPERule:
-    name: str  # ten mon PPE, vd "hardhat"
-    cls_id: int  # class id cua mon PPE trong model
+    name: str  # ten mon PPE trong cau hinh, vd "hardhat"
+    cls_id: int  # chi so lop cua mon PPE trong model (tra theo ten, xem rules_from_config)
     region: tuple[float, float]  # (tu, den) theo ti le chieu cao box nguoi
+
+
+def rules_from_config(ppe_cfg: dict, class_ids: dict[str, int], required: list[str] | None = None) -> list[PPERule]:
+    """Tao luat kiem tra tu muc `ppe` cua settings.yaml.
+
+    class_ids: ten lop -> chi so lop (ket qua cua find_class_ids).
+    required: cac mon can kiem tra; None = dung ppe.required trong cau hinh.
+    """
+    names = ppe_cfg["required"] if required is None else required
+    rules = []
+    for name in names:
+        item = ppe_cfg["items"][name]
+        rules.append(PPERule(name, class_ids[item["class_name"]], tuple(item["region"])))
+    return rules
 
 
 def _region_boxes(person_xyxy: np.ndarray, region: tuple[float, float]) -> np.ndarray:
@@ -56,13 +62,24 @@ def assign_ppe(
     det_xyxy: np.ndarray,
     det_cls: np.ndarray,
     rules: list[PPERule],
-    min_inside: float = 0.5,
+    *,
+    min_inside: float,
+    upright_min_ratio: float,
+    whole_box_region: tuple[float, float],
 ) -> list[dict[str, bool]]:
     """Tra ve list (cung thu tu person_xyxy) cac dict {ten PPE: True neu co}.
 
     Moi box PPE chi duoc gan cho 1 nguoi — nguoi co vung tuong ung chua phan
     lon box do nhat — de khi 2 nguoi dung sat nhau, non cua nguoi nay khong bi
     tinh luon cho nguoi kia.
+
+    min_inside: ti le dien tich box PPE toi thieu phai nam trong vung.
+    upright_min_ratio, whole_box_region: box nguoi co cao/rong < upright_min_ratio
+    (nguoi cui gap, ngoi xom, bo) thi dau va than khong con nam theo chieu doc —
+    vd nguoi cui: dau o giua canh ben — nen dung whole_box_region (gan ca box)
+    thay cho vung dau/than. Nguoi dung thang (ti le ~2-3) van giu quy tac chat,
+    non cam o chan khong duoc tinh.
+    Ca 3 tham so lay tu settings.yaml (muc ppe), xem assign_kwargs().
     """
     person_xyxy = np.asarray(person_xyxy, dtype=np.float32).reshape(-1, 4)
     det_xyxy = np.asarray(det_xyxy, dtype=np.float32).reshape(-1, 4)
@@ -74,20 +91,29 @@ def assign_ppe(
 
     h = person_xyxy[:, 3] - person_xyxy[:, 1]
     w = person_xyxy[:, 2] - person_xyxy[:, 0]
-    not_upright = h < UPRIGHT_MIN_RATIO * w
+    not_upright = h < upright_min_ratio * w
 
     for rule in rules:
         ppe_xyxy = det_xyxy[det_cls == rule.cls_id]
         if len(ppe_xyxy) == 0:
             continue
         regions = _region_boxes(person_xyxy, rule.region)
-        regions[not_upright] = _region_boxes(person_xyxy[not_upright], WHOLE_BOX_REGION)
+        regions[not_upright] = _region_boxes(person_xyxy[not_upright], whole_box_region)
         ratio = _inside_ratio(regions, ppe_xyxy)
         best_person = ratio.argmax(axis=0)
         best_ratio = ratio.max(axis=0)
         for p in best_person[best_ratio >= min_inside]:
             status[p][rule.name] = True
     return status
+
+
+def assign_kwargs(ppe_cfg: dict) -> dict:
+    """Cac tham so nguong cua assign_ppe() lay tu muc `ppe` cua settings.yaml."""
+    return {
+        "min_inside": ppe_cfg["min_inside"],
+        "upright_min_ratio": ppe_cfg["upright_min_ratio"],
+        "whole_box_region": tuple(ppe_cfg["whole_box_region"]),
+    }
 
 
 def missing_ppe(status: dict[str, bool]) -> list[str]:
