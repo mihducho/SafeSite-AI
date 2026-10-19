@@ -22,9 +22,11 @@ def check(
     config: dict | None = None,
     detector=None,
     timeout: float | None = None,
+    record_frames: bool = False,
 ) -> dict:
     """1 luot kiem tra. reader: CameraReader da start(). zone: vung ti le 0-1 (None = ca khung,
     chi dung khi chay thu). timeout: giay; None = checkpoint.timeout_s trong cau hinh.
+    record_frames: them chi_tiet_khung (box, lop, do tin cay tung khung) vao ket qua.
 
     Tra ve cung cac truong voi evaluate_frames. Khong nhan duoc khung nao -> CameraError
     (loi thiet bi, khong phai ket luan ve nguoi: backend bao "tam gian doan").
@@ -32,7 +34,7 @@ def check(
     t0 = time.perf_counter()
     settings = config if config is not None else load_settings()
     timeout = settings["checkpoint"]["timeout_s"] if timeout is None else timeout
-    evaluator = FrameEvaluator(zone, required_ppe, settings, detector)  # model da nap san (get_detector)
+    evaluator = FrameEvaluator(zone, required_ppe, settings, detector, record=record_frames)  # model nap san
 
     deadline = t0 + timeout
     last_id = reader.latest_id  # chi xet khung moi hon luc goi check

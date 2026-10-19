@@ -17,6 +17,7 @@ from src.detection.detect import find_class_ids, load_model
 class Detections:
     xyxy: np.ndarray  # (N, 4) box x1, y1, x2, y2 theo pixel cua khung hinh
     cls: np.ndarray  # (N,) chi so lop cua tung box
+    conf: np.ndarray | None = None  # (N,) do tin cay; chi de ghi chi tiet tung khung, thuat toan khong dung
 
 
 class YoloDetector:
@@ -32,7 +33,7 @@ class YoloDetector:
 
     def __call__(self, frame: np.ndarray) -> Detections:
         boxes = self.model.predict(frame, classes=self.classes, **self.predict_kw)[0].boxes
-        return Detections(boxes.xyxy.cpu().numpy(), boxes.cls.cpu().numpy().astype(int))
+        return Detections(boxes.xyxy.cpu().numpy(), boxes.cls.cpu().numpy().astype(int), boxes.conf.cpu().numpy())
 
     def warmup(self) -> None:
         """Chay model 1 lan tren anh den luc khoi dong. Lan predict dau tien cham hon han

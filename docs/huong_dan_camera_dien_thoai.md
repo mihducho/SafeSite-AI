@@ -39,8 +39,12 @@ Mục tiêu: điện thoại phát hình qua Wi-Fi, laptop đọc bằng một U
 
 ## 3. Đặt điện thoại
 
-- Đặt **ngang**, cao khoảng **1.6–2 m**, hơi chúc xuống. Người đứng cách **3–4 m** phải thấy **toàn thân**, và đầu
-  cách mép trên khung hình một khoảng. Nếu đầu chạm mép trên, hệ thống coi khung đó không hợp lệ (đầu bị cắt).
+- Đặt cao khoảng **1.6–2 m**, hơi chúc xuống. Người đứng cách **3–4 m** phải thấy **toàn thân, cả bàn chân**, và
+  đầu cách mép trên khung hình một khoảng. Nếu đầu chạm mép trên, hệ thống coi khung đó không hợp lệ (đầu bị cắt).
+- **Đặt dọc hay ngang đều được.** Một số app (như DroidCam) vẫn phát hình **ngang** khi điện thoại dựng **dọc**,
+  làm người trong hình bị **nằm ngang**. Khi đó thêm `--rotate 90` (xoay 90° theo chiều kim đồng hồ) lúc vẽ vùng
+  ở bước 4.2. Góc xoay được lưu cùng vùng của cổng, nên các lệnh có `--gate` tự xoay theo. Nếu hình bị lộn ngược
+  thì dùng `--rotate 270`. Lệnh thử ở bước 4.1 (chưa có `--gate`) cũng cần thêm `--rotate 90`.
 - Tránh để camera nhìn thẳng ra cửa sổ sáng (ngược sáng).
 - Giữ app chạy ở màn hình chính, không khóa màn hình: một số máy tự tắt camera khi tắt màn hình.
 
@@ -87,10 +91,14 @@ Chưa có mũ hoặc áo bảo hộ thì cứ chạy các trường hợp làm �
 | Hình giật, ít khung mỗi lượt | Giảm độ phân giải hoặc Quality trong app, để điện thoại gần bộ phát Wi-Fi |
 | Đang chạy thì mất hình | Chương trình tự kết nối lại sau 2 giây (`camera.reconnect_delay_s`). Mất hẳn thì lượt đó báo lỗi camera |
 | Luôn ra `KHONG_XAC_DINH` | Xem `dem_khung` trong kết quả. Nhiều `qua_nho` thì đứng gần hơn hoặc tăng độ phân giải. Nhiều `cat_dau` thì hạ góc camera để thấy cả đầu |
+| Người trong ảnh kết quả bị nằm ngang | Điện thoại dựng dọc nhưng app phát hình ngang: vẽ lại vùng với `--rotate 90` (mục 3) |
+| `Loi: cong '...': vung da ve tren hinh xoay ...` | Đã gõ `--rotate` khác với góc đã lưu cùng vùng. Bỏ `--rotate` đi, hoặc vẽ lại vùng với góc mới |
 
 ## 6. Gửi lại cho trợ lý
 
 1. **Toàn bộ chữ in ra trong terminal** của các lần chạy ở bước 4: copy rồi dán.
 2. App đã dùng (IP Webcam hay DroidCam), độ phân giải đã chọn trong app.
-3. Các file `.json` trong `runs\checkpoint\` (ghi kết quả từng lượt, không chứa ảnh).
+3. Các file `.json` trong `runs\checkpoint\` (ghi kết quả từng lượt, không chứa ảnh). Phần `chi_tiet_khung` ghi
+   từng khung trên 1 dòng: các box model thấy (lớp, độ tin cậy, tọa độ tỷ lệ 0–1), loại khung, người được tính trong
+   vùng. Nhờ đó trợ lý tìm được nguyên nhân kết quả sai mà không cần xem ảnh.
 4. Ảnh `.jpg` trong cùng thư mục **chỉ khi bạn muốn**. Ảnh có chụp người, bạn tự quyết có gửi hay không.

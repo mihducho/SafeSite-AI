@@ -27,12 +27,16 @@ ppe:
   upright_min_ratio: 1.0       # box nguoi cao/rong < gia tri nay (cui, ngoi xom) thi dung ca box
   whole_box_region: [-0.1, 1.0]
   contain_thresh: 0.8          # suppress_contained: bo box nguoi nam >= 80% trong box nguoi lon hon
+  group_max_x_overlap: 0.5     # box nguoi lon chua >= 2 box nguoi dung canh nhau (chong nhau theo chieu ngang
+                               # <= 50% box hep hon) la box GOP nhieu nguoi: bo box gop, giu tung nguoi
 
 checkpoint:
   # Thuat toan kiem tra tai cong (DE_TAI.md muc 5). Gia tri ban dau, hieu chinh o Giai doan 2.
   timeout_s: 1.5               # thoi gian lay khung hinh cho moi lan kiem tra
   min_person_height_px: 150    # box nguoi thap hon -> khung khong hop le (nguoi qua nho)
   top_edge_margin_px: 2        # mep tren box cach mep tren khung <= gia tri nay -> dau bi cat, khung khong hop le
+  multi_person_ratio: 0.5      # ti le khung co >= 2 nguoi trong vung >= gia tri nay -> NHIEU_NGUOI, khong xet do bao ho.
+                               # 0.25 bao nham khi chi co 1 nguoi (2026-10-20); chot lai o Giai doan 2
   min_valid_frames: 3          # it hon -> KHONG_CO_NGUOI hoac KHONG_XAC_DINH
   present_ratio: 0.6           # ti le khung hop le thay mon do >= gia tri nay -> co
   absent_ratio: 0.2            # ti le <= gia tri nay -> thieu; o giua -> khong chac
@@ -46,6 +50,9 @@ camera:
   first_frame_timeout_s: 10    # cho khung dau tien khi mo camera; qua thoi gian -> bao loi
   reconnect_delay_s: 2.0       # webcam/URL mat ket noi: cho bao lau roi mo lai
   loop_video: true             # file video: het thi phat lai tu dau (mo phong camera chay lien tuc)
+  rotate: 0                    # xoay hinh theo chieu kim dong ho: 0, 90, 180, 270. Dien thoai dung DOC ma app
+                               # phat hinh ngang (nguoi nam ngang, dau ben trai) -> 90. Khi chay voi --gate thi
+                               # dung goc da luu cung vung trong gates_file (define_zone --rotate)
 
 paths:
   snapshot_dir: data/snapshots              # thu muc luu anh moi luot kiem tra (backend dung o Giai doan 3)

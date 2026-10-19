@@ -43,6 +43,13 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(det.seen, sorted(det.seen))
         self.assertTrue(6 <= r["so_khung"] <= 11, r["so_khung"])
 
+    def test_record_frames_one_row_per_processed_frame(self):
+        det = IndexDetector(lambda i: FULL)
+        with camera(FakeCapture(read_delay=0.05)) as cam:
+            r = check(cam, ZONE, REQUIRED, SETTINGS, det, timeout=0.3, record_frames=True)
+        self.assertEqual(len(r["chi_tiet_khung"]), r["so_khung"])
+        self.assertTrue(all(row["loai"] == "hop_le" for row in r["chi_tiet_khung"]))
+
     def test_only_frames_after_call(self):
         # Khung da co truoc luc goi check (co the chup truoc khi cong nhan buoc vao) khong duoc xet.
         det = IndexDetector(lambda i: FULL)

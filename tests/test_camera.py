@@ -6,12 +6,13 @@ import unittest
 from pathlib import Path
 
 import cv2
+import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from src.checkpoint.camera import CameraError, CameraReader, Source, open_capture, parse_source
-from fakes import CAM_CFG, FakeCapture, frame_number
+from src.checkpoint.camera import CameraError, CameraReader, Source, open_capture, parse_source, rotate_frame
+from fakes import CAM_CFG, FRAME_H, FRAME_W, FakeCapture, frame_number
 
 
 def reader_with(capture, source="0", **cfg):
@@ -43,6 +44,31 @@ class ParseSourceTest(unittest.TestCase):
     def test_missing_file(self):
         with self.assertRaises(CameraError):
             open_capture(parse_source("data/raw/khong_ton_tai.mp4"), CAM_CFG)
+
+
+class RotateFrameTest(unittest.TestCase):
+    # Khung 4x6 (cao x rong), danh dau 1 diem o giua canh TRAI: nhu dau nguoi khi dien thoai
+    # dung doc ma app phat hinh ngang.
+    def setUp(self):
+        self.frame = np.zeros((4, 6, 3), np.uint8)
+        self.frame[2, 0] = 255
+
+    def test_90_moves_left_edge_to_top(self):
+        out = rotate_frame(self.frame, 90)
+        self.assertEqual(out.shape, (6, 4, 3))  # ngang -> doc
+        self.assertEqual(np.argwhere(out[..., 0] == 255).tolist(), [[0, 1]])  # canh trai -> canh tren
+
+    def test_270_and_180(self):
+        self.assertEqual(np.argwhere(rotate_frame(self.frame, 270)[..., 0] == 255).tolist(), [[5, 2]])  # -> canh duoi
+        self.assertEqual(np.argwhere(rotate_frame(self.frame, 180)[..., 0] == 255).tolist(), [[1, 5]])  # -> canh phai
+
+    def test_0_returns_same_frame(self):
+        self.assertIs(rotate_frame(self.frame, 0), self.frame)
+
+    def test_invalid_angle(self):
+        for bad in (45, -90, 360, "90", True):
+            with self.assertRaises(ValueError):
+                rotate_frame(self.frame, bad)
 
 
 class CameraReaderTest(unittest.TestCase):
@@ -111,6 +137,18 @@ class CameraReaderTest(unittest.TestCase):
         with cam.start():  # start() roi lai `with` (goi start() lan 2)
             pass
         self.assertEqual(len(opened), 1)
+
+    def test_frames_rotated_when_read(self):
+        with reader_with(FakeCapture(read_delay=0.005), rotate=90) as cam:
+            fid, frame = cam.wait_new(after_id=0, timeout=1)
+        self.assertEqual(frame.shape, (FRAME_W, FRAME_H, 3))  # 1280x720 ngang -> 720x1280 doc
+        self.assertEqual(frame_number(rotate_frame(frame, 270)), fid)  # xoay nguoc lai dung khung goc
+
+    def test_invalid_rotate_rejected_before_opening(self):
+        opened = []
+        with self.assertRaises(ValueError):
+            CameraReader("0", {**CAM_CFG, "rotate": 45}, capture_factory=opened.append)
+        self.assertEqual(opened, [])
 
     def test_stop_releases_capture(self):
         cap = FakeCapture(read_delay=0.005)

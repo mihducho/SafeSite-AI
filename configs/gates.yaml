@@ -1,7 +1,8 @@
 # Vung kiem tra cua tung cong (luu tam, cho toi khi co bang `gates` trong co so du lieu).
 # zone: danh sach diem [x, y] dang TI LE 0-1 so voi chieu rong/chieu cao khung hinh,
-# noi lai thanh da giac khep kin. Ghi tu dong boi scripts/define_zone.py, khong can go tay:
-#   .venv\Scripts\python.exe scripts\define_zone.py --source <video | so webcam | URL> --gate cong_1
+# noi lai thanh da giac khep kin. rotate: goc xoay hinh camera cua cong (0/90/180/270,
+# chieu kim dong ho); vung ve tren hinh da xoay. Ghi tu dong boi scripts/define_zone.py:
+#   .venv\Scripts\python.exe scripts\define_zone.py --source <video | so webcam | URL> --gate cong_1 [--rotate 90]
 cong_1:
   zone:
   - [0.1898, 0.0861]
@@ -10,7 +11,8 @@ cong_1:
   - [0.182, 0.9375]
 cong_dt:
   zone:
-  - [0.0094, 0.0236]
-  - [0.0039, 0.9333]
-  - [0.9867, 0.9319]
-  - [0.9891, 0.0194]
+  - [0.0025, 0.0014]
+  - [0.9975, 0.0014]
+  - [0.9926, 0.9944]
+  - [0.0074, 0.9958]
+  rotate: 90

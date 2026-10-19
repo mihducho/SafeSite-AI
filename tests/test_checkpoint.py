@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from src.checkpoint.evaluate import DAT, KHONG_CO_NGUOI, KHONG_DAT, KHONG_XAC_DINH, NHIEU_NGUOI, evaluate_frames
 # Box gia, bo phat hien gia, nguong co dinh: dung chung voi test_check.py (tests/fakes.py).
-from fakes import (BARE, EMPTY, FRAME, FULL, HAT, HEAD_CUT, NO_HAT, NO_VEST, OUTSIDE, PERSON, REQUIRED,
+from fakes import (BARE, EMPTY, FRAME, FULL, HAT, HEAD_CUT, NO_HAT, NO_VEST, OUTSIDE, PERSON, PERSON_2, REQUIRED,
                    SETTINGS, SMALL, TWO, VEST, ZONE, FakeDetector, dets)
 
 def run(script, zone=ZONE, required=REQUIRED, settings=SETTINGS):
@@ -47,7 +47,7 @@ class KetQuaTest(unittest.TestCase):
         self.assertEqual((r["ket_qua"], r["thieu"]), (KHONG_DAT, ["thieu_mu", "thieu_ao"]))
 
     def test_nhieu_nguoi(self):
-        r = run([TWO] * 3 + [FULL] * 2)  # 3/5 khung co 2 nguoi > nua
+        r = run([TWO] * 3 + [FULL] * 2)  # 3/5 khung co 2 nguoi >= 0.5
         self.assertEqual(r["ket_qua"], NHIEU_NGUOI)
 
     def test_khong_co_nguoi(self):
@@ -91,9 +91,23 @@ class NguongVaBienTest(unittest.TestCase):
         r = run([FULL, FULL, NO_HAT, FULL, FULL])
         self.assertEqual(r["ket_qua"], DAT)
 
-    def test_nhieu_nguoi_khong_qua_nua(self):
-        r = run([TWO] * 2 + [FULL] * 3)  # 2/5 khung 2 nguoi, chua qua nua
+    def test_nhieu_nguoi_duoi_nguong(self):
+        r = run([TWO] * 2 + [FULL] * 3)  # 2/5 = 0.4 < multi_person_ratio 0.5 -> xet do bao ho
         self.assertEqual(r["ket_qua"], DAT)
+
+    def test_bien_multi_person_ratio(self):
+        r = run([TWO] * 2 + [FULL] * 2)  # 2/4 = 0.5 >= 0.5 (luat cu "qua nua" thi chua tinh)
+        self.assertEqual(r["ket_qua"], NHIEU_NGUOI)
+        self.assertEqual(r["ty_le_co_mat"], {})
+
+    def test_mot_khung_nham_hai_nguoi_van_dat(self):
+        # Model thinh thoang thay nham 2 nguoi 1 khung: 1/5 = 0.2, van xet do bao ho.
+        self.assertEqual(run([TWO] + [FULL] * 4)["ket_qua"], DAT)
+
+    def test_multi_person_ratio_lay_tu_cau_hinh(self):
+        s = copy.deepcopy(SETTINGS)
+        s["checkpoint"]["multi_person_ratio"] = 0.25
+        self.assertEqual(run([TWO] * 2 + [FULL] * 3, settings=s)["ket_qua"], NHIEU_NGUOI)  # 0.4 >= 0.25
 
     def test_nguong_lay_tu_cau_hinh(self):
         s = copy.deepcopy(SETTINGS)
@@ -124,6 +138,15 @@ class VungVaGanPPETest(unittest.TestCase):
         dup = dets((PERSON, "Person"), ([520, 300, 690, 650], "Person"), (HAT, "Hardhat"), (VEST, "Safety-Vest"))
         self.assertEqual(run([dup] * 5)["ket_qua"], DAT)
 
+    def test_box_gop_hai_nguoi_la_nhieu_nguoi(self):
+        # 2 nguoi dung sat vai, model ve them 1 box bao ca hai (gap that 2026-10-20). Truoc khi sua,
+        # 2 box tung nguoi bi bo vi nam trong box gop -> con 1 "nguoi" -> DAT sai.
+        group = dets((PERSON, "Person"), (PERSON_2, "Person"), ([490, 90, 910, 660], "Person"),
+                     (HAT, "Hardhat"), (VEST, "Safety-Vest"))
+        r = run([group] * 5)
+        self.assertEqual(r["ket_qua"], NHIEU_NGUOI)
+        self.assertEqual(r["dem_khung"]["nhieu_nguoi"], 5)
+
     def test_tat_kiem_tra_ao(self):
         r = run([NO_VEST] * 5, required=["hardhat"])
         self.assertEqual(r["ket_qua"], DAT)
@@ -138,6 +161,21 @@ class DauRaVaLoiTest(unittest.TestCase):
         img = cv2.imdecode(np.frombuffer(r["anh_jpeg"], np.uint8), cv2.IMREAD_COLOR)
         self.assertEqual(img.shape, (720, 1280, 3))
         self.assertGreaterEqual(r["thoi_gian_ms"], 0)
+
+    def test_chi_tiet_khung(self):
+        script = [FULL, TWO, EMPTY]
+        r = evaluate_frames([FRAME] * 3, ZONE, REQUIRED, SETTINGS, detector=FakeDetector(script), record_frames=True)
+        rows = r["chi_tiet_khung"]
+        self.assertEqual([row["loai"] for row in rows], ["hop_le", "nhieu_nguoi", "trong"])
+        ratio = [round(PERSON[0] / 1280, 3), round(PERSON[1] / 720, 3), round(PERSON[2] / 1280, 3), round(PERSON[3] / 720, 3)]
+        self.assertEqual(rows[0]["box"][0], {"lop": "Person", "conf": None, "xyxy": ratio})  # ti le 0-1, khong pixel
+        self.assertEqual([b["lop"] for b in rows[1]["box"]], ["Person", "Hardhat", "Safety-Vest", "Person"])
+        self.assertEqual(len(rows[1]["nguoi_trong_vung"]), 2)
+        self.assertEqual(rows[0]["ppe"], {"hardhat": True, "vest": True})
+        self.assertEqual((rows[2]["box"], rows[2]["ppe"]), ([], None))
+
+    def test_khong_ghi_chi_tiet_mac_dinh(self):
+        self.assertNotIn("chi_tiet_khung", run([FULL] * 3))
 
     def test_khong_co_khung_nao(self):
         r = run([])

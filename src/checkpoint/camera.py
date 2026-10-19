@@ -9,6 +9,9 @@ Nguon hinh (parse_source):
   - chuoi co "://"            -> URL camera IP tu dien thoai (http://... hoac rtsp://...)
   - con lai                   -> file video: phat DUNG TOC DO THAT (theo FPS cua
                                  video) de mo phong camera; het video thi phat lai.
+
+Xoay hinh (camera.rotate): khung duoc xoay NGAY KHI DOC, nen moi buoc sau (vung kiem
+tra, model, anh chup) deu thay hinh da dung thang.
 """
 import threading
 import time
@@ -21,6 +24,24 @@ import numpy as np
 
 class CameraError(RuntimeError):
     """Khong mo duoc nguon hinh, hoac khong nhan duoc khung hinh nao."""
+
+
+# Goc xoay theo chieu kim dong ho (do) -> ma cv2.rotate. Vd dien thoai dung doc ma app
+# (DroidCam) van phat hinh ngang: nguoi nam ngang, dau ben trai -> xoay 90 de dung thang.
+ROTATIONS = {0: None, 90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180, 270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+
+
+def check_rotate(degrees) -> int:
+    """Goc xoay hop le (0, 90, 180, 270) -> int; goc khac thi bao ValueError."""
+    if isinstance(degrees, bool) or degrees not in ROTATIONS:
+        raise ValueError(f"Goc xoay hinh phai la 0, 90, 180 hoac 270 (chieu kim dong ho), nhan duoc {degrees!r}")
+    return int(degrees)
+
+
+def rotate_frame(frame: np.ndarray, degrees: int) -> np.ndarray:
+    """Xoay khung theo chieu kim dong ho; 0 thi tra ve chinh khung do (khong sao chep)."""
+    code = ROTATIONS[check_rotate(degrees)]
+    return frame if code is None else cv2.rotate(frame, code)
 
 
 @dataclass(frozen=True)
@@ -77,6 +98,7 @@ class CameraReader:
     def __init__(self, source, cam_cfg: dict, capture_factory=None):
         self.source = parse_source(source)
         self.cfg = cam_cfg
+        self.rotate = check_rotate(cam_cfg["rotate"])  # sai goc thi bao loi ngay, truoc khi mo camera
         self._open = capture_factory or (lambda src: open_capture(src, cam_cfg))
         self._cond = threading.Condition()
         self._stop = threading.Event()
@@ -160,7 +182,7 @@ class CameraReader:
                     else:
                         self._reconnect()
                         continue
-                self._publish(frame)
+                self._publish(rotate_frame(frame, self.rotate))
                 if period:  # file video: giu dung toc do that
                     next_t += period
                     delay = next_t - time.monotonic()

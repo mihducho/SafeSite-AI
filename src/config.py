@@ -14,10 +14,11 @@ DEFAULT_SETTINGS = ROOT / "configs" / "settings.yaml"
 # Cac khoa bat buoc phai co, de loi cau hinh lo ra ngay khi khoi dong thay vi giua chung.
 REQUIRED_KEYS = {
     "model": ["weights", "imgsz", "conf", "iou", "person_class"],
-    "ppe": ["items", "required", "min_inside", "upright_min_ratio", "whole_box_region", "contain_thresh"],
-    "checkpoint": ["timeout_s", "min_person_height_px", "top_edge_margin_px", "min_valid_frames",
+    "ppe": ["items", "required", "min_inside", "upright_min_ratio", "whole_box_region", "contain_thresh",
+            "group_max_x_overlap"],
+    "checkpoint": ["timeout_s", "min_person_height_px", "top_edge_margin_px", "multi_person_ratio", "min_valid_frames",
                    "present_ratio", "absent_ratio", "snapshot_jpeg_quality"],
-    "camera": ["webcam_width", "webcam_height", "first_frame_timeout_s", "reconnect_delay_s", "loop_video"],
+    "camera": ["webcam_width", "webcam_height", "first_frame_timeout_s", "reconnect_delay_s", "loop_video", "rotate"],
     "paths": ["snapshot_dir", "gates_file", "checkpoint_runs", "tracker_config"],
 }
 ITEM_KEYS = ["class_name", "region", "missing_code"]  # moi mon trong ppe.items

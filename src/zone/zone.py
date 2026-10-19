@@ -6,6 +6,7 @@ Cho toi khi co bang `gates` trong co so du lieu, vung luu tam o configs/gates.ya
 kiem tra" cua bang gates de sau nay chuyen sang de dang:
     cong_1:
       zone: [[0.25, 0.5], [0.75, 0.5], [0.75, 1.0], [0.25, 1.0]]
+      rotate: 0      # goc xoay hinh camera cua cong; vung ve tren hinh DA XOAY theo goc nay
 """
 from pathlib import Path
 
@@ -13,12 +14,15 @@ import cv2
 import numpy as np
 import yaml
 
+from src.checkpoint.camera import check_rotate
+
 # yaml.safe_dump xoa het comment trong file, nen ghi lai phan huong dan moi lan luu.
 GATES_HEADER = """\
 # Vung kiem tra cua tung cong (luu tam, cho toi khi co bang `gates` trong co so du lieu).
 # zone: danh sach diem [x, y] dang TI LE 0-1 so voi chieu rong/chieu cao khung hinh,
-# noi lai thanh da giac khep kin. Ghi tu dong boi scripts/define_zone.py, khong can go tay:
-#   .venv\\Scripts\\python.exe scripts\\define_zone.py --source <video | so webcam | URL> --gate cong_1
+# noi lai thanh da giac khep kin. rotate: goc xoay hinh camera cua cong (0/90/180/270,
+# chieu kim dong ho); vung ve tren hinh da xoay. Ghi tu dong boi scripts/define_zone.py:
+#   .venv\\Scripts\\python.exe scripts\\define_zone.py --source <video | so webcam | URL> --gate cong_1 [--rotate 90]
 """
 
 
@@ -37,26 +41,46 @@ def load_gates(path: str | Path) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def load_gate_zone(path: str | Path, gate: str) -> list[list[float]]:
-    """Vung ti le 0-1 cua 1 cong. Khong co cong do thi bao loi kem danh sach cong co san."""
+def load_gate(path: str | Path, gate: str) -> dict:
+    """{"zone": vung ti le 0-1, "rotate": goc xoay hinh} cua 1 cong. Muc ve truoc khi co
+    tinh nang xoay (chua co rotate) -> 0. Khong co cong do thi bao loi kem danh sach cong co san."""
     gates = load_gates(path)
-    if gate not in gates or "zone" not in (gates[gate] or {}):
+    entry = gates.get(gate) or {}
+    if "zone" not in entry:
         raise KeyError(f"Khong co vung cho cong '{gate}' trong {path}. Cac cong co san: {list(gates)}")
-    zone = gates[gate]["zone"]
-    zone_to_pixels(zone, 1, 1)  # kiem tra hop le (>= 3 diem, trong khoang 0-1)
-    return zone
+    zone_to_pixels(entry["zone"], 1, 1)  # kiem tra hop le (>= 3 diem, trong khoang 0-1)
+    return {"zone": entry["zone"], "rotate": check_rotate(entry.get("rotate", 0))}
 
 
-def save_gate_zone(path: str | Path, gate: str, zone) -> None:
-    """Ghi (hoac ghi de) vung ti le 0-1 cua 1 cong, giu nguyen cac cong khac."""
+def load_gate_zone(path: str | Path, gate: str) -> list[list[float]]:
+    """Vung ti le 0-1 cua 1 cong (xem load_gate)."""
+    return load_gate(path, gate)["zone"]
+
+
+def save_gate_zone(path: str | Path, gate: str, zone, rotate: int = 0) -> None:
+    """Ghi (hoac ghi de) vung ti le 0-1 va goc xoay hinh cua 1 cong, giu nguyen cac cong khac."""
     zone_to_pixels(zone, 1, 1)  # tu choi luu toa do pixel hoac vung < 3 diem
+    rotate = check_rotate(rotate)
     path = Path(path)
     data = load_gates(path)
-    data[gate] = {**(data.get(gate) or {}), "zone": [[float(x), float(y)] for x, y in zone]}
+    data[gate] = {**(data.get(gate) or {}), "zone": [[float(x), float(y)] for x, y in zone], "rotate": rotate}
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         f.write(GATES_HEADER)
         yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False, default_flow_style=None)
+
+
+def choose_rotate(cli_rotate: int | None, gate: dict | None, default: int) -> int:
+    """Goc xoay hinh khi chay kiem tra.
+    Co cong (gate tu load_gate): dung goc da luu cung vung, vi vung ve tren hinh da xoay theo
+    goc do; cli_rotate khac goc nay thi bao ValueError (vung se lech). Khong co cong:
+    cli_rotate neu co, khong thi default (camera.rotate)."""
+    if gate is not None:
+        if cli_rotate is not None and check_rotate(cli_rotate) != gate["rotate"]:
+            raise ValueError(f"vung da ve tren hinh xoay {gate['rotate']} do, khong dung duoc voi --rotate {cli_rotate}. "
+                             f"Bo --rotate, hoac ve lai vung voi --rotate {cli_rotate}.")
+        return gate["rotate"]
+    return check_rotate(default if cli_rotate is None else cli_rotate)
 
 
 def load_zones(path: str | Path) -> dict[str, np.ndarray]:

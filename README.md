@@ -16,7 +16,8 @@ và mặc áo phản quang không (YOLO11s). Đạt thì ghi giờ vào ca. Mô 
   - [x] 1b-2: luồng đọc camera, `check`, vùng kiểm tra tỷ lệ 0–1, script chạy thử; chạy thật với webcam
   - [x] Đọc được camera điện thoại qua Wi-Fi (DroidCam 1280x720: ~18 khung/lượt, ~85 ms/khung), xem
         [docs/huong_dan_camera_dien_thoai.md](docs/huong_dan_camera_dien_thoai.md)
-  - [ ] Chạy 5 tình huống tại cổng (cần mũ, áo bảo hộ) và video tự quay
+  - [x] Chạy thử tại cổng với điện thoại dựng dọc (`--rotate 90`): đủ đồ, thiếu mũ, thiếu áo, 2 người, mũ két
+  - [ ] Quay video các tình huống (dùng lại cho Giai đoạn 2); kéo mép vùng sát mép hình trong `define_zone.py` (để sau)
 - [ ] Giai đoạn 2–6: script đánh giá, backend, kiosk, web quản lý (xem DE_TAI.md mục 10)
 
 ## Cài đặt (Windows, Python 3.13)
@@ -45,6 +46,7 @@ vùng đầu/thân, các ngưỡng của thuật toán kiểm tra tại cổng, 
 # Chế độ cổng. Nguồn hình (--source): file video, số webcam (0) hoặc URL điện thoại (http://.../video)
 .venv\Scripts\python.exe scripts\define_zone.py --source 0 --gate cong_1                  # 1. vẽ vùng kiểm tra (tỷ lệ 0–1) -> configs\gates.yaml
 .venv\Scripts\python.exe scripts\run_checkpoint.py --source 0 --gate cong_1 --rounds 3    # 2. chạy check(), ảnh + JSON -> runs\checkpoint\
+# Hình bị nằm ngang (điện thoại dựng dọc): thêm --rotate 90 khi vẽ vùng; góc lưu cùng vùng, --gate tự xoay theo
 
 # Công cụ khác
 .venv\Scripts\python.exe scripts\extract_frames.py --source data\raw\<video>.mp4          # cắt khung để gán nhãn

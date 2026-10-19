@@ -6,7 +6,10 @@ Chay:
   .venv\\Scripts\\python.exe scripts\\run_checkpoint.py --source 0 --gate cong_1 --rounds 5          (webcam)
   .venv\\Scripts\\python.exe scripts\\run_checkpoint.py --source 0 --width 1920 --height 1080        (webcam 1080p)
   .venv\\Scripts\\python.exe scripts\\run_checkpoint.py --source http://192.168.1.23:8080/video --gate cong_1
+  .venv\\Scripts\\python.exe scripts\\run_checkpoint.py --source http://192.168.1.23:4747/video --rotate 90   (dien thoai dung doc)
 Khong co --gate: xet ca khung hinh (CHI de chay thu, DE_TAI muc 5).
+Co --gate: hinh duoc xoay theo goc da luu cung vung cua cong (define_zone --rotate).
+File JSON co them "chi_tiet_khung": moi khung 1 dong (box, lop, do tin cay, loai khung), chi so, khong co anh.
 """
 import argparse
 import json
@@ -16,11 +19,22 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.checkpoint.camera import CameraError, CameraReader
+from src.checkpoint.camera import ROTATIONS, CameraError, CameraReader
 from src.checkpoint.check import check
 from src.checkpoint.detector import get_detector
 from src.config import DEFAULT_SETTINGS, load_settings
-from src.zone.zone import load_gate_zone
+from src.zone.zone import choose_rotate, load_gate
+
+
+def to_json(result: dict) -> str:
+    """JSON ket qua 1 luot: thut dong cho de doc, rieng chi_tiet_khung ghi moi khung tren 1 dong."""
+    data = dict(result)
+    frames = data.pop("chi_tiet_khung", None)
+    text = json.dumps(data, ensure_ascii=False, indent=2)
+    if frames is None:
+        return text
+    rows = ",\n".join("    " + json.dumps(f, ensure_ascii=False) for f in frames)
+    return text[:-2] + f',\n  "chi_tiet_khung": [\n{rows}\n  ]\n}}'  # text ket thuc bang "\n}"
 
 
 def main():
@@ -33,6 +47,9 @@ def main():
     parser.add_argument("--width", type=int, default=None, help="Webcam: do phan giai ngang xin camera (ghi de cau hinh).")
     parser.add_argument("--height", type=int, default=None, help="Webcam: do phan giai doc xin camera (ghi de cau hinh).")
     parser.add_argument("--required", nargs="+", default=None, help="Mon bat buoc, vd: hardhat vest. Mac dinh ppe.required.")
+    parser.add_argument("--rotate", type=int, choices=sorted(ROTATIONS), default=None,
+                        help="Xoay hinh theo chieu kim dong ho (do). Mac dinh: goc luu cung vung cua --gate, "
+                             "khong co --gate thi camera.rotate.")
     parser.add_argument("--settings", default=str(DEFAULT_SETTINGS))
     args = parser.parse_args()
 
@@ -43,7 +60,13 @@ def main():
         settings["camera"]["webcam_height"] = args.height
     timeout = args.timeout or settings["checkpoint"]["timeout_s"]
 
-    zone = load_gate_zone(settings["paths"]["gates_file"], args.gate) if args.gate else None
+    gate = load_gate(settings["paths"]["gates_file"], args.gate) if args.gate else None
+    zone = gate["zone"] if gate else None
+    try:
+        rotate = choose_rotate(args.rotate, gate, settings["camera"]["rotate"])
+    except ValueError as e:
+        sys.exit(f"Loi: cong '{args.gate}': {e}")
+    settings["camera"]["rotate"] = rotate
     if zone is None:
         print("Canh bao: khong co --gate, xet CA KHUNG HINH (chi de chay thu).")
 
@@ -60,20 +83,21 @@ def main():
     src = reader.source
     h, w = reader.latest()[1].shape[:2]
     fps_note = f", FPS video {reader.source_fps:.1f} (phat dung toc do that)" if src.kind == "file" else ""
-    print(f"Nguon: {src.kind} {src.value} | khung {w}x{h}{fps_note} | timeout {timeout} s")
+    print(f"Nguon: {src.kind} {src.value} | khung {w}x{h} (xoay {rotate} do){fps_note} | timeout {timeout} s")
 
     stats = []
     try:
         for i in range(1, args.rounds + 1):
             id_before = reader.latest_id
-            r = check(reader, zone, args.required, settings, detector, timeout)
+            r = check(reader, zone, args.required, settings, detector, timeout, record_frames=True)
             delivered = reader.latest_id - id_before  # so khung camera dua ra trong luot nay
             jpeg = r.pop("anh_jpeg")
 
             stem = f"{time.strftime('%Y%m%d_%H%M%S')}_{src.label}_{args.gate or 'ca_khung'}_{i}_{r['ket_qua']}"
             (out_dir / f"{stem}.jpg").write_bytes(jpeg or b"")
-            r_json = {**r, "nguon": str(src.value), "cong": args.gate, "khung_hinh": [w, h], "khung_camera_dua_ra": delivered}
-            (out_dir / f"{stem}.json").write_text(json.dumps(r_json, ensure_ascii=False, indent=2), encoding="utf-8")
+            r_json = {**r, "nguon": str(src.value), "cong": args.gate, "khung_hinh": [w, h], "xoay_hinh": rotate,
+                      "khung_camera_dua_ra": delivered}
+            (out_dir / f"{stem}.json").write_text(to_json(r_json), encoding="utf-8")
 
             print(f"[Luot {i}] {r['ket_qua']}" + (f" thieu={r['thieu']}" if r["thieu"] else "")
                   + (f" ly_do={r['ly_do']}" if r["ly_do"] else ""))

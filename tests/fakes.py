@@ -24,8 +24,9 @@ CLS = {name: idx for idx, name in MODEL_NAMES.items()}
 # Co dinh cac nguong test dua vao (bang gia tri mac dinh trong DE_TAI.md muc 5), de
 # hieu chinh settings.yaml o Giai doan 2 khong lam hong test cua thuat toan.
 SETTINGS = copy.deepcopy(load_settings())
-SETTINGS["checkpoint"].update(min_person_height_px=150, top_edge_margin_px=2, min_valid_frames=3,
-                              present_ratio=0.6, absent_ratio=0.2)
+SETTINGS["checkpoint"].update(min_person_height_px=150, top_edge_margin_px=2, multi_person_ratio=0.5,
+                              min_valid_frames=3, present_ratio=0.6, absent_ratio=0.2)
+SETTINGS["ppe"].update(contain_thresh=0.8, group_max_x_overlap=0.5)
 REQUIRED = ["hardhat", "vest"]
 
 FRAME_H, FRAME_W = 720, 1280
@@ -133,4 +134,4 @@ class FakeCapture:
 
 
 CAM_CFG = {"webcam_width": 1280, "webcam_height": 720, "first_frame_timeout_s": 2.0,
-           "reconnect_delay_s": 0.01, "loop_video": True}
+           "reconnect_delay_s": 0.01, "loop_video": True, "rotate": 0}

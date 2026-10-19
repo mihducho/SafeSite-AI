@@ -5,11 +5,14 @@ Chay:
   .venv\\Scripts\\python.exe scripts\\define_zone.py --source data\\raw\\ten_video.mp4 --gate cong_1
   .venv\\Scripts\\python.exe scripts\\define_zone.py --source 0 --gate cong_1                          (webcam)
   .venv\\Scripts\\python.exe scripts\\define_zone.py --source http://192.168.1.23:8080/video --gate cong_1   (dien thoai)
+  .venv\\Scripts\\python.exe scripts\\define_zone.py --source http://192.168.1.23:4747/video --gate cong_dt --rotate 90
+                                                     (dien thoai dung doc, hinh bi nam ngang)
 
 Cach dung: click lan luot cac diem tao thanh da giac (toi thieu 3 diem). Vung nen
 bao phan SAN noi cong nhan dung (he thong xet DIEM CHAN cua nguoi).
   s = luu va thoat | r = ve lai tu dau | q = thoat khong luu
-Vung cu cua cong (neu co) hien mau xam de tham khao.
+Vung cu cua cong (neu co, cung goc xoay) hien mau xam de tham khao.
+Goc xoay (--rotate) duoc luu cung vung; run_checkpoint --gate tu dung goc nay.
 """
 import argparse
 import sys
@@ -21,7 +24,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.checkpoint.camera import CameraReader, open_capture, parse_source
+from src.checkpoint.camera import CameraReader, ROTATIONS, open_capture, parse_source, rotate_frame
 from src.config import load_settings
 from src.zone.zone import clicks_to_ratio, load_gates, save_gate_zone, zone_to_pixels
 
@@ -40,8 +43,8 @@ def grab_frame(source: str, frame_idx: int, cam_cfg: dict) -> np.ndarray:
         cap.release()
         if not ok:
             raise RuntimeError(f"Khong doc duoc khung {frame_idx} tu {source}")
-        return frame
-    with CameraReader(source, cam_cfg) as cam:
+        return rotate_frame(frame, cam_cfg["rotate"])
+    with CameraReader(source, cam_cfg) as cam:  # CameraReader tu xoay theo cam_cfg["rotate"]
         time.sleep(CAMERA_WARMUP_S)
         return cam.latest()[1]
 
@@ -53,16 +56,23 @@ def main():
     parser.add_argument("--gate", type=str, required=True, help="Ten cong, dung lam khoa trong file vung (vd cong_1).")
     parser.add_argument("--gates-file", type=str, default=str(settings["paths"]["gates_file"]))
     parser.add_argument("--frame-idx", type=int, default=0, help="File video: lay khung thu may de ve (mac dinh khung dau).")
+    parser.add_argument("--rotate", type=int, choices=sorted(ROTATIONS), default=None,
+                        help="Xoay hinh theo chieu kim dong ho (do). Mac dinh: goc da luu cua cong, chua co thi camera.rotate.")
     args = parser.parse_args()
+
+    old_gate = load_gates(args.gates_file).get(args.gate) or {}
+    rotate = args.rotate if args.rotate is not None else old_gate.get("rotate", settings["camera"]["rotate"])
+    settings["camera"]["rotate"] = rotate
 
     frame = grab_frame(args.source, args.frame_idx, settings["camera"])
     h, w = frame.shape[:2]
     scale = min(MAX_DISPLAY[0] / w, MAX_DISPLAY[1] / h, 1.0)
     frame = cv2.resize(frame, (round(w * scale), round(h * scale))) if scale < 1 else frame
     disp_h, disp_w = frame.shape[:2]
-    print(f"Khung hinh goc {w}x{h}, hien thi {disp_w}x{disp_h}")
+    print(f"Khung hinh {w}x{h} (xoay {rotate} do), hien thi {disp_w}x{disp_h}")
 
-    old = (load_gates(args.gates_file).get(args.gate) or {}).get("zone")
+    # Vung cu ve tren hinh xoay goc khac thi khong con khop, khong hien.
+    old = old_gate.get("zone") if old_gate.get("rotate", 0) == rotate else None
     old_px = zone_to_pixels(old, disp_w, disp_h) if old else None
 
     points: list[list[int]] = []  # toa do click tren anh dang hien thi
@@ -93,8 +103,8 @@ def main():
                 print("Can toi thieu 3 diem de tao thanh 1 vung.")
                 continue
             zone = clicks_to_ratio(points, disp_w, disp_h)
-            save_gate_zone(args.gates_file, args.gate, zone)
-            print(f"Da luu vung '{args.gate}' ({len(zone)} diem, ti le 0-1) vao {args.gates_file}: {zone}")
+            save_gate_zone(args.gates_file, args.gate, zone, rotate)
+            print(f"Da luu vung '{args.gate}' ({len(zone)} diem, ti le 0-1, xoay {rotate} do) vao {args.gates_file}: {zone}")
             break
         elif key == ord("q"):
             print("Thoat, khong luu.")

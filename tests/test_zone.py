@@ -6,8 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.zone.zone import (clicks_to_ratio, load_gate_zone, load_gates, load_zones, person_feet_point,
-                           point_in_zone, save_gate_zone, zone_to_pixels)
+from src.zone.zone import (choose_rotate, clicks_to_ratio, load_gate, load_gate_zone, load_gates, load_zones,
+                           person_feet_point, point_in_zone, save_gate_zone, zone_to_pixels)
 
 ZONE_YAML = """
 camera_1:
@@ -88,6 +88,45 @@ class GateZoneFileTest(unittest.TestCase):
         # Click tren anh hien thi 1280x720 (anh 4K da thu nho): ti le khong phu thuoc do phan giai goc.
         self.assertEqual(clicks_to_ratio([[320, 360], [960, 720], [1290, -5]], 1280, 720),
                          [[0.25, 0.5], [0.75, 1.0], [1.0, 0.0]])  # click lo ra ngoai anh bi kep ve 0-1
+
+    def test_rotate_saved_with_zone(self):
+        save_gate_zone(self.path, "cong_dt", self.ZONE, rotate=90)
+        self.assertEqual(load_gate(self.path, "cong_dt"), {"zone": self.ZONE, "rotate": 90})
+        save_gate_zone(self.path, "cong_dt", self.ZONE)  # ve lai khong xoay -> ghi de goc cu
+        self.assertEqual(load_gate(self.path, "cong_dt")["rotate"], 0)
+
+    def test_old_entry_without_rotate_is_0(self):
+        # Vung ve truoc khi co tinh nang xoay (chi co zone) van doc duoc, coi nhu khong xoay.
+        self.path.write_text("cong_1:\n  zone: [[0.25, 0.5], [0.75, 0.5], [0.75, 1.0]]\n", encoding="utf-8")
+        self.assertEqual(load_gate(self.path, "cong_1")["rotate"], 0)
+
+    def test_invalid_rotate_not_saved(self):
+        with self.assertRaises(ValueError):
+            save_gate_zone(self.path, "cong_1", self.ZONE, rotate=45)
+        self.assertFalse(self.path.exists())
+
+
+class ChooseRotateTest(unittest.TestCase):
+    """Goc xoay khi chay kiem tra: co cong thi theo goc luu cung vung."""
+
+    GATE = {"zone": [[0, 0], [1, 0], [1, 1]], "rotate": 90}
+
+    def test_gate_rotate_used_by_default(self):
+        self.assertEqual(choose_rotate(None, self.GATE, default=0), 90)
+
+    def test_cli_same_as_gate_ok(self):
+        self.assertEqual(choose_rotate(90, self.GATE, default=0), 90)
+
+    def test_cli_different_from_gate_rejected(self):
+        # Vung ve tren hinh xoay 90 ma chay khong xoay -> vung lech, phai bao loi.
+        with self.assertRaisesRegex(ValueError, "ve lai vung"):
+            choose_rotate(0, self.GATE, default=0)
+
+    def test_no_gate_cli_then_config(self):
+        self.assertEqual(choose_rotate(270, None, default=0), 270)
+        self.assertEqual(choose_rotate(None, None, default=180), 180)
+        with self.assertRaises(ValueError):
+            choose_rotate(None, None, default=45)
 
 
 class ZoneToPixelsTest(unittest.TestCase):

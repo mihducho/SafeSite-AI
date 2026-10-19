@@ -25,7 +25,8 @@ class FakeYolo:
 
     def predict(self, frame, **kw):
         self.calls.append((frame.shape, kw))
-        boxes = SimpleNamespace(xyxy=torch.tensor([[1.0, 2.0, 3.0, 4.0]]), cls=torch.tensor([3.0]))
+        boxes = SimpleNamespace(xyxy=torch.tensor([[1.0, 2.0, 3.0, 4.0]]), cls=torch.tensor([3.0]),
+                                conf=torch.tensor([0.9]))
         return [SimpleNamespace(boxes=boxes)]
 
 
@@ -40,6 +41,7 @@ class YoloDetectorTest(unittest.TestCase):
                          (SETTINGS["model"]["conf"], SETTINGS["model"]["iou"], SETTINGS["model"]["imgsz"]))
         self.assertEqual(d.cls.tolist(), [3])
         self.assertEqual(d.xyxy.shape, (1, 4))
+        self.assertAlmostEqual(float(d.conf[0]), 0.9, places=5)
 
     def test_warmup_runs_model_once_on_blank_image(self):
         model = FakeYolo()

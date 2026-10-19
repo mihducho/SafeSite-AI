@@ -5,14 +5,16 @@ Dung cho kiem tra that (check(), Giai doan 1b-2), script chay thu tren video
 va test tu dong (truyen bo phat hien gia thay cho model).
 
 Buoc 1 - xet tung khung (classify_frame):
-  1. Detect (chi lop nguoi + do bao ho), bo box nguoi trung bang suppress_contained.
+  1. Detect (chi lop nguoi + do bao ho), bo box nguoi trung bang suppress_contained
+     (box gop bao nhieu nguoi dung canh nhau thi bo box gop, giu tung nguoi).
   2. Chi giu nguoi co diem chan nam trong vung kiem tra.
   3. 0 nguoi -> "trong"; tu 2 nguoi -> "nhieu_nguoi"; dung 1 nguoi -> xet tiep.
   4. Khung 1 nguoi KHONG hop le neu box nguoi thap hon nguong (qua nho) hoac
      mep tren box cham mep tren khung (dau bi cat, khong xet duoc mu).
   5. Khung hop le: assign_ppe ghi nhan co mu / co ao trong khung do.
 Buoc 2 - tong hop (aggregate):
-  1. Qua nua so khung "nhieu_nguoi" -> NHIEU_NGUOI.
+  1. Ti le khung "nhieu_nguoi" >= multi_person_ratio -> NHIEU_NGUOI (cong chi kiem tra
+     1 nguoi; co nguoi thu 2 trong vung thi khong xet do bao ho).
   2. So khung hop le < min_valid_frames: qua nua so khung "trong" -> KHONG_CO_NGUOI,
      nguoc lai -> KHONG_XAC_DINH.
   3. Moi mon bat buoc: ti le co mat = so khung hop le thay mon do / so khung hop le.
@@ -73,7 +75,8 @@ def classify_frame(
     cls = np.asarray(det.cls).reshape(-1)
 
     persons = xyxy[cls == person_cls]
-    persons = persons[suppress_contained(persons, contain_thresh=ppe_cfg["contain_thresh"])]
+    persons = persons[suppress_contained(persons, contain_thresh=ppe_cfg["contain_thresh"],
+                                         group_max_x_overlap=ppe_cfg["group_max_x_overlap"])]
     if zone_px is None:
         in_zone = np.ones(len(persons), dtype=bool)
     else:
@@ -115,7 +118,7 @@ def aggregate(results: list[FrameResult], required: list[str], settings: dict) -
         "ly_do": None,  # them cho KHONG_XAC_DINH: "it_khung_hop_le" hoac "khong_chac"
     }
 
-    if kinds[NHIEU] > n / 2:
+    if n and kinds[NHIEU] / n >= cp["multi_person_ratio"]:
         out["ket_qua"] = NHIEU_NGUOI
         return out
     if len(valid) < cp["min_valid_frames"]:
@@ -173,12 +176,31 @@ class SnapshotPicker:
         return buf.tobytes() if ok else b""
 
 
+def _ratio_box(box, w: int, h: int) -> list[float]:
+    return [round(float(box[0]) / w, 3), round(float(box[1]) / h, 3), round(float(box[2]) / w, 3), round(float(box[3]) / h, 3)]
+
+
+def frame_detail(det: Detections, result: FrameResult, w: int, h: int, names: dict) -> dict:
+    """Chi tiet 1 khung de chan doan (chi so, khong co anh): moi box model tra ve (lop, do tin cay,
+    toa do ti le 0-1), loai khung, nguoi duoc tinh trong vung (sau buoc loc box trung)."""
+    conf = det.conf if det.conf is not None else [None] * len(det.cls)
+    return {
+        "loai": result.kind,
+        "ly_do": result.reason,
+        "box": [{"lop": names[int(c)], "conf": None if cf is None else round(float(cf), 3), "xyxy": _ratio_box(b, w, h)}
+                for b, c, cf in zip(det.xyxy, det.cls, conf)],
+        "nguoi_trong_vung": [_ratio_box(b, w, h) for b in result.zone_persons],
+        "ppe": result.ppe or None,
+    }
+
+
 class FrameEvaluator:
     """Phan dung chung cua evaluate_frames() va check() (DE_TAI muc 5): chuan bi luat 1 lan,
     xet tung khung bang classify_frame ngay khi nhan, chon anh, roi tong hop bang aggregate.
-    Hai duong chay goi cung cac buoc nay nen cho ket qua giong nhau."""
+    Hai duong chay goi cung cac buoc nay nen cho ket qua giong nhau.
+    record: ghi chi tiet tung khung (frame_detail) vao ket qua, truong "chi_tiet_khung"."""
 
-    def __init__(self, zone, required_ppe: list[str] | None, settings: dict, detector=None):
+    def __init__(self, zone, required_ppe: list[str] | None, settings: dict, detector=None, record: bool = False):
         ppe_cfg = settings["ppe"]
         self.required = list(ppe_cfg["required"] if required_ppe is None else required_ppe)
         unknown = [name for name in self.required if name not in ppe_cfg["items"]]
@@ -194,16 +216,21 @@ class FrameEvaluator:
         self.results: list[FrameResult] = []
         self.picker = SnapshotPicker()
         self._frame_ms: list[float] = []
+        self.record = record
+        self.details: list[dict] = []
 
     def add(self, frame: np.ndarray) -> FrameResult:
         """Buoc 1 cho 1 khung (detect + classify_frame), luu ket qua va ung vien anh chup."""
         t = time.perf_counter()
         h, w = frame.shape[:2]
         zone_px = None if self.zone is None else zone_to_pixels(self.zone, w, h)
-        result = classify_frame(self.detector(frame), frame.shape, zone_px, self.person_cls, self.rules, self.settings)
+        det = self.detector(frame)
+        result = classify_frame(det, frame.shape, zone_px, self.person_cls, self.rules, self.settings)
         self.results.append(result)
         self.picker.offer(frame, result, zone_px)
         self._frame_ms.append((time.perf_counter() - t) * 1000)
+        if self.record:
+            self.details.append(frame_detail(det, result, w, h, self.detector.names))
         return result
 
     def finish(self, t0: float) -> dict:
@@ -213,6 +240,8 @@ class FrameEvaluator:
                                            self.settings["checkpoint"]["snapshot_jpeg_quality"])
         out["ms_moi_khung"] = round(sum(self._frame_ms) / len(self._frame_ms), 1) if self._frame_ms else None
         out["thoi_gian_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        if self.record:
+            out["chi_tiet_khung"] = self.details
         return out
 
 
@@ -222,6 +251,7 @@ def evaluate_frames(
     required_ppe: list[str] | None = None,
     config: dict | None = None,
     detector=None,
+    record_frames: bool = False,
 ) -> dict:
     """Kiem tra bao ho tren danh sach khung hinh (BGR, cung 1 luot kiem tra).
 
@@ -232,7 +262,8 @@ def evaluate_frames(
 
     Tra ve dict: ket_qua, thieu, ty_le_co_mat, so_khung, so_khung_hop_le,
     dem_khung, ly_do, thoi_gian_ms, ms_moi_khung (thoi gian TB xu ly 1 khung),
-    anh_jpeg (bytes; None neu khong co khung nao).
+    anh_jpeg (bytes; None neu khong co khung nao); record_frames=True thi them
+    chi_tiet_khung (danh sach frame_detail, de chan doan).
     """
     t0 = time.perf_counter()
     bad = [i for i, f in enumerate(frames) if not isinstance(f, np.ndarray) or f.ndim != 3]
@@ -240,7 +271,7 @@ def evaluate_frames(
         # Vd doc camera/video loi tra ve None: bao ro thay vi loi kho hieu ben trong.
         raise ValueError(f"Khung hinh khong hop le (None hoac khong phai anh BGR) o vi tri {bad}")
     settings = config if config is not None else load_settings()
-    evaluator = FrameEvaluator(zone, required_ppe, settings, detector)
+    evaluator = FrameEvaluator(zone, required_ppe, settings, detector, record=record_frames)
     for frame in frames:
         evaluator.add(frame)
     return evaluator.finish(t0)

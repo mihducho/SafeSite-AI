@@ -8,11 +8,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import load_settings
 from src.utils.postprocess import suppress_contained
 
-CONTAIN_THRESH = load_settings()["ppe"]["contain_thresh"]  # 0.8 trong configs/settings.yaml
+PPE_CFG = load_settings()["ppe"]
+CONTAIN_THRESH = PPE_CFG["contain_thresh"]  # 0.8 trong configs/settings.yaml
+GROUP_MAX_X_OVERLAP = PPE_CFG["group_max_x_overlap"]  # 0.5
 
 
-def keep(boxes):
-    return suppress_contained(boxes, contain_thresh=CONTAIN_THRESH)
+def keep(boxes, group_max_x_overlap=GROUP_MAX_X_OVERLAP):
+    return suppress_contained(boxes, contain_thresh=CONTAIN_THRESH, group_max_x_overlap=group_max_x_overlap)
 
 
 class SuppressContainedTest(unittest.TestCase):
@@ -41,6 +43,29 @@ class SuppressContainedTest(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(keep([]).tolist(), [])
+
+
+class GroupBoxTest(unittest.TestCase):
+    """Box gop: model ve them 1 box bao nhieu nguoi dung sat vai nhau."""
+
+    # So lieu that (2026-10-20, khung 720x1280, 2 nguoi sat vai): nguoi trai, box gop, nguoi phai.
+    LEFT, GROUP, RIGHT = [0, 115, 360, 845], [14, 128, 590, 1011], [310, 128, 590, 858]
+
+    def test_group_box_removed_people_kept(self):
+        self.assertEqual(keep([self.LEFT, self.GROUP, self.RIGHT]).tolist(), [True, False, True])
+
+    def test_halves_of_one_person_not_split(self):
+        # Nua tren + nua duoi cua 1 nguoi: chong nhau het chieu ngang -> khong phai 2 nguoi.
+        whole, top, bottom = [100, 100, 300, 600], [100, 100, 300, 350], [105, 350, 295, 600]
+        self.assertEqual(keep([whole, top, bottom]).tolist(), [True, False, False])
+
+    def test_half_body_duplicate_still_removed(self):
+        # Chi 1 box nam trong (box nua than cua chinh nguoi do) -> xu ly nhu cu.
+        self.assertEqual(keep([[186, 166, 590, 1255], [186, 166, 590, 858]]).tolist(), [True, False])
+
+    def test_group_check_off_keeps_old_behavior(self):
+        self.assertEqual(keep([self.LEFT, self.GROUP, self.RIGHT], group_max_x_overlap=None).tolist(),
+                         [False, True, False])
 
 
 if __name__ == "__main__":
