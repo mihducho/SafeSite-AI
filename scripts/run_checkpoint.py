@@ -60,7 +60,11 @@ def main():
         settings["camera"]["webcam_height"] = args.height
     timeout = args.timeout or settings["checkpoint"]["timeout_s"]
 
-    gate = load_gate(settings["paths"]["gates_file"], args.gate) if args.gate else None
+    try:
+        gate = load_gate(settings["paths"]["gates_file"], args.gate) if args.gate else None
+    except KeyError as e:
+        sys.exit(f"Loi: {e.args[0]}\nVe vung truoc: .venv\\Scripts\\python.exe scripts\\define_zone.py "
+                 f"--source {args.source} --gate {args.gate}  (bam s de luu)")
     zone = gate["zone"] if gate else None
     try:
         rotate = choose_rotate(args.rotate, gate, settings["camera"]["rotate"])

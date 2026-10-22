@@ -19,7 +19,9 @@ REQUIRED_KEYS = {
     "checkpoint": ["timeout_s", "min_person_height_px", "top_edge_margin_px", "multi_person_ratio", "min_valid_frames",
                    "present_ratio", "absent_ratio", "snapshot_jpeg_quality"],
     "camera": ["webcam_width", "webcam_height", "first_frame_timeout_s", "reconnect_delay_s", "loop_video", "rotate"],
-    "paths": ["snapshot_dir", "gates_file", "checkpoint_runs", "tracker_config"],
+    "evaluation": ["sample_fps", "fps_probe_frames", "video_exts", "answer_prefixes", "condition_prefixes"],
+    "paths": ["snapshot_dir", "gates_file", "checkpoint_runs", "tracker_config", "eval_videos", "eval_answers",
+              "eval_runs"],
 }
 ITEM_KEYS = ["class_name", "region", "missing_code"]  # moi mon trong ppe.items
 

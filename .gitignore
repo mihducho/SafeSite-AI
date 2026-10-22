@@ -11,6 +11,9 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 data/snapshots/
+data/eval/*
+!data/eval/.gitkeep
+!data/eval/dap_an.csv
 *.pt
 *.pth
 *.onnx

@@ -54,8 +54,33 @@ camera:
                                # phat hinh ngang (nguoi nam ngang, dau ben trai) -> 90. Khi chay voi --gate thi
                                # dung goc da luu cung vung trong gates_file (define_zone --rotate)
 
+evaluation:
+  # Giai doan 2 (DE_TAI.md muc 10): moi video 1 luot, nguoi da dung trong vung tu dau video.
+  sample_fps: null             # so khung/giay mo phong; null = do toc do xu ly that tren may (theo imgsz)
+  fps_probe_frames: 10         # so lan chay model de do toc do
+  video_exts: [.mp4, .mov, .avi, .mkv, .m4v, .3gp]
+  # Quy uoc ten file -> dap an (scripts/make_answers.py), khop tien to dai nhat truoc. Vd du_do_01.mp4 -> DAT.
+  answer_prefixes:
+    du_do: {ket_qua: DAT}
+    mu_trang: {ket_qua: DAT}
+    ao_cam: {ket_qua: DAT}
+    ao_xanh: {ket_qua: DAT}                          # ao phan quang mau xanh
+    thieu_mu: {ket_qua: KHONG_DAT, thieu: [thieu_mu]}
+    mubaohiem: {ket_qua: KHONG_DAT, thieu: [thieu_mu]}   # mu bao hiem xe may, khong phai mu bao ho
+    non_la: {ket_qua: KHONG_DAT, thieu: [thieu_mu]}
+    mu_luoi_trai: {ket_qua: KHONG_DAT, thieu: [thieu_mu]}
+    thieu_ao: {ket_qua: KHONG_DAT, thieu: [thieu_ao]}
+    thieu_ca_hai: {ket_qua: KHONG_DAT, thieu: [thieu_mu, thieu_ao]}
+    hai_nguoi: {ket_qua: NHIEU_NGUOI}
+    trong: {ket_qua: KHONG_CO_NGUOI}
+  # Tien to dieu kien anh sang: dap an theo phan duoi (vd nguoc_sang_du_do -> DAT, dieu kien nguoc_sang_du_do)
+  condition_prefixes: [nguoc_sang, thieu_sang]
+
 paths:
   snapshot_dir: data/snapshots              # thu muc luu anh moi luot kiem tra (backend dung o Giai doan 3)
+  eval_videos: data/eval                    # video danh gia Giai doan 2 (khong commit)
+  eval_answers: data/eval/dap_an.csv        # file dap an: ten_file, ket_qua_dung, thieu_dung, dieu_kien
+  eval_runs: runs/eval                      # ket qua danh gia: CSV, tom_tat.md, anh cac luot sai
   gates_file: configs/gates.yaml            # vung kiem tra ti le 0-1 cua tung cong (luu tam, cho bang gates)
   checkpoint_runs: runs/checkpoint          # anh + ket qua cua script chay thu scripts/run_checkpoint.py
   tracker_config: configs/botsort_tracking.yaml   # chi script giam sat cu dung, che do cong khong tracking

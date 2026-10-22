@@ -18,7 +18,13 @@ và mặc áo phản quang không (YOLO11s). Đạt thì ghi giờ vào ca. Mô 
         [docs/huong_dan_camera_dien_thoai.md](docs/huong_dan_camera_dien_thoai.md)
   - [x] Chạy thử tại cổng với điện thoại dựng dọc (`--rotate 90`): đủ đồ, thiếu mũ, thiếu áo, 2 người, mũ két
   - [ ] Quay video các tình huống (dùng lại cho Giai đoạn 2); kéo mép vùng sát mép hình trong `define_zone.py` (để sau)
-- [ ] Giai đoạn 2–6: script đánh giá, backend, kiosk, web quản lý (xem DE_TAI.md mục 10)
+- [ ] Giai đoạn 2: script đánh giá trên video
+  - [x] Bản rút gọn: tạo file đáp án từ tên video, đánh giá (tỷ lệ đúng, ma trận nhầm lẫn, precision/recall
+        vi phạm, KHONG_XAC_DINH, thời gian), so sánh imgsz 640/960
+  - [x] Chạy trên bộ video tự quay `cong_gia_v1` (43 video, imgsz 640: 38/43 đúng, precision vi phạm 100%,
+        recall 90.9%), xem [docs/ket_qua_danh_gia_cong_v1.md](docs/ket_qua_danh_gia_cong_v1.md)
+  - [ ] Mở rộng bộ video (ngược sáng, thiếu sáng, mũ vải...), hiệu chỉnh ngưỡng
+- [ ] Giai đoạn 3–6: backend, kiosk, web quản lý (xem DE_TAI.md mục 10)
 
 ## Cài đặt (Windows, Python 3.13)
 
@@ -47,6 +53,13 @@ vùng đầu/thân, các ngưỡng của thuật toán kiểm tra tại cổng, 
 .venv\Scripts\python.exe scripts\define_zone.py --source 0 --gate cong_1                  # 1. vẽ vùng kiểm tra (tỷ lệ 0–1) -> configs\gates.yaml
 .venv\Scripts\python.exe scripts\run_checkpoint.py --source 0 --gate cong_1 --rounds 3    # 2. chạy check(), ảnh + JSON -> runs\checkpoint\
 # Hình bị nằm ngang (điện thoại dựng dọc): thêm --rotate 90 khi vẽ vùng; góc lưu cùng vùng, --gate tự xoay theo
+
+# Đánh giá trên video (Giai đoạn 2). Tên file theo quy ước: du_do_01.mp4, thieu_mu_01.mp4, hai_nguoi_01.mp4,
+# nguoc_sang_du_do_01.mp4... (danh sách đầy đủ trong configs\settings.yaml, mục evaluation)
+.venv\Scripts\python.exe scripts\make_answers.py --videos <thu_muc_video>                 # 1. tạo dap_an.csv, kiểm tra và sửa tay
+.venv\Scripts\python.exe scripts\define_zone.py --source <thu_muc_video>\du_do_01.mp4 --gate cong_video   # 2. vẽ vùng
+.venv\Scripts\python.exe scripts\evaluate_videos.py --videos <thu_muc_video> --gate cong_video --imgsz 640   # 3. -> runs\eval\
+.venv\Scripts\python.exe scripts\evaluate_videos.py --videos <thu_muc_video> --gate cong_video --imgsz 960
 
 # Công cụ khác
 .venv\Scripts\python.exe scripts\extract_frames.py --source data\raw\<video>.mp4          # cắt khung để gán nhãn
