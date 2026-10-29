@@ -75,8 +75,7 @@ SafeSite-AI/
 │   ├── ppe/                gán mũ, áo cho đúng người (vùng đầu, vùng thân)
 │   ├── zone/               vùng kiểm tra (đa giác), điểm chân
 │   ├── utils/              lọc khung trùng, vẽ lên ảnh
-│   ├── evaluation/         đánh giá trên video (Giai đoạn 2)
-│   └── tracking/           theo dõi người qua nhiều khung (chỉ hướng cũ dùng)
+│   └── evaluation/         đánh giá trên video (Giai đoạn 2)
 ├── scripts/        "CHƯƠNG TRÌNH": file chạy được, gọi các hàm trong src/
 ├── tests/          kiểm thử tự động
 ├── docs/           tài liệu (file này, kết quả model, kết quả đánh giá...)
@@ -156,7 +155,6 @@ Vùng kiểm tra được lưu bằng **tỷ lệ** so với kích thước ản
 | **opencv-python** (`cv2`) 5.0 | Đọc camera và video, xoay ảnh, vẽ khung, nén JPEG, kiểm tra điểm trong đa giác, cửa sổ click chuột | `cv2.VideoCapture`, `cv2.rotate`, `cv2.pointPolygonTest`, `cv2.imencode` |
 | **numpy** 2.5 | Làm việc với mảng số (ảnh, danh sách khung) và tính toán nhanh trên cả mảng | `np.maximum`, `np.clip`, mảng `(N, 4)` các khung |
 | **PyYAML** | Đọc, ghi file cấu hình `.yaml` | `yaml.safe_load` trong [config.py](../src/config.py) |
-| **lap** | Thuật toán ghép cặp cho tracker (chỉ hướng cũ) | |
 
 **Thư viện có sẵn của Python** (không cần cài):
 - `pathlib` (đường dẫn file), `argparse` (đọc tham số dòng lệnh như `--source`, `--gate`).
@@ -673,7 +671,7 @@ Theo DE_TAI.md, các giai đoạn tiếp theo sẽ **gọi lại** đúng các h
 | [scripts/evaluate_videos.py](../scripts/evaluate_videos.py) | Đánh giá cả bộ video |
 | [scripts/demo.py](../scripts/demo.py) | Menu demo |
 | [scripts/train.py](../scripts/train.py) | Train model (đã chạy trên Colab) |
-| `scripts/run_safety_demo.py`, `src/tracking/` | Hướng cũ (giám sát toàn công trường), giữ để tham khảo |
+| [_old/](../_old/) | File của hướng cũ (giám sát toàn công trường, tracking), chỉ giữ để tham khảo |
 
 ### B. Thuật ngữ
 

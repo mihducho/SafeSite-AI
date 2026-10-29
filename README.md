@@ -58,7 +58,7 @@ GRANT ALL PRIVILEGES ON safegate.* TO 'safegate'@'localhost';
 ```
 copy .env.example .env                                   # 1. điền DATABASE_URL (mật khẩu MySQL), SECRET_KEY, ADMIN_PASSWORD
 .venv\Scripts\python.exe scripts\seed_demo.py --source 0 --zone ca_khung        # 2. tạo bảng, tài khoản admin, cổng (webcam), ca, tổ đội
-.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000                     # 3. chạy; mở http://127.0.0.1:8000 (Ctrl+C: dừng)
+.\web                                                                            # 3. chạy (web.bat); mở http://127.0.0.1:8000 (Ctrl+C: dừng)
 ```
 
 - Trang: `/` Tổng quan · `/cong` Màn hình cổng (bấm "Bật âm thanh", "Toàn màn hình"; nên mở bằng Microsoft Edge vì có sẵn giọng
@@ -116,10 +116,6 @@ vùng đầu/thân, các ngưỡng của thuật toán kiểm tra tại cổng, 
 
 # Menu demo (báo cáo tiến độ): chọn số thay vì gõ lệnh dài. Cấu hình ở mục demo trong configs\settings.yaml
 .\demo
-
-# Công cụ khác
-.venv\Scripts\python.exe scripts\extract_frames.py --source data\raw\<video>.mp4          # cắt khung để gán nhãn
-.venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\<video>.mp4         # [hướng cũ] giám sát công trường, giữ để tham khảo
 ```
 
 Dùng điện thoại làm camera: [docs/huong_dan_camera_dien_thoai.md](docs/huong_dan_camera_dien_thoai.md).
@@ -133,8 +129,8 @@ app/       ứng dụng web FastAPI: main.py, config.py (.env), db.py, models.py
            templates/ (trang Jinja2), static/ (Bootstrap 5.3.3, CSS, JavaScript từng trang)
 src/       config.py, checkpoint/ (kiểm tra bảo hộ: camera, evaluate, check), face/ (YuNet, SFace, phân tích mặt,
            so khớp, đăng ký), gate/ (kết hợp, máy trạng thái, một lượt, vòng lặp cổng), detection/, ppe/ (luật vùng
-           đầu/thân), zone/, evaluation/, tracking/ (chỉ hướng cũ dùng), utils/
-scripts/   công cụ chạy thử, vẽ vùng, cắt khung, train
+           đầu/thân), zone/, evaluation/, utils/
+scripts/   công cụ chạy thử, vẽ vùng, đánh giá, tạo dữ liệu demo, train
 tests/     kiểm thử tự động (unittest)
 docs/      rà soát, hướng dẫn train, kết quả model
 weights/   model đã train (không commit)

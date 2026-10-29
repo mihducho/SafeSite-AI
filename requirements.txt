@@ -6,7 +6,6 @@ torch==2.14.0
 torchvision==0.29.0
 opencv-python==5.0.0.93
 numpy==2.5.3
-lap==0.5.13          # can cho BoT-SORT (PersonTracker)
 PyYAML==6.0.3        # doc configs/settings.yaml
 
 

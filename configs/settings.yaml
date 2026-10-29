@@ -154,7 +154,6 @@ demo:
     - {name: non_la_01, note: "Non la -> he thong SAI (nhan nham la mu bao ho)"}
 
 paths:
-  snapshot_dir: data/snapshots              # [cu] anh check() cua run_checkpoint.py
   check_images: data/anh_luot               # ung dung web: anh moi luot kiem tra <ngay>/<gio>_<ma>.jpg (khong commit)
   face_samples: data/anh_mau_mat            # ung dung web: anh mat 112x112 cua mau <worker_id>/*.jpg (khong commit)
   eval_videos: data/eval                    # video danh gia Giai doan 2 (khong commit)
@@ -166,4 +165,3 @@ paths:
   gate_runs: runs/gate                      # anh + JSON moi luot cua scripts/run_gate.py
   gates_file: configs/gates.yaml            # vung kiem tra ti le 0-1 cua tung cong (luu tam, cho bang gates)
   checkpoint_runs: runs/checkpoint          # anh + ket qua cua script chay thu scripts/run_checkpoint.py
-  tracker_config: configs/botsort_tracking.yaml   # chi script giam sat cu dung, che do cong khong tracking

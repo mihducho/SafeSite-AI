@@ -10,7 +10,6 @@ data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
-data/snapshots/
 # Du lieu khuon mat (du lieu sinh trac hoc, nhay cam): anh dang ky, vector mau, anh luot, anh mau mat
 data/anh_dang_ky/
 data/face/
@@ -32,7 +31,6 @@ data/eval/*
 *.onnx
 runs/
 weights/
-_archive_lostlens/
 
 # Notebooks checkpoints
 .ipynb_checkpoints/

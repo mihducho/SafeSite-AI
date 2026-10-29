@@ -30,7 +30,7 @@ class LoadSettingsTest(unittest.TestCase):
         self.assertEqual(s["model"]["person_class"], "Person")
         # Duong dan tuong doi duoc doi thanh tuyet doi theo thu muc goc du an.
         self.assertEqual(s["model"]["weights"], ROOT / "weights" / "ppe_s" / "weights" / "best.pt")
-        self.assertTrue(s["paths"]["snapshot_dir"].is_absolute())
+        self.assertTrue(s["paths"]["gates_file"].is_absolute())
 
     def test_missing_key_reported(self):
         data = yaml.safe_load(DEFAULT_SETTINGS.read_text(encoding="utf-8"))

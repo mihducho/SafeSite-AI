@@ -28,8 +28,8 @@ REQUIRED_KEYS = {
     "attendance": ["duplicate_minutes", "missing_checkout_hours", "timezone", "default_shift"],
     "web": ["session_hours", "page_size", "max_page_size", "max_upload_mb", "gate_result_seconds"],
     "evaluation": ["sample_fps", "fps_probe_frames", "video_exts", "answer_prefixes", "condition_prefixes"],
-    "paths": ["snapshot_dir", "gates_file", "checkpoint_runs", "tracker_config", "eval_videos", "eval_answers",
-              "eval_runs", "enroll_images", "face_gallery", "face_thumbs", "gate_runs", "check_images", "face_samples"],
+    "paths": ["gates_file", "checkpoint_runs", "eval_videos", "eval_answers", "eval_runs", "enroll_images",
+              "face_gallery", "face_thumbs", "gate_runs", "check_images", "face_samples"],
 }
 ITEM_KEYS = ["class_name", "region", "missing_code"]  # moi mon trong ppe.items
 

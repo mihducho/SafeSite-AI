@@ -1,8 +1,7 @@
-"""Detection: load model YOLO, tra chi so lop theo ten, chay inference."""
+"""Detection: load model YOLO, tra chi so lop theo ten."""
 from pathlib import Path
 
 from ultralytics import YOLO
-from ultralytics.engine.results import Results
 
 from src.config import load_settings
 
@@ -27,14 +26,3 @@ def find_class_ids(model_names: dict[int, str], class_names: list[str]) -> dict[
     if missing:
         raise ValueError(f"Model khong co lop {missing}. Cac lop cua model: {list(model_names.values())}")
     return {n: by_name[n] for n in class_names}
-
-
-def detect(
-    model: YOLO,
-    source,
-    conf: float,
-    classes: list[int] | None = None,
-    **kwargs,
-) -> list[Results]:
-    """Chay detect tren 1 anh / video / thu muc anh. classes=None: giu moi lop."""
-    return model.predict(source=source, conf=conf, classes=classes, **kwargs)
