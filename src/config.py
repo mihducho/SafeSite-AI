@@ -19,9 +19,15 @@ REQUIRED_KEYS = {
     "checkpoint": ["timeout_s", "min_person_height_px", "top_edge_margin_px", "multi_person_ratio", "min_valid_frames",
                    "present_ratio", "absent_ratio", "snapshot_jpeg_quality"],
     "camera": ["webcam_width", "webcam_height", "first_frame_timeout_s", "reconnect_delay_s", "loop_video", "rotate"],
+    "face": ["detector_model", "recognizer_model", "score_threshold", "nms_threshold", "opencv_threads", "enroll_min_score",
+             "min_face_px", "multi_min_px", "multi_min_ratio", "quality_full_width_px", "max_vectors",
+             "match_threshold", "match_margin", "min_samples", "max_samples"],
+    "gate": ["idle_long_side", "idle_max_fps", "trigger_frames", "cooldown_seconds", "empty_seconds",
+             "result_display_seconds"],
+    "attendance": ["duplicate_minutes", "missing_checkout_hours", "timezone"],
     "evaluation": ["sample_fps", "fps_probe_frames", "video_exts", "answer_prefixes", "condition_prefixes"],
     "paths": ["snapshot_dir", "gates_file", "checkpoint_runs", "tracker_config", "eval_videos", "eval_answers",
-              "eval_runs"],
+              "eval_runs", "enroll_images", "face_gallery", "face_thumbs", "gate_runs"],
 }
 ITEM_KEYS = ["class_name", "region", "missing_code"]  # moi mon trong ppe.items
 
@@ -52,5 +58,7 @@ def load_settings(path: str | Path = DEFAULT_SETTINGS) -> dict:
         raise KeyError(f"ppe.required co mon chua khai bao trong ppe.items: {unknown}")
 
     settings["model"]["weights"] = project_path(settings["model"]["weights"])
+    for key in ("detector_model", "recognizer_model"):
+        settings["face"][key] = project_path(settings["face"][key])
     settings["paths"] = {k: project_path(v) for k, v in settings["paths"].items()}
     return settings

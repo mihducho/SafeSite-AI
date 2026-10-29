@@ -66,3 +66,15 @@ def draw_header(frame: np.ndarray, lines: list[str]) -> None:
         y = line_h * (i + 1)
         cv2.putText(frame, line, (margin, y), FONT, font_scale, (0, 0, 0), _px(3, s), cv2.LINE_AA)
         cv2.putText(frame, line, (margin, y), FONT, font_scale, WHITE, thickness, cv2.LINE_AA)
+
+
+CYAN = (255, 255, 0)  # khuon mat cua nguoi dang kiem tra
+
+
+def draw_faces(frame: np.ndarray, rows: np.ndarray, main_idx: int | None = None) -> None:
+    """Khung mat (dong YuNet: x, y, w, h, ...): mat cua nguoi dang kiem tra mau xanh lo, net dam; mat khac mau trang."""
+    s = _scale(frame)
+    for i, r in enumerate(np.asarray(rows).reshape(-1, 15)):
+        x, y, w, h = (int(round(v)) for v in r[:4])
+        main = i == main_idx
+        cv2.rectangle(frame, (x, y), (x + w, y + h), CYAN if main else WHITE, _px(3 if main else 1, s))

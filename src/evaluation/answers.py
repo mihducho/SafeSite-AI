@@ -1,7 +1,9 @@
 """File dap an cho danh gia Giai doan 2 (DE_TAI.md muc 10).
 
-CSV (utf-8-sig de mo bang Excel khong loi dau): ten_file, ket_qua_dung, thieu_dung, dieu_kien.
+CSV (utf-8-sig de mo bang Excel khong loi dau): ten_file, ket_qua_dung, thieu_dung, dieu_kien, nguoi.
 thieu_dung: cac ma thieu cach nhau bang ";" (vd "thieu_mu;thieu_ao"), trong khi khong thieu.
+nguoi (DE_TAI.md muc 11.1, khong bat buoc): ma nguoi DANG DUOC KIEM TRA trong video (vd A, B) de danh gia nhan dien
+khuon mat; dien tay. De trong (vd video khong co nguoi, hai nguoi) thi khong tinh vao ti le nhan dung nguoi.
 
 Dap an duoc DOAN tu tien to ten file theo quy uoc trong settings.yaml (evaluation.answer_prefixes,
 evaluation.condition_prefixes), roi nguoi dung kiem tra va sua tay. Tao lai file thi GIU NGUYEN cac
@@ -14,7 +16,8 @@ from pathlib import Path
 
 from src.checkpoint.evaluate import DAT, KHONG_CO_NGUOI, KHONG_DAT, NHIEU_NGUOI
 
-COLUMNS = ["ten_file", "ket_qua_dung", "thieu_dung", "dieu_kien"]
+REQUIRED_COLUMNS = ["ten_file", "ket_qua_dung", "thieu_dung", "dieu_kien"]
+COLUMNS = REQUIRED_COLUMNS + ["nguoi"]  # file cu chua co cot nguoi van doc duoc; ghi lai thi luon co
 TRUE_RESULTS = [DAT, KHONG_DAT, NHIEU_NGUOI, KHONG_CO_NGUOI]  # dap an khong the la KHONG_XAC_DINH
 SEP = ";"
 
@@ -25,6 +28,7 @@ class Answer:
     ket_qua_dung: str  # "" = chua biet (ten file khong theo quy uoc), can sua tay
     thieu_dung: list[str] = field(default_factory=list)
     dieu_kien: str = ""
+    nguoi: str = ""    # ma nguoi dang duoc kiem tra (danh gia khuon mat); "" = khong xet
 
 
 def _starts_with_word(text: str, prefix: str) -> bool:
@@ -84,7 +88,7 @@ def write_answers(path: str | Path, answers: list[Answer]) -> None:
         w = csv.writer(f)
         w.writerow(COLUMNS)
         for a in answers:
-            w.writerow([a.ten_file, a.ket_qua_dung, SEP.join(a.thieu_dung), a.dieu_kien])
+            w.writerow([a.ten_file, a.ket_qua_dung, SEP.join(a.thieu_dung), a.dieu_kien, a.nguoi])
 
 
 def read_answers(path: str | Path, missing_codes: list[str] | None = None, strict: bool = True) -> list[Answer]:
@@ -96,9 +100,9 @@ def read_answers(path: str | Path, missing_codes: list[str] | None = None, stric
         return []
     with open(path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        lacking = [c for c in COLUMNS if c not in (reader.fieldnames or [])]
+        lacking = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or [])]
         if lacking:
-            raise ValueError(f"File dap an {path} thieu cot {lacking}. Can co cac cot: {COLUMNS}")
+            raise ValueError(f"File dap an {path} thieu cot {lacking}. Can co cac cot: {REQUIRED_COLUMNS}")
         answers, errors = [], []
         for line, row in enumerate(reader, start=2):
             ket_qua = (row["ket_qua_dung"] or "").strip().upper()
@@ -113,7 +117,8 @@ def read_answers(path: str | Path, missing_codes: list[str] | None = None, stric
                 bad = [t for t in thieu if t not in missing_codes]
                 if bad:
                     errors.append(f"dong {line}: ma thieu {bad} khong hop le (chon trong {missing_codes})")
-            answers.append(Answer(row["ten_file"].strip(), ket_qua, thieu, (row["dieu_kien"] or "").strip()))
+            answers.append(Answer(row["ten_file"].strip(), ket_qua, thieu, (row["dieu_kien"] or "").strip(),
+                                  (row.get("nguoi") or "").strip()))
     if strict and errors:
         raise ValueError(f"File dap an {path} co loi:\n  " + "\n  ".join(errors))
     return answers

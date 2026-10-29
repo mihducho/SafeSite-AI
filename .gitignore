@@ -11,6 +11,12 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 data/snapshots/
+# Du lieu khuon mat (du lieu sinh trac hoc, nhay cam): anh dang ky, vector mau, anh luot, anh mau mat
+data/anh_dang_ky/
+data/face/
+data/anh_luot/
+data/anh_mau_mat/
+.env
 data/eval/*
 !data/eval/.gitkeep
 !data/eval/dap_an.csv

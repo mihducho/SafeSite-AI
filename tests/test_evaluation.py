@@ -285,3 +285,79 @@ class ReportTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NguoiColumnTest(unittest.TestCase):
+    """Cot `nguoi` (DE_TAI muc 11.1) trong file dap an."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.path = Path(self.tmp.name) / "dap_an.csv"
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_ghi_doc_lai_co_cot_nguoi(self):
+        rows = [Answer("du_do_01.mp4", "DAT", [], "du_do", "A"), Answer("trong_01.mp4", "KHONG_CO_NGUOI", [], "trong", "")]
+        write_answers(self.path, rows)
+        self.assertEqual(read_answers(self.path, CODES), rows)
+        self.assertTrue(self.path.read_text(encoding="utf-8-sig").startswith("ten_file,ket_qua_dung,thieu_dung,dieu_kien,nguoi"))
+
+    def test_file_cu_khong_co_cot_nguoi_van_doc_duoc(self):
+        self.path.write_text("ten_file,ket_qua_dung,thieu_dung,dieu_kien\ndu_do_01.mp4,DAT,,du_do\n", encoding="utf-8")
+        self.assertEqual(read_answers(self.path, CODES)[0].nguoi, "")
+
+    def test_tao_lai_giu_cot_nguoi_da_dien_tay(self):
+        rows, _ = merge_answers([Answer("du_do_01.mp4", "DAT", [], "du_do", "B")], [Answer("du_do_01.mp4", "DAT", [], "du_do")])
+        self.assertEqual(rows[0].nguoi, "B")
+
+
+from src.evaluation.face_eval import FaceRound, decide_at, outcome, ppe_changes, recognition_counts, sweep  # noqa: E402
+from src.evaluation.face_eval import to_markdown as faces_markdown  # noqa: E402
+
+FACE_ROWS = [
+    FaceRound("a1", "A", "A", 0.80, 0.10),     # dung
+    FaceRound("a2", "A", "B", 0.45, 0.42),     # sat nhau (khoang cach 0.03 < 0.05) -> khong nhan ra
+    FaceRound("b1", "B", "A", 0.50, 0.20),     # nhan nham sang A
+    FaceRound("b2", "B", "B", 0.35, 0.10),     # duoi nguong 0.40 -> khong nhan ra
+    FaceRound("la1", "LA1", "A", 0.30, 0.25),  # nguoi la, duoi nguong -> tu choi dung
+    FaceRound("la2", "LA2", "B", 0.47, 0.20),  # nguoi la bi nhan nham thanh B
+    FaceRound("hn", "", "A", 0.90, 0.10),      # khong xet (de trong)
+]
+
+
+class FaceEvalTest(unittest.TestCase):
+    def test_quyet_dinh_theo_nguong(self):
+        self.assertEqual([decide_at(r, 0.40, 0.05) for r in FACE_ROWS], ["A", None, "A", None, None, "B", "A"])
+
+    def test_phan_loai_ket_qua(self):
+        enrolled = {"A", "B"}
+        self.assertEqual(outcome("A", "A", enrolled), "dung")
+        self.assertEqual(outcome("A", "B", enrolled), "nham")
+        self.assertEqual(outcome("A", None, enrolled), "khong_nhan_ra")
+        self.assertEqual(outcome("LA1", None, enrolled), "la_tu_choi_dung")
+        self.assertEqual(outcome("LA1", "A", enrolled), "la_bi_nhan_nham")
+        self.assertIsNone(outcome("", "A", enrolled))
+
+    def test_dem_ket_qua(self):
+        c = recognition_counts(FACE_ROWS, 0.40, 0.05, {"A", "B"})
+        self.assertEqual((c["dung"], c["nham"], c["khong_nhan_ra"], c["la_tu_choi_dung"], c["la_bi_nhan_nham"]), (1, 1, 2, 1, 1))
+        self.assertEqual((c["so_luot_nguoi_da_dang_ky"], c["so_luot_nguoi_la"]), (4, 2))
+        self.assertAlmostEqual(c["ty_le_dung"], 0.25)
+
+    def test_quet_nguong_nguong_cao_it_nhan_nham(self):
+        res = {r["nguong"]: r for r in sweep(FACE_ROWS, [0.30, 0.48, 0.60], 0.05, {"A", "B"})}
+        self.assertEqual(res[0.48]["la_bi_nhan_nham"], 0)   # nguong 0.48: nguoi la (0.47) bi tu choi
+        self.assertEqual(res[0.60]["dung"], 1)
+        self.assertGreaterEqual(res[0.30]["la_bi_nhan_nham"], res[0.60]["la_bi_nhan_nham"])
+
+    def test_video_doi_ket_qua_va_bao_cao(self):
+        before = [R("hai_nguoi_dungsau_01.mp4", "NHIEU_NGUOI", "KHONG_DAT", thieu=["thieu_mu"]),
+                  R("du_do_1.mp4", "DAT", "DAT")]
+        after = [R("hai_nguoi_dungsau_01.mp4", "NHIEU_NGUOI", "NHIEU_NGUOI"), R("du_do_1.mp4", "DAT", "DAT")]
+        ch = ppe_changes(before, after)
+        self.assertEqual([(c["ten_file"], c["dung_truoc"], c["dung_sau"]) for c in ch], [("hai_nguoi_dungsau_01.mp4", False, True)])
+        table = [{"dieu_kien": "du_do", "so_luot": 1, "luot_co_mat": 1, "khung_co_mat_tb": 1.0, "ty_le_nhieu_mat_tb": 0.0}]
+        md = faces_markdown({"imgsz": 640}, before, after, table, None, 0.40, {"YuNet": "33"})
+        for text in ("| Tỷ lệ đúng | 1/2 (50.0%) | 2/2 (100.0%) |", "hai_nguoi_dungsau_01.mp4", "Chưa chạy", "| YuNet | 33 |"):
+            self.assertIn(text, md)

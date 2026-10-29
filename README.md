@@ -3,9 +3,9 @@
 Đồ án tốt nghiệp: **hệ thống quản lý và chấm công công nhân tại công trường, tích hợp kiểm tra trang bị
 bảo hộ lao động bằng thị giác máy tính**.
 
-Công nhân quét thẻ QR ở kiosk tại cổng. Camera kiểm tra người đứng trong vùng kiểm tra có đội mũ bảo hộ
-và mặc áo phản quang không (YOLO11s). Đạt thì ghi giờ vào ca. Mô tả đầy đủ, phạm vi và các quyết định
-đã chốt nằm ở [DE_TAI.md](DE_TAI.md).
+**SafeGate** (DE_TAI.md phiên bản 2): một camera tại cổng vừa **nhận diện khuôn mặt** để biết công nhân là ai
+(YuNet + SFace của OpenCV), vừa kiểm tra **mũ bảo hộ và áo phản quang** (YOLO11s); đủ bảo hộ thì tự động ghi công.
+Mô tả đầy đủ, phạm vi, các giai đoạn nước rút F1–F4 nằm ở [DE_TAI.md](DE_TAI.md).
 
 ## Trạng thái
 
@@ -24,7 +24,10 @@ và mặc áo phản quang không (YOLO11s). Đạt thì ghi giờ vào ca. Mô 
   - [x] Chạy trên bộ video tự quay `cong_gia_v1` (43 video, imgsz 640: 38/43 đúng, precision vi phạm 100%,
         recall 90.9%), xem [docs/ket_qua_danh_gia_cong_v1.md](docs/ket_qua_danh_gia_cong_v1.md)
   - [ ] Mở rộng bộ video (ngược sáng, thiếu sáng, mũ vải...), hiệu chỉnh ngưỡng
-- [ ] Giai đoạn 3–6: backend, kiosk, web quản lý (xem DE_TAI.md mục 10)
+- [x] **F1. Khuôn mặt + vòng lặp cổng (phần AI)**: `src/face/` (YuNet, SFace, gắn mặt với người trong vùng, đếm mặt,
+      so khớp), `src/gate/` (kết hợp + luật `nhieu_mat`, máy trạng thái, một lượt, vòng lặp cổng), đăng ký mẫu,
+      `run_gate.py`, `evaluate_faces.py`. Bộ `cong_gia_v1` (cùng 18 khung): bảo hộ 38/43 → 40/43 sau luật `nhieu_mat`
+- [ ] F2. Backend + CSDL · F3. Giao diện web · F4. Đánh giá `cong_gia_v2` + hoàn thiện demo
 
 ## Cài đặt (Windows, Python 3.13)
 
@@ -61,6 +64,14 @@ vùng đầu/thân, các ngưỡng của thuật toán kiểm tra tại cổng, 
 .venv\Scripts\python.exe scripts\evaluate_videos.py --videos <thu_muc_video> --gate cong_video --imgsz 640   # 3. -> runs\eval\
 .venv\Scripts\python.exe scripts\evaluate_videos.py --videos <thu_muc_video> --gate cong_video --imgsz 960
 
+# Khuôn mặt + cổng (F1). Mô hình YuNet/SFace tải 1 lần vào weights\face\ (không commit)
+.venv\Scripts\python.exe scripts\download_face_models.py
+.venv\Scripts\python.exe scripts\enroll_from_images.py --camera 0 --code ME --count 5     # đăng ký mặt từ webcam (hoặc --images <thu_muc>\<ma>\*.jpg)
+.venv\Scripts\python.exe scripts\run_gate.py --source 0                                   # vòng lặp cổng, cửa sổ OpenCV (q: thoát)
+.venv\Scripts\python.exe scripts\run_gate.py --source data\raw\cong_gia_v1\du_do_01.mp4 --gate cong_gia_v1
+.venv\Scripts\python.exe scripts\evaluate_faces.py --videos data\raw\cong_gia_v1 --answers data\annotations\cong_gia_v1.csv --gate cong_gia_v1
+# Dữ liệu khuôn mặt (data\face\, data\anh_dang_ky\) là dữ liệu sinh trắc học: chỉ để trên máy, không đưa lên git
+
 # Menu demo (báo cáo tiến độ): chọn số thay vì gõ lệnh dài. Cấu hình ở mục demo trong configs\settings.yaml
 .\demo
 
@@ -75,8 +86,9 @@ Dùng điện thoại làm camera: [docs/huong_dan_camera_dien_thoai.md](docs/hu
 
 ```
 configs/   settings.yaml (cấu hình chung), gates.yaml (vùng kiểm tra, tạo bởi define_zone), data_ppe.yaml (dataset)
-src/       config.py, checkpoint/ (chế độ cổng: camera, evaluate, check), detection/, ppe/ (luật vùng đầu/thân),
-           zone/, tracking/ (chỉ hướng cũ dùng), utils/
+src/       config.py, checkpoint/ (kiểm tra bảo hộ: camera, evaluate, check), face/ (YuNet, SFace, phân tích mặt,
+           so khớp, đăng ký), gate/ (kết hợp, máy trạng thái, một lượt, vòng lặp cổng), detection/, ppe/ (luật vùng
+           đầu/thân), zone/, evaluation/, tracking/ (chỉ hướng cũ dùng), utils/
 scripts/   công cụ chạy thử, vẽ vùng, cắt khung, train
 tests/     kiểm thử tự động (unittest)
 docs/      rà soát, hướng dẫn train, kết quả model

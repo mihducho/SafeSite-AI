@@ -54,6 +54,41 @@ camera:
                                # phat hinh ngang (nguoi nam ngang, dau ben trai) -> 90. Khi chay voi --gate thi
                                # dung goc da luu cung vung trong gates_file (define_zone --rotate)
 
+face:
+  # Nhan dien khuon mat (DE_TAI.md muc 4, 6.2, 15): YuNet tim mat, SFace lay vector 128 chieu (OpenCV co san).
+  # Tai mo hinh: scripts/download_face_models.py
+  detector_model: weights/face/face_detection_yunet_2023mar.onnx
+  recognizer_model: weights/face/face_recognition_sface_2021dec.onnx
+  score_threshold: 0.7        # YuNet: diem tin cay toi thieu cua 1 khuon mat
+  nms_threshold: 0.3          # YuNet: bo khung mat trung
+  opencv_threads: 4           # so luong CPU cho YuNet/SFace. ultralytics tu dat OpenCV ve 1 luong khi nap,
+                              # lam YuNet/SFace cham ~2 lan (do 29/10: 55->33 ms, 49->23 ms); 4 = so nhan may
+  enroll_min_score: 0.85      # anh dang ky: diem YuNet toi thieu
+  min_face_px: 50             # chieu rong mat toi thieu de nhan dang (pixel cua khung day du)
+  multi_min_px: 40            # dem mat nhieu nguoi: rong >= gia tri nay...
+  multi_min_ratio: 0.7        # ...va >= 0.7 x mat lon nhat (nguoi xep hang xa phia sau khong bi tinh)
+  quality_full_width_px: 100  # diem chat luong = score x min(1, rong / gia tri nay)
+  max_vectors: 5              # so vector chat luong cao nhat giu lai moi luot
+  match_threshold: 0.40       # cosine toi thieu de nhan ra (OpenCV khuyen nghi 0.363 tren LFW; hieu chinh o muc 11)
+  match_margin: 0.05          # hon nguoi thu hai it nhat bay nhieu
+  min_samples: 3              # so mau toi thieu / toi da moi cong nhan
+  max_samples: 10
+
+gate:
+  # Vong lap cong (DE_TAI.md muc 5): CHO -> KIEM_TRA -> CHO_ROI_DI -> CHO
+  idle_long_side: 640         # CHO: thu nho khung (canh dai) truoc khi tim mat
+  idle_max_fps: 10            # CHO: toi da bay nhieu lan tim mat moi giay
+  trigger_frames: 3           # so khung lien tiep co mat trong vung de bat dau 1 luot
+  cooldown_seconds: 4         # CHO_ROI_DI: toi thieu bay nhieu giay truoc luot moi
+  empty_seconds: 1.0          # ... va vung phai trong lien tuc bay nhieu giay (neu luot truoc da ghi cong)
+  result_display_seconds: 4   # run_gate.py: hien ket qua tren cua so bao lau
+
+attendance:
+  # Cham cong (DE_TAI.md muc 7), dung o Giai doan F2
+  duplicate_minutes: 2
+  missing_checkout_hours: 4
+  timezone: Asia/Ho_Chi_Minh
+
 evaluation:
   # Giai doan 2 (DE_TAI.md muc 10): moi video 1 luot, nguoi da dung trong vung tu dau video.
   sample_fps: null             # so khung/giay mo phong; null = do toc do xu ly that tren may (theo imgsz)
@@ -98,6 +133,10 @@ paths:
   eval_videos: data/eval                    # video danh gia Giai doan 2 (khong commit)
   eval_answers: data/eval/dap_an.csv        # file dap an: ten_file, ket_qua_dung, thieu_dung, dieu_kien
   eval_runs: runs/eval                      # ket qua danh gia: CSV, tom_tat.md, anh cac luot sai
+  enroll_images: data/anh_dang_ky           # anh dang ky: <thu muc>/<ma_nguoi>/*.jpg (khong commit)
+  face_gallery: data/face/mau_mat.npz       # vector mau khuon mat cho chay thu, khi chua co CSDL (khong commit)
+  face_thumbs: data/face/anh_mau            # anh mat da can chinh 112x112 khi dang ky (khong commit)
+  gate_runs: runs/gate                      # anh + JSON moi luot cua scripts/run_gate.py
   gates_file: configs/gates.yaml            # vung kiem tra ti le 0-1 cua tung cong (luu tam, cho bang gates)
   checkpoint_runs: runs/checkpoint          # anh + ket qua cua script chay thu scripts/run_checkpoint.py
   tracker_config: configs/botsort_tracking.yaml   # chi script giam sat cu dung, che do cong khong tracking
