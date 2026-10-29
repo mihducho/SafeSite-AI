@@ -27,7 +27,10 @@ Mô tả đầy đủ, phạm vi, các giai đoạn nước rút F1–F4 nằm �
 - [x] **F1. Khuôn mặt + vòng lặp cổng (phần AI)**: `src/face/` (YuNet, SFace, gắn mặt với người trong vùng, đếm mặt,
       so khớp), `src/gate/` (kết hợp + luật `nhieu_mat`, máy trạng thái, một lượt, vòng lặp cổng), đăng ký mẫu,
       `run_gate.py`, `evaluate_faces.py`. Bộ `cong_gia_v1` (cùng 18 khung): bảo hộ 38/43 → 40/43 sau luật `nhieu_mat`
-- [ ] F2. Backend + CSDL · F3. Giao diện web · F4. Đánh giá `cong_gia_v2` + hoàn thiện demo
+- [x] **F2. Backend + CSDL**: ứng dụng FastAPI `app/` (SQLAlchemy 2: SQLite hoặc PostgreSQL), đăng nhập, API JSON
+      (công nhân, tổ đội, mẫu mặt, lượt kiểm tra, bảng công, chấm công thủ công, tổng quan), WebSocket `/ws/events`,
+      luồng hình `/stream/gate`, vòng lặp cổng chạy nền trong ứng dụng, `scripts/seed_demo.py`
+- [ ] F3. Giao diện web · F4. Đánh giá `cong_gia_v2` + hoàn thiện demo
 
 ## Cài đặt (Windows, Python 3.13)
 
@@ -39,6 +42,28 @@ python -m venv .venv
 File model **không nằm trong git**. Chép thư mục `ppe_s` (kết quả train trên Colab) vào `weights\`, sao cho có
 `weights\ppe_s\weights\best.pt`. Cách train và kết quả model: [docs/huong_dan_train_ppe.md](docs/huong_dan_train_ppe.md),
 [docs/ket_qua_model_ppe.md](docs/ket_qua_model_ppe.md).
+
+## Ứng dụng web (F2)
+
+```
+copy .env.example .env                                   # 1. điền SECRET_KEY, ADMIN_PASSWORD (file .env KHÔNG đưa lên git)
+.venv\Scripts\python.exe scripts\seed_demo.py --source 0 --zone ca_khung        # 2. tài khoản admin, cổng (webcam), ca, tổ đội
+.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000                     # 3. chạy; mở http://127.0.0.1:8000/login
+```
+
+- Thử API ở `http://127.0.0.1:8000/docs` (đăng nhập trước). Luồng hình: `/stream/gate`. Sự kiện từng lượt: WebSocket `/ws/events`.
+- Đổi nguồn hình của cổng: `seed_demo.py --source <0 | URL điện thoại | file video> [--zone <tên vùng trong configs\gates.yaml>]`
+  rồi gọi `POST /api/cong/khoi-dong-lai` (hoặc khởi động lại ứng dụng). Nhanh hơn: đặt `GATE_SOURCE=...` trong `.env`.
+  Demo dự phòng: `--source data\raw\cong_gia_v1\du_do_01.mp4 --zone cong_gia_v1` (video tự lặp lại).
+- Nhập mẫu khuôn mặt từ thư mục ảnh `<thư_mục>\<mã_công_nhân>\*.jpg`: `seed_demo.py --faces <thư_mục>` (công nhân phải có sẵn
+  và đã ghi nhận đồng ý; thêm `--dong-y` nếu đã có giấy đồng ý).
+- CSDL mặc định SQLite `data\safegate.db`. Dùng PostgreSQL: tạo tài khoản và CSDL (thay `MAT_KHAU`), sửa `DATABASE_URL`
+  trong `.env`, rồi chạy lại bước 2:
+  ```
+  "C:\Program Files\PostgreSQL\17\bin\psql.exe" -U postgres -c "CREATE USER safegate WITH PASSWORD 'MAT_KHAU';" -c "CREATE DATABASE safegate OWNER safegate;"
+  DATABASE_URL=postgresql+psycopg://safegate:MAT_KHAU@localhost:5432/safegate
+  ```
+- Chạy test trên PostgreSQL (CSDL riêng cho test, bị xoá sạch mỗi test): đặt biến môi trường `SAFEGATE_TEST_DB` = URL của CSDL đó.
 
 ## Cấu hình
 
@@ -86,6 +111,8 @@ Dùng điện thoại làm camera: [docs/huong_dan_camera_dien_thoai.md](docs/hu
 
 ```
 configs/   settings.yaml (cấu hình chung), gates.yaml (vùng kiểm tra, tạo bởi define_zone), data_ppe.yaml (dataset)
+app/       ứng dụng web FastAPI: main.py, config.py (.env), db.py, models.py (các bảng), auth.py, gate_service.py (cổng chạy nền),
+           events.py (WebSocket), services/ (nhan_dien, dang_ky_mat, cham_cong, luot, cong_nhan, bao_cao), routers/ (api, pages, ws, stream)
 src/       config.py, checkpoint/ (kiểm tra bảo hộ: camera, evaluate, check), face/ (YuNet, SFace, phân tích mặt,
            so khớp, đăng ký), gate/ (kết hợp, máy trạng thái, một lượt, vòng lặp cổng), detection/, ppe/ (luật vùng
            đầu/thân), zone/, evaluation/, tracking/ (chỉ hướng cũ dùng), utils/
@@ -93,5 +120,6 @@ scripts/   công cụ chạy thử, vẽ vùng, cắt khung, train
 tests/     kiểm thử tự động (unittest)
 docs/      rà soát, hướng dẫn train, kết quả model
 weights/   model đã train (không commit)
+data/      video, ảnh lượt (anh_luot), ảnh mẫu mặt (anh_mau_mat), CSDL SQLite: không commit
 _old/      code và file của hướng cũ (giám sát toàn công trường), không dùng nữa
 ```

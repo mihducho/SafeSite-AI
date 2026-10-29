@@ -21,13 +21,16 @@ from src.zone.zone import zone_to_pixels
 
 
 class GateWorker:
-    def __init__(self, reader, zone, settings: dict, detector, face_detector, embedder, on_result=None):
+    def __init__(self, reader, zone, settings: dict, detector, face_detector, embedder, on_result=None,
+                 required_ppe: list[str] | None = None):
         self.reader, self.zone, self.settings = reader, zone, settings
+        self.required_ppe = required_ppe  # None = ppe.required trong cau hinh
         self.detector, self.fd, self.emb = detector, face_detector, embedder
         self.on_result = on_result
         self.state = GateState(since=time.monotonic())
         self.last_faces = empty_faces()   # mat tim duoc o khung CHO gan nhat (de hien len man hinh)
         self.last_result: dict | None = None
+        self.round: GateRound | None = None  # luot dang chay (KIEM_TRA), de luong hinh ve khung nguoi/mat
         self.rounds = 0
         self.error: str | None = None
         self._last_id = 0
@@ -59,13 +62,15 @@ class GateWorker:
         if not start:
             return None
 
-        rnd = GateRound(self.zone, self.settings, self.detector, self.fd, self.emb)
+        rnd = self.round = GateRound(self.zone, self.settings, self.detector, self.fd, self.emb, self.required_ppe)
         try:
             result = run_round(self.reader, rnd, self.settings["checkpoint"]["timeout_s"])
         except CameraError as e:
             self.error = str(e)
             self.state = GateState(CHO, since=time.monotonic())
             return None
+        finally:
+            self.round = None
         if self._first_seen is not None:
             result["tu_luc_thay_mat_ms"] = round((time.monotonic() - self._first_seen) * 1000)
         recorded = bool(self.on_result(result)) if self.on_result else False

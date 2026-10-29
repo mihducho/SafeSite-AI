@@ -389,3 +389,21 @@ gán đồ bảo hộ có xét người ngoài vùng; `check` xử lý khung nga
 - Thêm luật `nhieu_mat` (đếm khuôn mặt) để bắt trường hợp hai người đứng trước–sau, không sửa thuật toán bảo hộ cũ.
 - Bản demo: một ứng dụng FastAPI + Jinja2 + Bootstrap, PostgreSQL qua SQLAlchemy; React, Docker, phân quyền để sang đồ án.
 - Làm thêm các chức năng quản lý công nhân: công nhân, tổ đội, đăng ký khuôn mặt, lịch sử, bảng công, tổng quan.
+
+**2026-10-29 (sau F1, commit 73107d0):**
+- So khớp viết thành hàm thuần trong `src/face/match.py` (`match`, `score_workers`); `app/services/nhan_dien.py` (F2) đọc mẫu
+  từ CSDL rồi gọi hàm này. Thêm `src/face/match.py`, `src/face/enroll.py` (kiểm tra ảnh mẫu), `src/gate/round.py` (một lượt:
+  `FrameEvaluator` giữ nguyên + phần khuôn mặt) ngoài các file ở mục 8.
+- Trạng thái CHO chưa chạy YOLO nên "có mặt trong vùng" = tâm mặt nằm trong khoảng x của vùng kiểm tra và rộng ≥ `min_face_px`.
+- Giữ YuNet `2023mar`: bản `2026may` cho kết quả giống hệt trên ảnh thử nhưng chậm hơn (480×854: 28 ms so với 20 ms).
+- Thêm `face.opencv_threads: 4`: ultralytics tự đặt OpenCV về 1 luồng khi nạp, làm YuNet/SFace chậm khoảng 2 lần.
+- Cột `nguoi` (mã người A/B) trong file đáp án là cột không bắt buộc; ghi lại file đáp án vẫn giữ giá trị đã điền tay.
+- `cong_gia_v1` (cùng 18 khung như lần đánh giá chính thức): bảo hộ 38/43 → 40/43 sau luật `nhieu_mat`
+  (`hai_nguoi_dungsau_01`, `_02` đúng), không nhóm nào kém đi. Thời gian một lượt 1,5–1,7 giây (8–12 khung),
+  từ lúc thấy mặt đến lúc có kết quả khoảng 1,8 giây.
+- **Giữ `face.multi_min_ratio = 0.7`, không hạ xuống 0,6**: không chỉnh ngưỡng theo đúng bộ dữ liệu đang dùng để đánh giá;
+  người xếp hàng cách 1,5–2 m phía sau có mặt bằng khoảng 0,6–0,67 mặt người đứng trước, hạ ngưỡng dễ báo nhầm NHIEU_NGUOI.
+  `hai_nguoi_dungsau_03` (mặt người sau bằng 0,64–0,70 mặt người trước) ghi là **hạn chế đã biết**; quay thêm trường hợp
+  "người xếp hàng sau vạch chờ" ở bộ `cong_gia_v2` rồi mới xem lại ngưỡng này.
+- Tỷ lệ nhận đúng người trên `cong_gia_v1`: người dùng tự điền cột `nguoi` và chuẩn bị ảnh đăng ký riêng của A/B rồi chạy
+  `evaluate_faces.py --enroll-dir`. Mẫu chụp bằng webcam laptop cho điểm ở cổng thấp hơn (0,40–0,60) → đăng ký bằng camera cổng.

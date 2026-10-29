@@ -21,13 +21,14 @@ REQUIRED_KEYS = {
     "camera": ["webcam_width", "webcam_height", "first_frame_timeout_s", "reconnect_delay_s", "loop_video", "rotate"],
     "face": ["detector_model", "recognizer_model", "score_threshold", "nms_threshold", "opencv_threads", "enroll_min_score",
              "min_face_px", "multi_min_px", "multi_min_ratio", "quality_full_width_px", "max_vectors",
-             "match_threshold", "match_margin", "min_samples", "max_samples"],
+             "match_threshold", "match_margin", "min_samples", "max_samples", "enroll_long_side"],
     "gate": ["idle_long_side", "idle_max_fps", "trigger_frames", "cooldown_seconds", "empty_seconds",
-             "result_display_seconds"],
-    "attendance": ["duplicate_minutes", "missing_checkout_hours", "timezone"],
+             "result_display_seconds", "source", "zone_name", "stream_fps", "stream_long_side", "stream_jpeg_quality"],
+    "attendance": ["duplicate_minutes", "missing_checkout_hours", "timezone", "default_shift"],
+    "web": ["session_hours", "page_size", "max_page_size", "max_upload_mb"],
     "evaluation": ["sample_fps", "fps_probe_frames", "video_exts", "answer_prefixes", "condition_prefixes"],
     "paths": ["snapshot_dir", "gates_file", "checkpoint_runs", "tracker_config", "eval_videos", "eval_answers",
-              "eval_runs", "enroll_images", "face_gallery", "face_thumbs", "gate_runs"],
+              "eval_runs", "enroll_images", "face_gallery", "face_thumbs", "gate_runs", "check_images", "face_samples"],
 }
 ITEM_KEYS = ["class_name", "region", "missing_code"]  # moi mon trong ppe.items
 

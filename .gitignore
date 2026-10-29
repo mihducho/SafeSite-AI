@@ -17,6 +17,11 @@ data/face/
 data/anh_luot/
 data/anh_mau_mat/
 .env
+# CSDL SQLite cua ung dung web (du lieu cong nhan, cham cong)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
 data/eval/*
 !data/eval/.gitkeep
 !data/eval/dap_an.csv

@@ -38,6 +38,8 @@ class GateRound:
         self.face_detail: list[dict] = []
         self.ms = {"bao_ho": [], "yunet": [], "sface": []}  # thoi gian moi buoc (ms) de bao cao
         self._snap: tuple[np.ndarray, int | None] | None = None  # mat tren khung duoc chon lam anh minh chung
+        self.last: tuple[np.ndarray, np.ndarray, int | None] | None = None  # khung vua xu ly: (nguoi trong vung, mat,
+                                                                            # mat chinh) -> luong hinh truc tiep ve len
 
     def add(self, frame: np.ndarray):
         t0 = time.perf_counter()
@@ -60,6 +62,7 @@ class GateRound:
             self.ms["sface"].append((time.perf_counter() - t3) * 1000)
             quality = face_quality(faces.rows[idx, 14], faces.rows[idx, 2], fc["quality_full_width_px"])
         self.faces.add(n_zone, vector, quality)
+        self.last = (r.zone_persons, faces.rows, idx)
 
         if self.ppe.picker.frame is frame:  # khung nay dang duoc chon lam anh minh chung -> nho mat cua no
             self._snap = (faces.rows, idx)

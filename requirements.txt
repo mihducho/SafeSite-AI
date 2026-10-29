@@ -9,4 +9,16 @@ numpy==2.5.3
 lap==0.5.13          # can cho BoT-SORT (PersonTracker)
 PyYAML==6.0.3        # doc configs/settings.yaml
 
-# Backend (FastAPI, SQLAlchemy, PostgreSQL...) bo sung o Giai doan 3.
+
+# Ung dung web (F2, 2026-10-29): FastAPI + SQLAlchemy 2 + PostgreSQL (psycopg 3) hoac SQLite
+fastapi==0.162.0
+starlette==1.10.0
+uvicorn==0.54.0
+websockets==17.3     # uvicorn can goi nay de chay WebSocket (/ws/events)
+SQLAlchemy==2.1.6
+psycopg[binary]==3.3.6
+python-multipart==0.0.32   # form dang nhap, tai anh len
+itsdangerous==2.2.0  # cookie phien dang nhap (SessionMiddleware)
+Jinja2==3.1.6        # trang HTML (F3)
+tzdata==2026.6       # du lieu mui gio cho zoneinfo tren Windows (Asia/Ho_Chi_Minh)
+httpx==0.28.1        # TestClient cua FastAPI (test)

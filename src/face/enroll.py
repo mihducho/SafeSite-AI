@@ -37,8 +37,10 @@ def check_enroll_face(rows, min_score: float, min_face_px: float) -> tuple[int |
     return 0, ""
 
 
-def sample_from_image(image: np.ndarray, face_detector, embedder, face_cfg: dict, source: str) -> tuple[Sample | None, str]:
-    faces = face_detector.detect(image)
+def sample_from_image(image: np.ndarray, face_detector, embedder, face_cfg: dict, source: str,
+                      long_side: int | None = None) -> tuple[Sample | None, str]:
+    """long_side: thu nho anh truoc khi tim mat (anh dien thoai lon); kiem tra va anh 112x112 van theo anh goc."""
+    faces = face_detector.detect(image, long_side=long_side)
     idx, why = check_enroll_face(faces.rows, face_cfg["enroll_min_score"], face_cfg["min_face_px"])
     if idx is None:
         return None, why

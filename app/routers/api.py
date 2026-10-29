@@ -1,0 +1,390 @@
+"""API JSON /api/... (DE_TAI.md muc 12, F2). Moi API tru /api/dang-nhap deu can dang nhap (cookie phien).
+Thu bang trang /docs (dang nhap o /login truoc). Gio tra ve theo gio Viet Nam (ISO 8601, +07:00).
+Loi nghiep vu (chua dong y, thieu ly do, anh khong dat...) -> 400 {"detail": "cau tieng Viet"} (xem main.py).
+"""
+from datetime import date, datetime, time
+from typing import Literal
+
+import cv2
+import numpy as np
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session
+
+from app.auth import authenticate, current_user, login_session
+from app.db import get_db, utcnow
+from app.models import DANG_LAM, Attendance, FaceSample, PpeCheck, Team, User, Worker
+from app.services import bao_cao, cham_cong, cong_nhan
+from app.services.dang_ky_mat import CAMERA, NOI_DUNG_DONG_Y, UPLOAD, DangKyMatError
+
+public = APIRouter(prefix="/api", tags=["dang nhap"])
+router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
+
+KET_QUA = Literal["DAT", "KHONG_DAT", "KHONG_XAC_DINH", "NHIEU_NGUOI", "KHONG_CO_NGUOI"]
+HANH_DONG = Literal["ghi_vao", "ghi_ra", "khong_ghi", "bo_qua_trung"]
+
+
+# ---------- tien ich ----------
+def _state(request: Request):
+    return request.app.state
+
+
+def _tz(request: Request):
+    return cham_cong.mui_gio(request.app.state.settings["attendance"])
+
+
+def _iso(t: datetime | None, tz) -> str | None:
+    return t.astimezone(tz).isoformat(timespec="seconds") if t else None
+
+
+def _get(db: Session, model, obj_id: int, name: str):
+    obj = db.get(model, obj_id)
+    if obj is None:
+        raise HTTPException(404, f"Không có {name} id={obj_id}")
+    return obj
+
+
+def worker_json(w: Worker, tz, so_mau: int | None = None) -> dict:
+    return {"id": w.id, "code": w.code, "full_name": w.full_name, "phone": w.phone, "trade": w.trade,
+            "team_id": w.team_id, "team_name": w.team.name if w.team else None, "status": w.status,
+            "consent_at": _iso(w.consent_at, tz), "consent_by": w.consent_by, "created_at": _iso(w.created_at, tz),
+            "so_mau": so_mau}
+
+
+def team_json(t: Team, so_cong_nhan: int | None = None) -> dict:
+    return {"id": t.id, "name": t.name, "contractor": t.contractor, "leader_name": t.leader_name,
+            "so_cong_nhan": so_cong_nhan}
+
+
+def sample_json(s: FaceSample, tz) -> dict:
+    return {"id": s.id, "worker_id": s.worker_id, "quality": round(s.quality, 3), "source": s.source,
+            "created_at": _iso(s.created_at, tz), "anh": f"/api/mau-mat/{s.id}/anh"}
+
+
+def check_json(c: PpeCheck, tz) -> dict:
+    return {"id": c.id, "thoi_diem": _iso(c.checked_at, tz), "gio": cham_cong.gio_phut(c.checked_at, tz),
+            "cong_id": c.gate_id,
+            "cong_nhan": None if c.worker is None else {"id": c.worker.id, "ma": c.worker.code, "ten": c.worker.full_name},
+            "trang_thai_mat": c.face_status, "diem": c.face_score, "ket_qua": c.result, "thieu": c.missing,
+            "ty_le_co_mat": c.presence_ratio, "ly_do": c.reason, "thoi_gian_ms": c.duration_ms, "huong": c.direction,
+            "hanh_dong": c.action, "anh": f"/api/luot/{c.id}/anh" if c.image_path else None,
+            "danh_gia": c.review_status, "chi_tiet": c.detail}
+
+
+def attendance_json(a: Attendance, tz) -> dict:
+    return {"id": a.id, "worker_id": a.worker_id, "ngay": a.work_date.isoformat(), "shift_id": a.shift_id,
+            "gio_vao": _iso(a.check_in, tz), "gio_ra": _iso(a.check_out, tz), "ppe_check_id": a.ppe_check_id,
+            "di_muon_phut": a.late_minutes, "ve_som_phut": a.early_leave_minutes, "so_phut_lam": a.worked_minutes,
+            "trang_thai": a.status, "ghi_chu": a.note, "updated_by": a.updated_by, "updated_at": _iso(a.updated_at, tz)}
+
+
+def _sample_count(db: Session, worker_id: int) -> int:
+    return db.scalar(select(func.count(FaceSample.id)).where(FaceSample.worker_id == worker_id)) or 0
+
+
+# ---------- dang nhap ----------
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+@public.post("/dang-nhap")
+def api_login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
+    user = authenticate(db, body.username, body.password)
+    if user is None:
+        raise HTTPException(401, "Sai tên đăng nhập hoặc mật khẩu")
+    login_session(request, user)
+    return {"id": user.id, "username": user.username, "full_name": user.full_name}
+
+
+@public.post("/dang-xuat")
+def api_logout(request: Request):
+    request.session.clear()
+    return {"ok": True}
+
+
+@router.get("/toi", tags=["dang nhap"])
+def me(user: User = Depends(current_user)):
+    return {"id": user.id, "username": user.username, "full_name": user.full_name, "role": user.role}
+
+
+# ---------- cong nhan ----------
+class WorkerIn(BaseModel):
+    code: str = Field(min_length=1, max_length=20, examples=["CN001"])
+    full_name: str = Field(min_length=1, max_length=100, examples=["Nguyễn Văn An"])
+    phone: str | None = Field(None, max_length=20)
+    trade: str | None = Field(None, max_length=50, examples=["Thợ xây"])
+    team_id: int | None = None
+
+
+class WorkerPatch(BaseModel):
+    code: str | None = Field(None, min_length=1, max_length=20)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    phone: str | None = Field(None, max_length=20)
+    trade: str | None = Field(None, max_length=50)
+    team_id: int | None = None
+
+
+class ConsentIn(BaseModel):
+    dong_y: bool = Field(description="Ô xác nhận: công nhân đồng ý (xem GET /api/dong-y/noi-dung)")
+
+
+@router.get("/cong-nhan", tags=["cong nhan"])
+def list_workers(request: Request, q: str | None = Query(None, description="Tìm theo mã, họ tên, số điện thoại"),
+                 to_doi: int | None = None, trang_thai: Literal["dang_lam", "nghi_viec"] | None = None,
+                 db: Session = Depends(get_db)):
+    counts = (select(FaceSample.worker_id, func.count(FaceSample.id).label("n"))
+              .group_by(FaceSample.worker_id).subquery())
+    stmt = select(Worker, func.coalesce(counts.c.n, 0)).outerjoin(counts, counts.c.worker_id == Worker.id)
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(Worker.code.ilike(like), Worker.full_name.ilike(like), Worker.phone.ilike(like)))
+    if to_doi is not None:
+        stmt = stmt.where(Worker.team_id == to_doi)
+    if trang_thai:
+        stmt = stmt.where(Worker.status == trang_thai)
+    rows = db.execute(stmt.order_by(Worker.code)).all()
+    tz = _tz(request)
+    return {"tong": len(rows), "ds": [worker_json(w, tz, n) for w, n in rows]}
+
+
+@router.post("/cong-nhan", status_code=201, tags=["cong nhan"])
+def create_worker(body: WorkerIn, request: Request, db: Session = Depends(get_db)):
+    w = cong_nhan.tao_cong_nhan(db, body.model_dump())
+    return worker_json(w, _tz(request), 0)
+
+
+@router.get("/cong-nhan/{worker_id}", tags=["cong nhan"])
+def get_worker(worker_id: int, request: Request, db: Session = Depends(get_db)):
+    w = _get(db, Worker, worker_id, "công nhân")
+    return worker_json(w, _tz(request), _sample_count(db, w.id))
+
+
+@router.patch("/cong-nhan/{worker_id}", tags=["cong nhan"])
+def update_worker(worker_id: int, body: WorkerPatch, request: Request, db: Session = Depends(get_db)):
+    w = cong_nhan.sua_cong_nhan(db, _get(db, Worker, worker_id, "công nhân"), body.model_dump(exclude_unset=True))
+    return worker_json(w, _tz(request), _sample_count(db, w.id))
+
+
+@router.post("/cong-nhan/{worker_id}/nghi-viec", tags=["cong nhan"])
+def worker_quit(worker_id: int, request: Request, db: Session = Depends(get_db)):
+    """Cho nghỉ việc: không còn được nhận diện, XOÁ toàn bộ mẫu khuôn mặt (vector + ảnh)."""
+    w = _get(db, Worker, worker_id, "công nhân")
+    n = cong_nhan.cho_nghi_viec(db, w, _state(request).dang_ky)
+    return {"cong_nhan": worker_json(w, _tz(request), 0), "so_mau_da_xoa": n}
+
+
+@router.post("/cong-nhan/{worker_id}/di-lam-lai", tags=["cong nhan"])
+def worker_rejoin(worker_id: int, request: Request, db: Session = Depends(get_db)):
+    """Nhận lại công nhân đã nghỉ: phải ghi nhận đồng ý và đăng ký khuôn mặt lại."""
+    w = cong_nhan.di_lam_lai(db, _get(db, Worker, worker_id, "công nhân"), _state(request).dang_ky)
+    return worker_json(w, _tz(request), 0)
+
+
+@router.get("/dong-y/noi-dung", tags=["mau mat"])
+def consent_text():
+    return {"noi_dung": NOI_DUNG_DONG_Y}
+
+
+@router.post("/cong-nhan/{worker_id}/dong-y", tags=["mau mat"])
+def record_consent(worker_id: int, body: ConsentIn, request: Request, db: Session = Depends(get_db),
+                   user: User = Depends(current_user)):
+    """Ghi nhận đồng ý đăng ký khuôn mặt (lưu thời điểm và người thực hiện). Bắt buộc trước khi thêm mẫu."""
+    if not body.dong_y:
+        raise HTTPException(400, "Phải tích ô đồng ý mới ghi nhận được")
+    w = _state(request).dang_ky.ghi_nhan_dong_y(db, _get(db, Worker, worker_id, "công nhân"), user)
+    return worker_json(w, _tz(request), _sample_count(db, w.id))
+
+
+# ---------- to doi ----------
+class TeamIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    contractor: str | None = Field(None, max_length=100)
+    leader_name: str | None = Field(None, max_length=100)
+
+
+class TeamPatch(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=100)
+    contractor: str | None = Field(None, max_length=100)
+    leader_name: str | None = Field(None, max_length=100)
+
+
+@router.get("/to-doi", tags=["to doi"])
+def list_teams(db: Session = Depends(get_db)):
+    counts = dict(db.execute(select(Worker.team_id, func.count(Worker.id)).where(Worker.status == DANG_LAM)
+                             .group_by(Worker.team_id)).all())
+    return {"ds": [team_json(t, counts.get(t.id, 0)) for t in db.scalars(select(Team).order_by(Team.name))]}
+
+
+@router.post("/to-doi", status_code=201, tags=["to doi"])
+def create_team(body: TeamIn, db: Session = Depends(get_db)):
+    return team_json(cong_nhan.tao_to_doi(db, body.model_dump()), 0)
+
+
+@router.patch("/to-doi/{team_id}", tags=["to doi"])
+def update_team(team_id: int, body: TeamPatch, db: Session = Depends(get_db)):
+    return team_json(cong_nhan.sua_to_doi(db, _get(db, Team, team_id, "tổ đội"), body.model_dump(exclude_unset=True)))
+
+
+# ---------- mau khuon mat ----------
+def _samples_json(db: Session, w: Worker, request: Request) -> dict:
+    face_cfg, tz = _state(request).settings["face"], _tz(request)
+    samples = db.scalars(select(FaceSample).where(FaceSample.worker_id == w.id).order_by(FaceSample.id)).all()
+    return {"worker_id": w.id, "so_mau": len(samples), "toi_thieu": face_cfg["min_samples"],
+            "toi_da": face_cfg["max_samples"], "du_mau": len(samples) >= face_cfg["min_samples"],
+            "da_dong_y": w.consent_at is not None, "ds": [sample_json(s, tz) for s in samples]}
+
+
+@router.get("/cong-nhan/{worker_id}/mau-mat", tags=["mau mat"])
+def list_samples(worker_id: int, request: Request, db: Session = Depends(get_db)):
+    return _samples_json(db, _get(db, Worker, worker_id, "công nhân"), request)
+
+
+@router.post("/cong-nhan/{worker_id}/mau-mat/chup", status_code=201, tags=["mau mat"])
+def capture_sample(worker_id: int, request: Request, db: Session = Depends(get_db)):
+    """Chụp 1 mẫu từ khung hình hiện tại của camera cổng (cần đúng 1 khuôn mặt đủ lớn, rõ)."""
+    st = _state(request)
+    w = _get(db, Worker, worker_id, "công nhân")
+    st.dang_ky.kiem_tra(db, w)  # chua dong y / du mau: bao ngay, khong can chup
+    frame = st.gate.latest_frame()
+    if frame is None:
+        raise HTTPException(503, "Camera cổng chưa chạy, chưa chụp được (xem GET /api/cong/trang-thai)")
+    s = st.dang_ky.them_mau(db, w, frame, CAMERA)
+    return {"mau": sample_json(s, _tz(request)), "so_mau": _sample_count(db, w.id)}
+
+
+@router.post("/cong-nhan/{worker_id}/mau-mat/tai-len", tags=["mau mat"])
+def upload_samples(worker_id: int, request: Request, files: list[UploadFile] = File(..., description="Một hoặc nhiều ảnh"),
+                   db: Session = Depends(get_db)):
+    """Tải ảnh lên (nhiều ảnh). Mỗi ảnh cần đúng 1 khuôn mặt. Chỉ lưu vector + ảnh mặt 112×112, KHÔNG lưu ảnh gốc."""
+    st = _state(request)
+    w = _get(db, Worker, worker_id, "công nhân")
+    st.dang_ky.kiem_tra(db, w)
+    max_bytes = int(st.settings["web"]["max_upload_mb"] * 1024 * 1024)
+    tz, results = _tz(request), []
+    for f in files:
+        data = f.file.read(max_bytes + 1)
+        try:
+            if len(data) > max_bytes:
+                raise DangKyMatError(f"Ảnh lớn hơn {st.settings['web']['max_upload_mb']} MB")
+            image = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR) if data else None
+            s = st.dang_ky.them_mau(db, w, image, UPLOAD)
+            results.append({"ten": f.filename, "ok": True, "ly_do": None, "mau": sample_json(s, tz)})
+        except DangKyMatError as e:
+            results.append({"ten": f.filename, "ok": False, "ly_do": str(e), "mau": None})
+        finally:
+            del data  # anh goc chi nam trong bo nho, khong ghi ra dia
+    return {"ket_qua": results, "so_mau": _sample_count(db, w.id)}
+
+
+@router.get("/mau-mat/{sample_id}/anh", tags=["mau mat"])
+def sample_image(sample_id: int, request: Request, db: Session = Depends(get_db)):
+    path = _state(request).dang_ky.thumb_file(_get(db, FaceSample, sample_id, "mẫu khuôn mặt"))
+    if not path.is_file():
+        raise HTTPException(404, "Không thấy file ảnh mẫu")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@router.delete("/mau-mat/{sample_id}", tags=["mau mat"])
+def delete_sample(sample_id: int, request: Request, db: Session = Depends(get_db)):
+    s = _get(db, FaceSample, sample_id, "mẫu khuôn mặt")
+    worker_id = s.worker_id
+    _state(request).dang_ky.xoa_mau(db, s)
+    return {"ok": True, "so_mau": _sample_count(db, worker_id)}
+
+
+@router.delete("/cong-nhan/{worker_id}/mau-mat", tags=["mau mat"])
+def delete_all_samples(worker_id: int, request: Request, db: Session = Depends(get_db)):
+    """Xoá dữ liệu khuôn mặt (toàn bộ vector + ảnh mẫu) của 1 công nhân."""
+    n = _state(request).dang_ky.xoa_tat_ca(db, _get(db, Worker, worker_id, "công nhân"))
+    return {"so_mau_da_xoa": n}
+
+
+# ---------- luot kiem tra ----------
+@router.get("/luot", tags=["luot kiem tra"])
+def list_checks(request: Request, ngay: date | None = Query(None, description="YYYY-MM-DD, giờ Việt Nam"),
+                cong_nhan_id: int | None = None, ket_qua: KET_QUA | None = None, hanh_dong: HANH_DONG | None = None,
+                trang: int = Query(1, ge=1), so_dong: int | None = Query(None, ge=1), db: Session = Depends(get_db)):
+    st, tz = _state(request), _tz(request)
+    so_dong = min(so_dong or st.settings["web"]["page_size"], st.settings["web"]["max_page_size"])
+    stmt = select(PpeCheck)
+    if ngay is not None:
+        start, end = cham_cong.khoang_ngay(ngay, tz)
+        stmt = stmt.where(PpeCheck.checked_at >= start, PpeCheck.checked_at < end)
+    if cong_nhan_id is not None:
+        stmt = stmt.where(PpeCheck.worker_id == cong_nhan_id)
+    if ket_qua:
+        stmt = stmt.where(PpeCheck.result == ket_qua)
+    if hanh_dong:
+        stmt = stmt.where(PpeCheck.action == hanh_dong)
+    tong = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = db.scalars(stmt.order_by(PpeCheck.checked_at.desc(), PpeCheck.id.desc())
+                      .offset((trang - 1) * so_dong).limit(so_dong)).all()
+    return {"tong": tong, "trang": trang, "so_dong": so_dong, "so_trang": (tong + so_dong - 1) // so_dong,
+            "ds": [check_json(c, tz) for c in rows]}
+
+
+@router.get("/luot/{check_id}", tags=["luot kiem tra"])
+def get_check(check_id: int, request: Request, db: Session = Depends(get_db)):
+    return check_json(_get(db, PpeCheck, check_id, "lượt kiểm tra"), _tz(request))
+
+
+@router.get("/luot/{check_id}/anh", tags=["luot kiem tra"])
+def check_image(check_id: int, request: Request, db: Session = Depends(get_db)):
+    c = _get(db, PpeCheck, check_id, "lượt kiểm tra")
+    path = _state(request).image_dir / c.image_path if c.image_path else None
+    if path is None or not path.is_file():
+        raise HTTPException(404, "Lượt này không có ảnh")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+# ---------- cham cong ----------
+class ManualIn(BaseModel):
+    worker_id: int
+    ngay: date = Field(description="YYYY-MM-DD")
+    gio_vao: time | None = Field(None, description="HH:MM giờ Việt Nam", examples=["07:00"])
+    gio_ra: time | None = Field(None, description="HH:MM giờ Việt Nam", examples=["17:00"])
+    ly_do: str = Field(description="Bắt buộc", examples=["Camera cổng hỏng, cán bộ xác nhận có mặt"])
+
+
+@router.get("/bang-cong", tags=["cham cong"])
+def daily_sheet(request: Request, ngay: date | None = Query(None, description="YYYY-MM-DD, mặc định hôm nay"),
+                to_doi: int | None = None, db: Session = Depends(get_db)):
+    att_cfg, now = _state(request).settings["attendance"], utcnow()
+    ngay = ngay or cham_cong.ngay_cong(now, cham_cong.mui_gio(att_cfg))
+    return {"ngay": ngay.isoformat(), "ds": bao_cao.bang_cong_ngay(db, ngay, att_cfg, now, to_doi)}
+
+
+@router.post("/cham-cong-thu-cong", tags=["cham cong"])
+def manual_attendance(body: ManualIn, request: Request, db: Session = Depends(get_db),
+                      user: User = Depends(current_user)):
+    """Thêm hoặc sửa giờ vào/ra. Bắt buộc có lý do; trạng thái chuyển thành cham_thu_cong, lưu người sửa."""
+    w = _get(db, Worker, body.worker_id, "công nhân")
+    a = cham_cong.cham_thu_cong(db, w, body.ngay, body.gio_vao, body.gio_ra, body.ly_do, user,
+                                _state(request).settings["attendance"])
+    return attendance_json(a, _tz(request))
+
+
+@router.get("/tong-quan", tags=["cham cong"])
+def overview(request: Request, db: Session = Depends(get_db)):
+    st, tz = _state(request), _tz(request)
+    data = bao_cao.tong_quan(db, st.settings["attendance"], utcnow())
+    data["luot_moi_nhat"] = [check_json(c, tz) for c in data["luot_moi_nhat"]]
+    data["cong"] = st.gate.status()
+    return data
+
+
+# ---------- cong ----------
+@router.get("/cong/trang-thai", tags=["cong"])
+def gate_status(request: Request):
+    return _state(request).gate.status()
+
+
+@router.post("/cong/khoi-dong-lai", tags=["cong"])
+def gate_restart(request: Request):
+    """Mở lại camera + vòng lặp cổng (vd sau khi cắm lại camera). Mô hình đã nạp thì không nạp lại."""
+    gate = _state(request).gate
+    gate.restart()
+    return gate.status()

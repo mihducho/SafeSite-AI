@@ -71,8 +71,10 @@ face:
   max_vectors: 5              # so vector chat luong cao nhat giu lai moi luot
   match_threshold: 0.40       # cosine toi thieu de nhan ra (OpenCV khuyen nghi 0.363 tren LFW; hieu chinh o muc 11)
   match_margin: 0.05          # hon nguoi thu hai it nhat bay nhieu
-  min_samples: 3              # so mau toi thieu / toi da moi cong nhan
+  min_samples: 3              # so mau toi thieu / toi da moi cong nhan. Backend chi so khop cong nhan co >= min_samples mau
   max_samples: 10
+  enroll_long_side: 1280      # anh tai len de dang ky: thu nho canh dai ve gia tri nay truoc khi tim mat (anh dien thoai
+                              # 4000 px: YuNet cham va de bo sot mat qua to); toa do va anh mat 112x112 van lay tu anh goc
 
 gate:
   # Vong lap cong (DE_TAI.md muc 5): CHO -> KIEM_TRA -> CHO_ROI_DI -> CHO
@@ -82,12 +84,31 @@ gate:
   cooldown_seconds: 4         # CHO_ROI_DI: toi thieu bay nhieu giay truoc luot moi
   empty_seconds: 1.0          # ... va vung phai trong lien tuc bay nhieu giay (neu luot truoc da ghi cong)
   result_display_seconds: 4   # run_gate.py: hien ket qua tren cua so bao lau
+  # Ung dung web (F2): cong mac dinh khi tao bang seed_demo.py. Nguon hinh luu trong bang gates; GATE_SOURCE trong .env ghi de
+  source: "0"                 # so webcam, URL camera dien thoai, hoac file video (lap lai theo camera.loop_video)
+  zone_name: null             # ten vung trong paths.gates_file (vd cong_dt); null = ca khung hinh
+  stream_fps: 10              # luong hinh truc tiep /stream/gate (MJPEG)
+  stream_long_side: 960       # thu nho khung truoc khi gui len trinh duyet
+  stream_jpeg_quality: 70
 
 attendance:
-  # Cham cong (DE_TAI.md muc 7), dung o Giai doan F2
-  duplicate_minutes: 2
-  missing_checkout_hours: 4
-  timezone: Asia/Ho_Chi_Minh
+  # Cham cong (DE_TAI.md muc 7)
+  duplicate_minutes: 2        # luot ra cach luot vao gan nhat duoi 2 phut -> bo qua (bo_qua_trung)
+  missing_checkout_hours: 4   # chua co gio ra sau gio ket thuc ca 4 gio -> hien "thieu gio ra"
+  timezone: Asia/Ho_Chi_Minh  # CSDL luu gio UTC; ngay cong (work_date) va hien thi tinh theo mui gio nay
+  default_shift:              # ca mac dinh tao boi seed_demo.py (bang shifts)
+    name: Ca hanh chinh
+    start: "07:00"
+    end: "17:00"
+    break_minutes: 60
+    grace_minutes: 5          # di muon <= 5 phut: khong tinh; > 5 phut: tinh tu gio bat dau ca
+    early_checkin_minutes: 60 # cho vao som toi da 60 phut; vao ngoai [bat dau - 60 phut, ket thuc] -> ngoai_ca
+
+web:
+  session_hours: 12           # dang nhap het han sau bay nhieu gio
+  page_size: 20               # so dong moi trang (lich su luot kiem tra)
+  max_page_size: 200
+  max_upload_mb: 10           # anh tai len de dang ky khuon mat
 
 evaluation:
   # Giai doan 2 (DE_TAI.md muc 10): moi video 1 luot, nguoi da dung trong vung tu dau video.
@@ -129,7 +150,9 @@ demo:
     - {name: non_la_01, note: "Non la -> he thong SAI (nhan nham la mu bao ho)"}
 
 paths:
-  snapshot_dir: data/snapshots              # thu muc luu anh moi luot kiem tra (backend dung o Giai doan 3)
+  snapshot_dir: data/snapshots              # [cu] anh check() cua run_checkpoint.py
+  check_images: data/anh_luot               # ung dung web: anh moi luot kiem tra <ngay>/<gio>_<ma>.jpg (khong commit)
+  face_samples: data/anh_mau_mat            # ung dung web: anh mat 112x112 cua mau <worker_id>/*.jpg (khong commit)
   eval_videos: data/eval                    # video danh gia Giai doan 2 (khong commit)
   eval_answers: data/eval/dap_an.csv        # file dap an: ten_file, ket_qua_dung, thieu_dung, dieu_kien
   eval_runs: runs/eval                      # ket qua danh gia: CSV, tom_tat.md, anh cac luot sai
