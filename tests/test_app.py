@@ -305,10 +305,11 @@ class GateInAppTest(AppCase):
             raise CameraError("Khong mo duoc nguon hinh: 0")
         gate._reader_factory = broken
         gate.start()
-        self.assertTrue(self.wait(lambda: gate.status()["trang_thai"] == "loi"))
+        self.assertTrue(self.wait(lambda: gate.status()["mat_camera"]))  # khong bo cuoc: thu lai moi 2 giay
         self.login()
         st = self.client.get("/api/cong/trang-thai").json()
-        self.assertEqual((st["gian_doan"], st["loi"]), (True, "Lỗi camera: Khong mo duoc nguon hinh: 0"))
+        self.assertEqual((st["gian_doan"], st["loi"]),
+                         (True, "Mất kết nối camera, đang thử lại (Khong mo duoc nguon hinh: 0)"))
         self.assertEqual(self.client.get("/api/cong-nhan").status_code, 200)
 
     def test_chua_co_cong_bao_loi(self):

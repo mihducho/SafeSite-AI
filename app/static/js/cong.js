@@ -121,16 +121,34 @@ stream.addEventListener("error", () => setTimeout(() => { stream.src = "/stream/
 
 // ---------- su kien ----------
 const errorBox = document.getElementById("gate-error");
-function showError(detail) {
+function showError(detail, camera = false) {
   errorBox.classList.add("show");
-  document.getElementById("gate-error-detail").textContent = detail || "";
+  const title = document.getElementById("gate-error-title");
+  title.textContent = camera ? "Mất kết nối camera, đang thử lại" : "Hệ thống kiểm tra tạm gián đoạn";
+  title.classList.toggle("camera", camera);
+  document.getElementById("gate-error-sub").textContent = camera ? "Kiểm tra điện thoại: mở ứng dụng camera, bật màn hình, cùng wifi"
+                                                                 : "Vui lòng gặp cán bộ";
+  document.getElementById("gate-error-detail").textContent = camera ? "" : (detail || "");
 }
+
+// hinh doc (dien thoai kep doc): cot trai theo dung ti le hinh, khong keo meo
+const wrap = document.querySelector(".gate-wrap");
+function fitStream() {
+  if (!stream.naturalWidth) return;
+  const portrait = stream.naturalHeight > stream.naturalWidth;
+  wrap.classList.toggle("portrait", portrait);
+  document.querySelector(".gate-video").style.aspectRatio = portrait ? `${stream.naturalWidth} / ${stream.naturalHeight}` : "";
+}
+stream.addEventListener("load", fitStream);
+setInterval(fitStream, 2000);  // luong MJPEG: trinh duyet khong phai luc nao cung bao "load"; doi goc xoay -> tu chinh lai
 
 SG.onEvent(ev => {
   if (ev.loai === "mat_ket_noi") { showError("Mất kết nối tới máy chủ, đang thử kết nối lại…"); return; }
   if (ev.loai === "trang_thai") {
     phase = ev.pha;
-    if (ev.trang_thai === "loi" || ev.trang_thai === "tat" || ev.loi) {
+    if (ev.mat_camera) {
+      showError(ev.loi, true);  // tu an khi co hinh lai (su kien trang_thai moi)
+    } else if (ev.trang_thai === "loi" || ev.trang_thai === "tat" || ev.loi) {
       showError(ev.trang_thai === "tat" ? "Cổng đang tắt" : ev.loi);
     } else {
       errorBox.classList.remove("show");

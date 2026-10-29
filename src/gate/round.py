@@ -36,6 +36,7 @@ class GateRound:
         self.faces = FaceAccumulator(self.face_cfg["max_vectors"])
         self.record = record
         self.face_detail: list[dict] = []
+        self.face_widths: list[float] = []  # chieu rong mat chinh (px) moi khung -> bao cao, chon vi tri dat camera
         self.ms = {"bao_ho": [], "yunet": [], "sface": []}  # thoi gian moi buoc (ms) de bao cao
         self._snap: tuple[np.ndarray, int | None] | None = None  # mat tren khung duoc chon lam anh minh chung
         self.last: tuple[np.ndarray, np.ndarray, int | None] | None = None  # khung vua xu ly: (nguoi trong vung, mat,
@@ -61,6 +62,7 @@ class GateRound:
             vector = self.emb.embed(frame, faces.rows[idx])
             self.ms["sface"].append((time.perf_counter() - t3) * 1000)
             quality = face_quality(faces.rows[idx, 14], faces.rows[idx, 2], fc["quality_full_width_px"])
+            self.face_widths.append(float(faces.rows[idx, 2]))
         self.faces.add(n_zone, vector, quality)
         self.last = (r.zone_persons, faces.rows, idx)
 
@@ -74,6 +76,7 @@ class GateRound:
     def finish(self, t0: float) -> dict:
         ppe = self.ppe.finish(t0)
         out = combine(ppe, self.faces.summary(), self.settings["checkpoint"]["multi_person_ratio"])
+        out["khuon_mat"]["rong_mat_px"] = round(float(np.median(self.face_widths))) if self.face_widths else None
         out["thoi_gian_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         out["ms_tb"] = {k: _mean(v) for k, v in self.ms.items()}
         out["anh_jpeg"] = self._annotate(ppe["anh_jpeg"], out)

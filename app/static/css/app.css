@@ -46,3 +46,18 @@ body.gate-body { background: #0f1115; color: #fff; height: 100vh; overflow: hidd
 .gate-error.show { display: flex; }
 .gate-error .big { font-size: clamp(2rem, 4.5vw, 4rem); font-weight: 800; }
 .gate-error .small-text { font-size: 1.4rem; margin-top: 16px; opacity: .9; }
+
+/* ---------- hinh camera doc (dien thoai kep doc 720x1280): giu dung ti le, khong keo meo ---------- */
+.preview-portrait { max-width: 100%; max-height: 70vh; object-fit: contain; background: #111; border-radius: 6px; }
+.live-view { max-height: 60vh; }
+.zone-editor { position: relative; display: inline-block; max-width: 100%; cursor: crosshair; line-height: 0; }
+.zone-editor img { display: block; max-width: 100%; max-height: 70vh; border-radius: 6px; background: #111; }
+.zone-editor svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.z-saved { fill: rgba(255, 200, 0, .18); stroke: #ffc800; stroke-width: .006; }
+.z-new { fill: rgba(0, 200, 255, .22); stroke: #00c8ff; stroke-width: .006; }
+.z-dot { fill: #00c8ff; stroke: #fff; stroke-width: .003; }
+/* man hinh cong: hinh doc -> cot trai rong theo ti le that cua hinh (JS dat aspect-ratio), cot phai lay phan con lai */
+.gate-wrap.portrait { grid-template-columns: auto minmax(0, 1fr); }
+.gate-wrap.portrait .gate-video { height: calc(100vh - 32px); }
+.gate-wrap.portrait .gate-video img { height: 100%; width: auto; }
+.gate-error .big.camera { color: #ffe08a; }

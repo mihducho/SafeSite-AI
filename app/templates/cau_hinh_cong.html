@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="page-title mb-3">Cấu hình cổng</h1>
+<div class="alert alert-warning py-2 d-none" id="g-env">Nguồn hình đang bị ghi đè bởi <code>GATE_SOURCE</code> trong file
+  <code>.env</code> (<span id="g-env-src"></span>). Xoá dòng đó trong <code>.env</code> rồi khởi động lại ứng dụng nếu muốn dùng nguồn ở đây.</div>
+
+<div class="row g-3">
+  <div class="col-xl-4">
+    <form class="card mb-3" id="g-form" novalidate>
+      <div class="card-header fw-semibold">Camera cổng</div>
+      <div class="card-body">
+        <div class="mb-3"><label class="form-label" for="g-name">Tên cổng</label><input class="form-control" id="g-name" maxlength="50"></div>
+        <div class="mb-3"><label class="form-label" for="g-source">Nguồn hình</label>
+          <input class="form-control" id="g-source" maxlength="500" placeholder="0 hoặc http://IP:4747/video/force/1280x720">
+          <div class="form-text">Số webcam (0), URL camera điện thoại (DroidCam), hoặc đường dẫn file video (demo dự phòng, tự lặp lại).
+            DroidCam chỉ cho <b>một</b> kết nối: đừng mở URL này ở trình duyệt hay chương trình khác khi ứng dụng đang chạy.</div></div>
+        <div class="mb-3"><label class="form-label" for="g-rotate">Xoay hình (theo chiều kim đồng hồ)</label>
+          <select class="form-select" id="g-rotate">
+            <option value="0">0° (giữ nguyên)</option><option value="90">90°</option>
+            <option value="180">180°</option><option value="270">270°</option>
+          </select>
+          <div class="form-text">Điện thoại kẹp dọc mà hình nhận về nằm ngang: chọn 90°, nếu người bị lộn ngược thì chọn 270°.
+            Đổi góc xoay thì vùng kiểm tra đặt lại thành cả khung, cần vẽ lại.</div></div>
+        <div class="alert alert-danger d-none" id="g-error"></div>
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Lưu và khởi động lại cổng</button>
+        <button class="btn btn-outline-secondary" type="button" id="g-restart">Khởi động lại</button>
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="card-header fw-semibold">Trạng thái</div>
+      <table class="table table-sm mb-0"><tbody id="g-status"></tbody></table>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Xem trực tiếp (sau khi xoay)</div>
+      <div class="card-body text-center"><img class="preview-portrait" id="g-live" src="/stream/gate" alt="Hình trực tiếp camera cổng"></div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card h-100">
+      <div class="card-header fw-semibold">Vùng kiểm tra</div>
+      <div class="card-body">
+        <p class="small text-muted mb-2">Bấm lên ảnh để thêm từng đỉnh của vùng (ít nhất 3 điểm), bao <b>chỗ người đứng</b>:
+          hệ thống xét <b>điểm chân</b> của người có nằm trong vùng không. Người đứng trong vùng phải thấy từ đầu đến chân.</p>
+        <div class="zone-editor" id="z-wrap">
+          <img id="z-img" alt="Khung hình hiện tại">
+          <svg id="z-svg" viewBox="0 0 1 1" preserveAspectRatio="none">
+            <polygon id="z-saved" class="z-saved"></polygon>
+            <polygon id="z-new" class="z-new"></polygon>
+            <g id="z-dots"></g>
+          </svg>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-2">
+          <button class="btn btn-outline-secondary btn-sm" id="z-snap">📷 Lấy ảnh mới</button>
+          <button class="btn btn-outline-secondary btn-sm" id="z-undo">↶ Xoá điểm cuối</button>
+          <button class="btn btn-outline-secondary btn-sm" id="z-clear">Xoá hết</button>
+          <button class="btn btn-outline-secondary btn-sm" id="z-full">Cả khung</button>
+          <button class="btn btn-success btn-sm ms-auto" id="z-save">Lưu vùng</button>
+        </div>
+        <div class="small mt-2" id="z-info"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/cau_hinh_cong.js?v={{ v }}"></script>{% endblock %}

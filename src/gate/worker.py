@@ -32,6 +32,7 @@ class GateWorker:
         self.last_result: dict | None = None
         self.round: GateRound | None = None  # luot dang chay (KIEM_TRA), de luong hinh ve khung nguoi/mat
         self.rounds = 0
+        self.camera_errors = 0
         self.error: str | None = None
         self._last_id = 0
         self._last_idle = 0.0
@@ -65,8 +66,8 @@ class GateWorker:
         rnd = self.round = GateRound(self.zone, self.settings, self.detector, self.fd, self.emb, self.required_ppe)
         try:
             result = run_round(self.reader, rnd, self.settings["checkpoint"]["timeout_s"])
-        except CameraError as e:
-            self.error = str(e)
+        except CameraError:  # mat hinh giua luot (vd dien thoai khoa man hinh): bo luot, ve CHO; GateService bao
+            self.camera_errors += 1  # "mat ket noi camera" dua vao tuoi khung hinh va tu het khi co hinh lai
             self.state = GateState(CHO, since=time.monotonic())
             return None
         finally:

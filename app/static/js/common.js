@@ -115,6 +115,7 @@ const SG = (() => {
 
   function gateText(st) {
     if (!st) return ["Cổng: đang kết nối…", "secondary"];
+    if (st.mat_camera) return ["Cổng: mất kết nối camera, đang thử lại", "danger"];
     if (st.trang_thai === "dang_chay" && !st.loi) return [`Cổng: đang chạy${st.pha === "KIEM_TRA" ? " · đang kiểm tra" : ""}`, "success"];
     if (st.trang_thai === "dang_khoi_dong") return ["Cổng: đang khởi động", "warning"];
     if (st.trang_thai === "tat") return ["Cổng: đang tắt", "secondary"];
@@ -157,7 +158,8 @@ const SG = (() => {
       ["Công nhân", c.cong_nhan ? `${esc(c.cong_nhan.ma)} – ${esc(c.cong_nhan.ten)}` : "–"],
       ["Kết quả", badge(KET_QUA, c.ket_qua) + (c.ly_do ? ` <span class="text-muted">(${esc(c.ly_do)})</span>` : "")],
       ["Thiếu", esc(thieu(c.missing || c.thieu)) || "–"],
-      ["Nhận diện", badge(MAT, c.trang_thai_mat) + (c.diem != null ? ` điểm ${c.diem.toFixed(2)}` : "")],
+      ["Nhận diện", badge(MAT, c.trang_thai_mat) + (c.diem != null ? ` điểm ${c.diem.toFixed(2)}` : "") +
+                    (d.rong_mat_px ? ` · mặt rộng ${d.rong_mat_px} px` : "")],
       ["Người giống nhất", nd.gan_nhat_ma ? `${esc(nd.gan_nhat_ma)}${nd.diem_thu_hai != null ? `, người thứ hai ${nd.diem_thu_hai.toFixed(2)}` : ""}` : "–"],
       ["Hướng / hành động", `${HUONG[c.huong] || "–"} / ${badge(HANH_DONG, c.hanh_dong)}`],
       ["Kết quả bảo hộ gốc", d.ket_qua_bao_ho ? badge(KET_QUA, d.ket_qua_bao_ho) : "–"],

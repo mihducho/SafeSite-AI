@@ -58,7 +58,7 @@ class LuotKiemTra:
             "ket_qua_bao_ho": r.get("ket_qua_bao_ho"), "thieu_bao_ho": r.get("thieu_bao_ho"),
             "so_khung": r.get("so_khung"), "so_khung_hop_le": r.get("so_khung_hop_le"), "dem_khung": r.get("dem_khung"),
             "so_khung_co_mat": km.get("so_khung_co_mat"), "ty_le_khung_nhieu_mat": km.get("ty_le_khung_nhieu_mat"),
-            "chat_luong_mat": km.get("chat_luong"), "ms_tb": r.get("ms_tb"),
+            "chat_luong_mat": km.get("chat_luong"), "rong_mat_px": km.get("rong_mat_px"), "ms_tb": r.get("ms_tb"),
             "tu_luc_thay_mat_ms": r.get("tu_luc_thay_mat_ms"),
         }
         return cls(thoi_diem=thoi_diem, ket_qua=r["ket_qua"], thieu=list(r.get("thieu") or []),

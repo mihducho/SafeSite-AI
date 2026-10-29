@@ -71,10 +71,17 @@ def parse_source(source) -> Source:
 
 
 def open_capture(src: Source, cam_cfg: dict) -> cv2.VideoCapture:
-    """Mo nguon hinh; khong mo duoc thi bao CameraError."""
+    """Mo nguon hinh; khong mo duoc thi bao CameraError.
+    URL (camera dien thoai): dat thoi gian cho khi mo / doc (camera.url_open_timeout_s, url_read_timeout_s). Khong dat thi
+    FFmpeg cho mac dinh ~30 giay moi bao loi khi dien thoai khoa man hinh hoac mat wifi -> tu ket noi lai rat cham."""
     if src.kind == "file" and not Path(src.value).exists():
         raise CameraError(f"Khong tim thay file video: {src.value}")
-    cap = cv2.VideoCapture(src.value)
+    if src.kind == "url":
+        ms = lambda key: int(cam_cfg.get(key, 5) * 1000)  # noqa: E731
+        cap = cv2.VideoCapture(src.value, cv2.CAP_FFMPEG, [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, ms("url_open_timeout_s"),
+                                                           cv2.CAP_PROP_READ_TIMEOUT_MSEC, ms("url_read_timeout_s")])
+    else:
+        cap = cv2.VideoCapture(src.value)
     if src.kind == "webcam":
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, cam_cfg["webcam_width"])
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, cam_cfg["webcam_height"])

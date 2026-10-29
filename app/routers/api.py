@@ -16,9 +16,11 @@ from sqlalchemy.orm import Session
 
 from app.auth import authenticate, current_user, login_session
 from app.db import get_db, utcnow
-from app.models import DANG_LAM, Attendance, FaceSample, PpeCheck, Shift, Team, User, Worker
+from app.config import mask_source
+from app.models import DANG_LAM, Attendance, FaceSample, Gate, PpeCheck, Shift, Team, User, Worker
 from app.services import bao_cao, cham_cong, cong_nhan
 from app.services.dang_ky_mat import CAMERA, NOI_DUNG_DONG_Y, UPLOAD, DangKyMatError
+from src.zone.zone import zone_to_pixels
 
 public = APIRouter(prefix="/api", tags=["dang nhap"])
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
@@ -458,6 +460,79 @@ def update_shift(body: ShiftPatch, request: Request, db: Session = Depends(get_d
 
 
 # ---------- cong ----------
+FULL_FRAME = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+
+
+class GatePatch(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=50)
+    camera_source: str | None = Field(None, min_length=1, max_length=500,
+                                      examples=["0", "http://192.168.1.10:4747/video/force/1280x720"])
+    rotate: Literal[0, 90, 180, 270] | None = Field(None, description="Xoay hình theo chiều kim đồng hồ (độ)")
+    zone: list[list[float]] | None = Field(None, description="Vùng kiểm tra: các điểm [x, y] tỷ lệ 0–1 trên hình ĐÃ xoay")
+    khoi_dong_lai: bool = Field(True, description="Khởi động lại cổng để áp dụng ngay")
+
+
+def gate_json(g: Gate, request: Request) -> dict:
+    cfg = _state(request).cfg
+    return {"id": g.id, "name": g.name, "camera_source": mask_source(g.camera_source), "rotate": g.rotate, "zone": g.zone,
+            "required_ppe": g.required_ppe, "ghi_de_boi_env": cfg.gate_source is not None,
+            "nguon_env": mask_source(cfg.gate_source)}
+
+
+def _gate_row(db: Session) -> Gate:
+    g = db.scalar(select(Gate).order_by(Gate.id).limit(1))
+    if g is None:
+        raise HTTPException(404, "Chưa có cổng trong CSDL: chạy scripts\\seed_demo.py")
+    return g
+
+
+@router.get("/cong", tags=["cong"])
+def get_gate(request: Request, db: Session = Depends(get_db)):
+    """Cấu hình cổng: nguồn camera, góc xoay, vùng kiểm tra."""
+    return gate_json(_gate_row(db), request)
+
+
+@router.patch("/cong", tags=["cong"])
+def update_gate(body: GatePatch, request: Request, db: Session = Depends(get_db)):
+    """Sửa nguồn camera / góc xoay / vùng kiểm tra rồi khởi động lại cổng. Đổi góc xoay mà không gửi vùng mới thì vùng
+    đặt lại thành cả khung hình (vùng cũ vẽ trên hình xoay khác). URL có mật khẩu: đặt GATE_SOURCE trong .env."""
+    g = _gate_row(db)
+    note = None
+    if body.camera_source is not None:
+        src = body.camera_source.strip()
+        if "://" in src and "@" in src:
+            raise HTTPException(400, "URL camera có mật khẩu: đặt GATE_SOURCE trong file .env, không lưu vào CSDL")
+        g.camera_source = src
+    if body.zone is not None:
+        try:
+            zone_to_pixels(body.zone, 1, 1)  # >= 3 diem, trong khoang 0-1
+        except ValueError as e:
+            raise HTTPException(400, f"Vùng kiểm tra không hợp lệ: {e}")
+        g.zone = [[round(float(x), 4), round(float(y), 4)] for x, y in body.zone]
+    if body.rotate is not None and body.rotate != g.rotate:
+        g.rotate = body.rotate
+        if body.zone is None:
+            g.zone, note = FULL_FRAME, "Đã đổi góc xoay: vùng kiểm tra đặt lại thành cả khung hình, cần vẽ lại vùng"
+    if body.name is not None:
+        g.name = body.name.strip()
+    db.commit()
+    gate = _state(request).gate
+    if body.khoi_dong_lai:
+        gate.restart()
+    return {**gate_json(g, request), "ghi_chu": note, "trang_thai": gate.status()}
+
+
+@router.get("/cong/anh-hien-tai", tags=["cong"])
+def gate_snapshot(request: Request):
+    """Khung hình hiện tại của camera cổng (đã xoay, không vẽ gì), để vẽ vùng kiểm tra. Lấy từ luồng đọc camera dùng
+    chung, không mở thêm kết nối tới camera (DroidCam chỉ cho 1 kết nối)."""
+    frame = _state(request).gate.latest_frame()
+    if frame is None:
+        raise HTTPException(503, "Chưa có hình từ camera cổng")
+    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return Response(buf.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
 @router.get("/cong/trang-thai", tags=["cong"])
 def gate_status(request: Request):
     return _state(request).gate.status()

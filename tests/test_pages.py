@@ -18,7 +18,7 @@ from app.models import Attendance  # noqa: E402
 from app.services.cham_cong import mui_gio  # noqa: E402
 from src.checkpoint.evaluate import KHONG_DAT  # noqa: E402
 
-PAGES = ["/", "/cong", "/cong-nhan", "/to-doi", "/lich-su", "/bang-cong", "/bang-cong/thang", "/ca-lam"]
+PAGES = ["/", "/cong", "/cong-nhan", "/to-doi", "/lich-su", "/bang-cong", "/bang-cong/thang", "/ca-lam", "/cau-hinh-cong"]
 
 
 class PagesTest(AppCase):
@@ -39,7 +39,7 @@ class PagesTest(AppCase):
                 self.assertIn("/static/vendor/bootstrap-5.3.3/bootstrap.min.css", r.text)
                 self.assertIsNone(re.search(r'(src|href)="https?://', r.text), "khong tai file tu mang ngoai (CDN)")
         menu = self.client.get("/").text
-        for label in ("Tổng quan", "Màn hình cổng", "Công nhân", "Tổ đội", "Lịch sử kiểm tra", "Bảng công", "Ca làm",
+        for label in ("Tổng quan", "Màn hình cổng", "Công nhân", "Tổ đội", "Lịch sử kiểm tra", "Bảng công", "Ca làm", "Cấu hình cổng",
                       "Đăng xuất", "Quản trị"):
             self.assertIn(label, menu)
         self.assertIn("Nguyễn Văn An", self.client.get(f"/cong-nhan/{self.an_id}").text)

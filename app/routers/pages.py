@@ -19,7 +19,7 @@ from app.services.cham_cong import mui_gio, ngay_cong
 
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
-ASSET_VERSION = "f3b"  # doi khi sua file tinh de trinh duyet tai lai (khong dung ban cu trong bo nho dem)
+ASSET_VERSION = "f3c"  # doi khi sua file tinh de trinh duyet tai lai (khong dung ban cu trong bo nho dem)
 
 NAV = [  # (khoa, duong dan, ten tren menu)
     ("tong_quan", "/", "Tổng quan"),
@@ -29,6 +29,7 @@ NAV = [  # (khoa, duong dan, ten tren menu)
     ("lich_su", "/lich-su", "Lịch sử kiểm tra"),
     ("bang_cong", "/bang-cong", "Bảng công"),
     ("ca_lam", "/ca-lam", "Ca làm"),
+    ("cau_hinh_cong", "/cau-hinh-cong", "Cấu hình cổng"),
 ]
 
 
@@ -118,6 +119,11 @@ def monthly_page(request: Request, user: User = Depends(page_user)):
 @router.get("/ca-lam", response_class=HTMLResponse)
 def shift_page(request: Request, user: User = Depends(page_user)):
     return render(request, "ca_lam.html", user, "ca_lam", "Ca làm")
+
+
+@router.get("/cau-hinh-cong", response_class=HTMLResponse)
+def gate_config_page(request: Request, user: User = Depends(page_user)):
+    return render(request, "cau_hinh_cong.html", user, "cau_hinh_cong", "Cấu hình cổng")
 
 
 # ---------- thu API (Swagger) ----------

@@ -48,7 +48,9 @@ camera:
   webcam_width: 1280           # do phan giai xin webcam; camera khong ho tro thi tu chon muc gan nhat
   webcam_height: 720
   first_frame_timeout_s: 10    # cho khung dau tien khi mo camera; qua thoi gian -> bao loi
-  reconnect_delay_s: 2.0       # webcam/URL mat ket noi: cho bao lau roi mo lai
+  reconnect_delay_s: 2.0       # webcam/URL mat ket noi: cho bao lau roi mo lai (thu lai moi 2 giay)
+  url_open_timeout_s: 5        # URL camera dien thoai: mo ket noi toi da bay nhieu giay
+  url_read_timeout_s: 5        # ... khong nhan duoc khung nao trong bay nhieu giay -> coi la mat ket noi, mo lai
   loop_video: true             # file video: het thi phat lai tu dau (mo phong camera chay lien tuc)
   rotate: 0                    # xoay hinh theo chieu kim dong ho: 0, 90, 180, 270. Dien thoai dung DOC ma app
                                # phat hinh ngang (nguoi nam ngang, dau ben trai) -> 90. Khi chay voi --gate thi
