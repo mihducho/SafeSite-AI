@@ -33,11 +33,14 @@ async def events_ws(websocket: WebSocket):
         while True:
             await websocket.receive_text()
 
-    tasks = [asyncio.create_task(send_events()), asyncio.create_task(wait_close())]
+    tasks = [asyncio.create_task(send_events()), asyncio.create_task(wait_close()),
+             asyncio.create_task(state.shutting_down.wait())]  # ung dung dang tat -> dong ket noi
     try:
         done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
         for t in done:
             t.exception()  # doc loi cua task da xong (thuong la WebSocketDisconnect) de asyncio khong canh bao
+        if tasks[2] in done:  # ung dung dang tat: bao trinh duyet "may chu tat" (1001); trinh duyet se tu ket noi lai
+            await websocket.close(code=1001)
     finally:
         for t in tasks:
             t.cancel()

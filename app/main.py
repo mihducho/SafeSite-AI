@@ -9,6 +9,8 @@ create_app(start_gate=False): khong bat cong (test, hoac GATE_ENABLED=0 trong .e
 """
 import asyncio
 import logging
+import signal
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote
@@ -43,6 +45,34 @@ def enroll_models(face_cfg: dict):
     return face_detector_from_settings(face_cfg), face_embedder_from_settings(face_cfg)
 
 
+def install_exit_hook(loop: asyncio.AbstractEventLoop, on_exit):
+    """Ctrl+C (hoac lenh tat): goi on_exit NGAY, roi moi chuyen cho uvicorn. Neu khong, uvicorn cho moi trinh duyet ngat
+    ket noi (luong hinh MJPEG, WebSocket khong bao gio tu dong) moi chay phan tat cua lifespan -> vong lap cong van chay,
+    van giu camera va ghi CSDL du cua so lenh bao "Shutting down". Tra ve ham go bo (dat lai xu ly cu)."""
+    if threading.current_thread() is not threading.main_thread():  # vd TestClient: khong co tin hieu
+        return lambda: None
+    saved = {}
+    for name in ("SIGINT", "SIGTERM", "SIGBREAK"):
+        sig = getattr(signal, name, None)
+        if sig is None:
+            continue
+        prev = signal.getsignal(sig)
+
+        def handler(signum, frame, prev=prev):
+            loop.call_soon_threadsafe(on_exit)
+            if callable(prev):
+                prev(signum, frame)
+            elif signum == signal.SIGINT:
+                raise KeyboardInterrupt
+        signal.signal(sig, handler)
+        saved[sig] = prev
+
+    def restore():
+        for sig, prev in saved.items():
+            signal.signal(sig, prev)
+    return restore
+
+
 def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, face_models=None, gate_models=None,
                reader_factory=None) -> FastAPI:
     """face_models / gate_models / reader_factory: thay mo hinh va camera bang bo gia khi test."""
@@ -69,9 +99,15 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
         if run_gate:
             gate.start()
         watcher = asyncio.create_task(ws.watch_gate_status(gate, events))
+
+        def on_exit():  # Ctrl+C: dung cong + camera ngay, ket thuc luong hinh va WebSocket de uvicorn tat duoc
+            app.state.shutting_down.set()
+            threading.Thread(target=gate.stop, name="gate-stop", daemon=True).start()
+        restore = install_exit_hook(asyncio.get_running_loop(), on_exit)
         try:
             yield
         finally:
+            restore()
             watcher.cancel()
             await run_in_threadpool(gate.stop)
 
@@ -82,6 +118,7 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
     app.state.cfg, app.state.settings, app.state.db = cfg, settings, db
     app.state.nhan_dien, app.state.dang_ky, app.state.events, app.state.gate = nhan_dien, dang_ky, events, gate
     app.state.image_dir = settings["paths"]["check_images"]
+    app.state.shutting_down = asyncio.Event()  # dat khi Ctrl+C: luong hinh, WebSocket tu ket thuc
 
     @app.exception_handler(LoginRequired)
     async def _login_required(request: Request, exc: LoginRequired):

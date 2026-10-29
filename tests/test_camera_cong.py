@@ -11,6 +11,7 @@ from unittest import mock
 
 import cv2
 import numpy as np
+from starlette.websockets import WebSocketDisconnect
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -211,6 +212,18 @@ class GateConfigApiTest(AppCase):
         page = self.client.get("/cau-hinh-cong")
         self.assertEqual(page.status_code, 200)
         self.assertIn("Vùng kiểm tra", page.text)
+
+
+class ShutdownTest(AppCase):
+    def test_ung_dung_dang_tat_thi_dong_websocket(self):
+        self.login()
+        with self.client.websocket_connect("/ws/events") as ws:
+            self.assertEqual(ws.receive_json()["loai"], "trang_thai")
+            self.client.portal.call(self.app.state.shutting_down.set)  # nhu luc bam Ctrl+C
+            with self.assertRaises(WebSocketDisconnect):
+                ws.receive_json()
+        r = self.client.get("/stream/gate")  # luong hinh ket thuc ngay, khong phat mai
+        self.assertEqual(r.status_code, 200)
 
 
 if __name__ == "__main__":

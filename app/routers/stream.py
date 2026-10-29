@@ -21,10 +21,11 @@ def mjpeg_part(jpeg: bytes) -> bytes:
 async def stream_gate(request: Request, so_khung: int = Query(0, ge=0, description="0 = phát mãi (dùng để thử)")):
     gate = request.app.state.gate
     period = 1.0 / request.app.state.settings["gate"]["stream_fps"]
+    stopping = request.app.state.shutting_down
 
     async def frames():
         sent = 0
-        while not so_khung or sent < so_khung:
+        while (not so_khung or sent < so_khung) and not stopping.is_set():  # ung dung dang tat -> dung
             if await request.is_disconnected():
                 break
             jpeg = await run_in_threadpool(gate.render_frame)  # ve + nen JPEG ngoai event loop
