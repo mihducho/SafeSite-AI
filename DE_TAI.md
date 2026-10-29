@@ -1,317 +1,391 @@
-# MÔ TẢ DỰ ÁN: SafeSite-AI
+# MÔ TẢ DỰ ÁN: SafeGate
 
 > File này là nguồn thông tin chính của dự án. Trợ lý AI phải đọc file này trước khi làm bất kỳ việc gì,
 > và làm đúng theo phạm vi, quy tắc ở đây. Nếu có điểm mâu thuẫn hoặc chưa rõ thì hỏi lại, không tự đoán.
+>
+> **Phiên bản 2 (29/10/2026): chấm công bằng nhận diện khuôn mặt, bỏ hoàn toàn thẻ QR và kiosk quét thẻ.**
+> Bản cũ (QR) chỉ còn giá trị tham khảo, mọi chỗ khác với bản này thì theo bản này.
 
-## 1. Tên đề tài
+## 1. Đề tài và mốc thời gian
 
 **Xây dựng hệ thống quản lý và chấm công công nhân tại công trường tích hợp kiểm tra trang bị bảo hộ lao động bằng thị giác máy tính**
 
-Tên sản phẩm: **SafeSite-AI**. Đồ án tốt nghiệp ngành CNTT, thời gian còn khoảng 3 tháng.
+Tên sản phẩm: **SafeGate**. Dùng cho hai học phần: Thực tập tốt nghiệp (TTTN) và Đồ án tốt nghiệp.
 
-## 2. Vì sao đổi hướng
+- **Thi TTTN: khoảng 08/11/2026 (còn 10 ngày tính từ 29/10/2026).** Từ nay đến đó là **giai đoạn nước rút**:
+  làm cho xong một bản demo chạy trọn vẹn tại cổng và một số chức năng quản lý công nhân (mục 9.1).
+- Đồ án tốt nghiệp: khoảng giữa tháng 01/2027, hoàn thiện các phần còn lại (mục 9.2).
 
-Hướng cũ: giám sát toàn bộ công trường bằng camera, phát hiện người không đội mũ/không mặc áo bảo hộ, có vẽ vùng cấm.
+Ý tưởng một câu: **một camera tại cổng vừa nhận diện khuôn mặt để biết công nhân là ai, vừa kiểm tra mũ bảo hộ
+và áo phản quang; đủ bảo hộ thì tự động ghi công.**
 
-Vấn đề của hướng cũ:
-- Model train tốt trên dataset (mAP50 ≈ 0.83, precision ≈ 0.92) nhưng chạy trên video camera công trường thì sai nhiều:
-  người nhỏ, ở xa, bị che khuất, góc cao, đông người.
-- Báo vi phạm từng người ở công trường đông người gây quá nhiều cảnh báo, không thực tế.
-- Không biết người vi phạm là ai.
+## 2. Lịch sử hướng đi (tóm tắt)
 
-Hướng mới: **kiểm tra tại cổng ra vào**. Mỗi lần chỉ 1 người, đứng gần camera (3–4 m), nhìn rõ.
-Bài toán AI dễ hơn nhiều, và gắn được với chấm công vì biết người đó là ai qua thẻ QR.
+- Ban đầu: giám sát toàn công trường. Bỏ vì người nhỏ, ở xa, đông người, không biết ai vi phạm.
+- 17/10: kiểm tra tại cổng, nhận diện công nhân bằng thẻ QR.
+- **29/10: theo góp ý của giảng viên hướng dẫn, chấm công bằng khuôn mặt, dùng chung camera với module AI.**
+  Lý do: QR không thực tế (quẹt thẻ hộ, mất thẻ, phải có kiosk riêng); khuôn mặt chống chấm công hộ và gắn
+  kết quả kiểm tra bảo hộ trực tiếp với danh tính. Đã thử nhanh trên ảnh của bộ video `cong_gia_v1`: tìm thấy mặt ở 10/10 ảnh
+  (kể cả đội mũ bảo hộ, mũ lưỡi trai, nón lá); cùng một người có độ tương đồng 0,52–0,94, hai người khác nhau 0,08–0,27;
+  ở 2 ảnh "hai người đứng trước–sau" mà YOLO chỉ thấy 1 người, bộ tìm mặt vẫn thấy 2 khuôn mặt.
 
-## 3. Hiện trạng dự án (đã có)
+## 3. Hiện trạng dự án (đã có, giữ nguyên)
 
-Theo `docs/RA_SOAT.md` (rà soát ngày 2026-10-16, commit `d1e9342`). Thư mục dự án: `SafeSite-AI/`.
+Thư mục dự án: `SafeSite-AI/`. Các giai đoạn 0, 1a, 1b (1b-1, 1b-2) và 2 (đánh giá rút gọn) **đã xong**.
 
-**Model**
-- YOLO11s, train trên Colab, dataset Roboflow "construction-site-safety-rmep1" (workspace 007-kd2zw, version 3),
-  imgsz=640, epochs=100. File trọng số: **`weights/ppe_s/weights/best.pt`** (không nằm trong git).
-- 10 lớp (đã kiểm chứng bằng `model.names`): 0 Mask, 1 Safety-Vest, 2 NO-Safety-Vest, 3 Person, 4 machinery,
-  5 Safety-Cone, 6 vehicle, 7 Hardhat, 8 NO-Mask, 9 NO-Hardhat.
-- Điểm yếu đã ghi nhận trên video công trường (`docs/ket_qua_model_ppe.md`): **mũ trắng, người quay lưng,
-  áo cam hoặc đỏ** gần như không được nhận. Tại cổng (3–4 m, đứng đối diện camera): CHƯA XÁC MINH.
+- **Model PPE**: YOLO11s, `weights/ppe_s/weights/best.pt`, 10 lớp; chỉ dùng Person, Hardhat, Safety-Vest (tra theo tên).
+- **Thuật toán kiểm tra bảo hộ chế độ cổng** (mục 6.1): `src/checkpoint/evaluate.py` (`evaluate_frames`,
+  `classify_frame`, `aggregate`), `src/checkpoint/detector.py` (`YoloDetector`, `get_detector`), hàm `check()` xử lý
+  từng khung ngay khi lấy được từ luồng đọc camera.
+- `src/ppe/compliance.py` (`assign_ppe`, `missing_ppe`), `src/utils/postprocess.py` (`suppress_contained`),
+  `src/zone/zone.py` (`zone_to_pixels`, `person_feet_point`, `point_in_zone`), luồng đọc camera chỉ giữ khung mới nhất,
+  `scripts/define_zone.py` (lưu vùng dạng tỷ lệ 0–1), `scripts/make_answers.py`, `scripts/evaluate_videos.py`.
+- `configs/settings.yaml`: toàn bộ tham số. Test tự động: 62 test trở lên, tất cả phải luôn chạy OK.
+- Kết quả đánh giá `cong_gia_v1` (43 video, 480×854, 2 người đóng vai): đúng 38/43 (88,4%), precision vi phạm 100%,
+  recall 90,9%, 0 lượt chặn nhầm. Lỗi đã biết: nón lá bị nhận là mũ bảo hộ (1/3), hai người đứng trước–sau (0/3).
+  Chi tiết: `docs/ket_qua_danh_gia_cong_v1.md`.
+- **Môi trường**: Windows, Python 3.13.7, ultralytics 8.4.152, torch 2.14.0 chỉ CPU, opencv-python 5.0.0.93.
+  YOLO imgsz 640: khoảng 117 ms/khung trên CPU Intel Core i5-1135G7.
 
-**Code tái sử dụng được** (đã có 24 test, chạy OK)
-- `src/ppe/compliance.py`: `assign_ppe`, `missing_ppe`. Gán mỗi box mũ/áo cho một người theo vùng đầu/vùng thân;
-  có quy tắc người cúi (box thấp hơn rộng thì dùng cả box).
-- `src/utils/postprocess.py`: `suppress_contained` (bỏ box người nằm trong box người lớn hơn).
-- `src/zone/zone.py`: `point_in_zone`, `person_feet_point` (kiểm tra điểm chân trong đa giác).
-- `src/tracking/tracker.py`: `PersonTracker` (BoT-SORT, chỉ theo dõi người). Chế độ cổng KHÔNG dùng (xem mục 4).
-- `src/utils/visualize.py`: hàm vẽ khung và chữ.
-- `scripts/define_zone.py`: vẽ đa giác bằng cửa sổ OpenCV. `scripts/extract_frames.py`: cắt khung từ video.
-
-**Môi trường**: Python 3.13.7 (Windows), ultralytics 8.4.152, torch 2.14.0 **chỉ CPU** (không có CUDA),
-opencv-python 5.0.0.93. Tốc độ trên CPU (video 1280×720): **6.6 FPS ở imgsz 640**, 2.9 FPS ở imgsz 960.
-
-**Chưa có**: backend, cơ sở dữ liệu, frontend, Docker, quét QR, chế độ cổng, lưu ảnh từng lượt.
-Code hướng cũ ghi cả video kết quả, xét vi phạm theo từng khung, không gộp theo thời gian.
+**Chưa có**: nhận diện khuôn mặt, backend, cơ sở dữ liệu, giao diện web.
 
 ## 4. Quyết định kỹ thuật đã chốt (không tự ý thay đổi)
 
-- **Giữ model YOLO11s hiện tại (`weights/ppe_s/weights/best.pt`). Không đổi model, không tìm dataset mới.**
-  Chưa train lại cho đến khi có kết quả đánh giá tại cổng (Giai đoạn 2). Nếu khi đó model kém ở vài trường hợp cụ thể
-  (ví dụ mũ trắng, áo cam), hướng xử lý là bổ sung ảnh đúng trường hợp đó rồi train thêm, và phải được tôi duyệt trước.
-- Đường dẫn model mặc định lấy từ **file cấu hình**, không còn mặc định `yolo11n.pt`.
-- **Không dùng các lớp NO-\*** (NO-Hardhat, NO-Safety-Vest, NO-Mask). Chỉ dùng Person, Hardhat, Safety-Vest.
-  **Tra chỉ số lớp theo TÊN** trong `model.names` (Person, Hardhat, Safety-Vest), bỏ các tham số `--person-cls`,
-  `--hardhat-cls`, `--vest-cls`. Không tìm thấy tên lớp thì báo lỗi rõ ràng và dừng.
-- Vi phạm xác định bằng **luật vùng cơ thể**, dùng lại nguyên `src/ppe/compliance.py` (`assign_ppe`, `missing_ppe`).
-  **Giữ giá trị hiện tại**: vùng đầu (-0.1, 0.35), vùng thân (0.15, 0.7), tỷ lệ nằm trong vùng tối thiểu 0.5,
-  ngưỡng chứa của `suppress_contained` 0.8; **chuyển tất cả ra file cấu hình**. Không viết hàm mới trùng chức năng.
-- **Vùng kiểm tra** dùng lại `point_in_zone`, `person_feet_point` (kiểm tra điểm chân).
-  **Tọa độ lưu dạng tỷ lệ 0–1** so với kích thước khung hình (không còn pixel tuyệt đối), để không phụ thuộc
-  độ phân giải camera và để lưu JSON trong bảng `gates`, vẽ trên web. Quy đổi sang pixel lúc chạy.
-- **Chế độ cổng không dùng tracking.** Xét từng khung rồi bỏ phiếu theo mục "Thuật toán kiểm tra" (mục 5).
-- **imgsz suy luận mặc định 640** (khớp lúc train, nhanh hơn trên CPU), đặt trong file cấu hình.
-  Giai đoạn 2 so sánh thêm 960 rồi mới chốt.
-- Nhận diện công nhân bằng **mã QR** trên thẻ. Không dùng nhận diện khuôn mặt, không dùng vân tay.
-- Nội dung mã QR là **chuỗi ngẫu nhiên (UUID)** lưu trong cơ sở dữ liệu, KHÔNG phải mã công nhân dạng CN001.
-- Ảnh lưu thành **file**, cơ sở dữ liệu chỉ lưu **đường dẫn ảnh**. Không lưu video liên tục.
-- Bản demo: **chạy tất cả trên 1 laptop** (AI, backend, cơ sở dữ liệu, kiosk). Điện thoại cũ làm camera IP (RTSP/HTTP),
-  webcam laptop dùng để quét QR.
+**Kiểm tra bảo hộ (giữ nguyên như đã cài đặt):** model YOLO11s hiện tại, không train lại trong giai đoạn nước rút;
+không dùng lớp NO-\*; luật vùng cơ thể; vùng kiểm tra dạng tỷ lệ 0–1, xét điểm chân; không dùng tracking;
+bỏ phiếu nhiều khung; imgsz 640; mọi tham số trong `configs/settings.yaml`.
 
-## 5. Luồng tại cổng (khi vào ca)
+**Nhận diện khuôn mặt:**
+- Dùng **OpenCV có sẵn**, không cài thêm thư viện nhận diện khuôn mặt:
+  - Tìm mặt: **YuNet** qua `cv2.FaceDetectorYN` (giấy phép MIT).
+  - Nhận dạng: **SFace** qua `cv2.FaceRecognizerSF` (giấy phép Apache 2.0), vector đặc trưng 128 chiều.
+  - **Không dùng** `face_recognition`/dlib (khó cài trên Windows + Python 3.13), không dùng InsightFace
+    (mô hình huấn luyện sẵn chỉ cho nghiên cứu phi thương mại), không dùng dịch vụ Docker như CompreFace.
+- File mô hình đặt ở `weights/face/` (không đưa vào git), có script tải `scripts/download_face_models.py`:
+  - `face_recognition_sface_2021dec.onnx`:
+    `https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx`
+  - `face_detection_yunet_2023mar.onnx` (đã kiểm chứng chạy được với OpenCV 5.0):
+    `https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx`
+  - Nếu tải được bản `face_detection_yunet_2026may.onnx` (bản đầu vào động, tài liệu OpenCV 5 dùng làm mặc định) thì dùng bản đó.
+    Đường dẫn mô hình lấy từ file cấu hình.
+- Cách gọi (đã chạy thử trên OpenCV 5.0):
+  ```python
+  det = cv2.FaceDetectorYN.create(yunet_path, "", (320, 320), 0.7, 0.3, 5000)
+  det.setInputSize((w, h)); _, faces = det.detect(img)   # None hoặc mảng N×15: x, y, w, h, 10 toạ độ điểm mốc, score
+  rec = cv2.FaceRecognizerSF.create(sface_path, "")
+  feat = rec.feature(rec.alignCrop(img, faces[i]))       # 1×128 float32
+  ```
+  Tự chuẩn hoá L2 vector rồi so khớp bằng tích vô hướng numpy (cosine). Vài trăm công nhân thì so trực tiếp, không cần CSDL vector.
+- **Dịch vụ AI không biết công nhân là ai**: phần AI chỉ trả về vector khuôn mặt; việc so khớp với danh sách công nhân
+  nằm ở phần backend (đọc CSDL). Vector khuôn mặt chỉ lưu trong CSDL, không ghi ra file log.
+- Tốc độ đo được (CPU 2 nhân, ảnh có 1 người): YuNet 480×854 khoảng 17 ms, 720×1280 khoảng 42 ms, 1080×1920 khoảng 103 ms;
+  SFace khoảng 12 ms/khuôn mặt. Chiều rộng mặt người đứng trước camera: khoảng 70 px ở 480×854, 105 px ở 720×1280.
+  → **Camera khuyến nghị: điện thoại đặt dọc, 720×1280**, cao ngang ngực–đầu, cách chỗ đứng 2,5–3 m, không ngược sáng.
 
-1. Camera bật liên tục, gửi hình về dịch vụ AI. Màn hình kiosk hiện "Mời quét thẻ".
-2. Công nhân quét QR ở kiosk. Backend kiểm tra thẻ còn hiệu lực, lấy tên và ảnh hồ sơ.
-3. Backend yêu cầu dịch vụ AI kiểm tra người trong vùng kiểm tra, trong khoảng 1.5 giây.
-4. Dịch vụ AI trả về một trong các kết quả:
-   - `DAT`: đủ mũ và áo.
-   - `KHONG_DAT`: kèm danh sách thiếu (`thieu_mu`, `thieu_ao`).
-   - `KHONG_XAC_DINH`: người quá nhỏ, bị cắt khung, quá ít khung hình hợp lệ.
-   - `NHIEU_NGUOI`: có từ 2 người trở lên trong vùng kiểm tra.
-   - `KHONG_CO_NGUOI`: không thấy ai trong vùng.
-   Kèm 1 ảnh chụp tại thời điểm kiểm tra.
-5. Backend lưu lượt kiểm tra. Nếu `DAT` thì ghi giờ vào ca.
-6. Kiosk hiển thị kết quả (xanh / đỏ / vàng) và phát loa. Sau vài giây quay về màn hình chờ.
-7. Web quản lý nhận lượt quét mới ngay lập tức qua WebSocket.
+**Bản demo TTTN (để kịp 10 ngày):**
+- **Một ứng dụng FastAPI duy nhất** chạy trên laptop: luồng camera + vòng lặp cổng chạy trong một thread nền của ứng dụng.
+  Code vẫn tách module rõ ràng (`src/` cho AI, `app/` cho backend và web) để sau này tách dịch vụ được.
+- Giao diện: **trang HTML render phía server (Jinja2) + Bootstrap 5 + JavaScript thuần**. Không dùng React trong giai đoạn nước rút.
+- CSDL: **SQLAlchemy 2**, chạy **PostgreSQL** theo thiết kế (`DATABASE_URL` trong `.env`). Code không dùng tính năng riêng
+  của một hệ CSDL, để đổi sang SQLite chỉ bằng `DATABASE_URL` khi cần. Test tự động dùng SQLite trong bộ nhớ.
+- Không Docker, không phân quyền nhiều vai trò trong giai đoạn nước rút (chỉ tài khoản quản trị).
+- Ảnh lưu thành **file**, CSDL lưu đường dẫn. Không lưu video liên tục.
 
-Khi ra về: quét QR để ghi giờ ra, không kiểm tra bảo hộ. Nếu người đó đang ở trạng thái "đã vào" thì lần quét này là "ra".
+## 5. Luồng tại cổng
 
-### Thuật toán kiểm tra của dịch vụ AI (chế độ cổng)
+Một **trạm chấm công** ở cổng: camera (điện thoại) + màn hình (laptop hoặc màn hình phụ) + loa. Có vạch đứng và vạch chờ.
 
-Tách làm 2 hàm:
-- `evaluate_frames(frames, zone, required_ppe, config) -> dict`: **hàm thuần**, nhận danh sách khung hình,
-  không đọc camera. Dùng cho cả kiểm tra thật, script chạy thử trên video, và test tự động.
-- `check(timeout)`: **xử lý từng khung ngay khi lấy được** từ luồng đọc camera (không gom đủ `timeout` giây rồi mới xử lý),
-  cho đến khi hết `timeout`, rồi tổng hợp. Dùng chung `classify_frame` và `aggregate` với `evaluate_frames`
-  để hai đường chạy cho kết quả giống nhau. Tổng thời gian một lượt kiểm tra ≈ `timeout`.
+1. Camera bật liên tục. Màn hình cổng hiện hình trực tiếp, vùng kiểm tra và dòng chữ "Mời đứng vào vị trí, nhìn vào camera".
+2. **Chờ (CHO):** chạy YuNet trên khung đã thu nhỏ (cạnh dài 640 px), tối đa 10 lần/giây. Khi có khuôn mặt đủ lớn
+   trong vùng (mục 6.2) xuất hiện liên tiếp `trigger_frames` khung (mặc định 3) → bắt đầu một lượt.
+3. **Kiểm tra (KIEM_TRA), trong `timeout` giây (mặc định 1,5):** với mỗi khung mới nhất:
+   - chạy kiểm tra bảo hộ như hiện nay (`classify_frame`);
+   - chạy YuNet trên khung đầy đủ; lấy vector SFace của khuôn mặt hợp lệ (mục 6.2);
+   - đếm số khuôn mặt trong vùng để phát hiện nhiều người.
+   Hết thời gian: tổng hợp kết quả bảo hộ (`aggregate`, giữ nguyên) và kết quả khuôn mặt, kết hợp theo mục 6.3.
+4. Gửi **một lượt** sang backend: vector khuôn mặt (tối đa 5), kết quả bảo hộ, ảnh minh chứng, thời gian.
+5. Backend: so khớp khuôn mặt → biết công nhân (hoặc "không nhận ra") → xác định **vào hay ra** → ghi lượt kiểm tra,
+   ghi chấm công nếu đủ điều kiện (mục 7) → đẩy kết quả lên màn hình cổng và web quản lý qua WebSocket.
+6. Màn hình cổng hiện kết quả vài giây và đọc thông báo bằng loa:
+   - Xanh: "Xin chào {tên}. Đã ghi giờ vào 07:02" / "Đã ghi giờ ra".
+   - Đỏ: "{tên}: thiếu mũ bảo hộ / thiếu áo phản quang. Chưa ghi công".
+   - Vàng: "Chưa nhận diện được, mời nhìn thẳng camera" / "Mời từng người một" / "Mời đứng yên".
+7. **Chờ rời đi (CHO_ROI_DI):** không bắt đầu lượt mới cho tới khi đã qua `cooldown_seconds` (mặc định 4) VÀ
+   (vùng đã trống liên tục `empty_seconds` (mặc định 1,0) HOẶC kết quả lượt trước không phải "đã ghi công").
+   Nhờ vậy người không đạt có thể chỉnh lại mũ, áo rồi được kiểm tra lại ngay tại chỗ, còn người đã ghi công thì không bị ghi lặp.
 
-**Bước 1. Xét từng khung:**
-1. Detect, chỉ giữ 3 lớp Person, Hardhat, Safety-Vest; bỏ box người trùng bằng `suppress_contained`.
-2. Chỉ giữ người có **điểm chân nằm trong vùng kiểm tra**.
-3. Phân loại khung: 0 người → `trong`; từ 2 người → `nhieu_nguoi`; đúng 1 người → xét tiếp.
-4. Khung 1 người là **không hợp lệ** nếu: chiều cao box người nhỏ hơn ngưỡng (pixel, cấu hình được),
-   hoặc mép trên box chạm mép trên khung hình (đầu bị cắt, không xét được mũ).
-5. Khung 1 người hợp lệ: dùng `assign_ppe` để ghi nhận có mũ / có áo trong khung đó. Khi gán, xét **tất cả người
-   trong khung** (kể cả người đứng ngoài vùng), để mũ/áo của người đứng sát bên ngoài không bị gán nhầm cho người trong vùng.
+## 6. Thuật toán
 
-**Bước 2. Tổng hợp** (các ngưỡng là giá trị ban đầu, đặt trong file cấu hình, hiệu chỉnh ở Giai đoạn 2):
-1. Quá nửa số khung là `nhieu_nguoi` → `NHIEU_NGUOI`.
-2. Số khung hợp lệ dưới `min_valid_frames` (mặc định 3): nếu quá nửa số khung là `trong` → `KHONG_CO_NGUOI`,
-   ngược lại → `KHONG_XAC_DINH`.
-3. Với mỗi món bảo hộ bắt buộc, tính **tỷ lệ có mặt** = số khung hợp lệ thấy món đó / số khung hợp lệ:
-   - tỷ lệ ≥ `present_ratio` (mặc định 0.6) → **có**;
-   - tỷ lệ ≤ `absent_ratio` (mặc định 0.2) → **thiếu**;
-   - ở giữa → **không chắc**.
-4. Có món nào **không chắc** → `KHONG_XAC_DINH` (mời đứng yên và quét lại).
-   Ngược lại, có món **thiếu** → `KHONG_DAT` kèm danh sách thiếu. Tất cả **có** → `DAT`.
+### 6.1. Kiểm tra bảo hộ (đã cài đặt, KHÔNG sửa logic)
 
-**Kết quả trả về** gồm: `ket_qua`, `thieu` (danh sách thiếu), `ty_le_co_mat` của từng món, `so_khung`, `so_khung_hop_le`,
-`dem_khung` (số khung theo từng loại), `ly_do` (`it_khung_hop_le` hoặc `khong_chac` khi KHONG_XAC_DINH, để kiosk báo đúng lý do),
-`thoi_gian_ms`, và `anh_jpeg`: khung hợp lệ có người lớn nhất, có vẽ khung nhận diện; nếu không có khung hợp lệ thì lấy
-khung có người lớn nhất; không có người nào thì lấy khung cuối.
+Xét từng khung: phát hiện 3 lớp, bỏ khung người trùng (`suppress_contained` 0,8), giữ người có điểm chân trong vùng,
+phân loại khung `trong` / `nhieu_nguoi` / `khong_hop_le` (quá nhỏ, cắt đầu) / `hop_le`; khung hợp lệ thì gán mũ vào vùng đầu
+(-0,1; 0,35), áo vào vùng thân (0,15; 0,7). Tổng hợp: `nhieu_nguoi` ≥ 50% → NHIEU_NGUOI; ít hơn 3 khung hợp lệ →
+KHONG_CO_NGUOI hoặc KHONG_XAC_DINH; tỷ lệ có mặt từng món ≥ 0,6 là có, ≤ 0,2 là thiếu, ở giữa là không chắc →
+KHONG_XAC_DINH; có món thiếu → KHONG_DAT; đủ → DAT. Trả về `ket_qua`, `thieu`, `ty_le_co_mat`, `so_khung`,
+`so_khung_hop_le`, `dem_khung`, `ly_do`, `thoi_gian_ms`, `anh_jpeg`.
 
-`zone=None` thì xét cả khung: **chỉ dùng khi chạy thử**. Khi chạy thật, backend luôn gửi vùng kiểm tra.
+### 6.2. Khuôn mặt (mới, module `src/face/`)
 
-Lý do có vùng "không chắc": tại cổng, quét lại rất rẻ (vài giây), còn kết luận sai thì hoặc chặn nhầm người đủ đồ,
-hoặc cho người thiếu đồ đi qua. Khi không chắc, hệ thống yêu cầu quét lại thay vì đoán.
+Tách hàm thuần (nhận dữ liệu, không đọc camera) để test được bằng dữ liệu giả, giống cách làm của `evaluate_frames`.
 
-## 6. Quy tắc nghiệp vụ
+**Trên mỗi khung trong lượt kiểm tra:**
+1. YuNet trên khung đầy đủ, ngưỡng `face.score_threshold` (mặc định 0,7).
+2. **Mặt của người đang kiểm tra**: tâm khuôn mặt nằm trong **vùng đầu** (dùng lại tham số vùng đầu của `compliance`)
+   của người có điểm chân trong vùng kiểm tra, và chiều rộng mặt ≥ `face.min_face_px` (mặc định 50).
+   Nếu có nhiều người trong vùng thì lấy người lớn nhất. Mặt không gắn được với người nào trong vùng thì **không dùng để nhận dạng**
+   (chặn trường hợp giơ ảnh, điện thoại có ảnh người khác lên).
+3. Lấy vector SFace của mặt đó (`alignCrop` + `feature`), chuẩn hoá L2, kèm điểm chất lượng = score YuNet × min(1, rộng/100).
+4. **Đếm mặt trong vùng** để phát hiện nhiều người: mặt có tâm nằm trong khoảng x của vùng kiểm tra (từ x nhỏ nhất đến x lớn nhất
+   của đa giác), chiều rộng ≥ `face.multi_min_px` (mặc định 40) và ≥ `face.multi_min_ratio` × mặt lớn nhất (mặc định 0,7).
+   Điều kiện tỷ lệ để người đứng xếp hàng xa phía sau không bị tính.
 
-- Thiếu bảo hộ thì **chưa ghi công**, không phải mất công. Bổ sung đủ rồi quét lại.
-- Quét trùng trong vòng 2 phút thì bỏ qua.
-- Không có ca hôm nay: vẫn ghi nhận, đánh dấu "ngoài ca" để quản lý duyệt.
-- Quên quét lúc ra: cuối ngày đánh dấu "thiếu giờ ra".
-- Quên/mất thẻ: cán bộ chấm công thủ công trên web, **bắt buộc ghi lý do**.
-- Mất thẻ: cấp lại mã mới, mã cũ hết hiệu lực. Nghỉ việc: khóa thẻ.
-- Chụp ảnh cho **mọi lượt quét** (kể cả đạt) để chống quẹt thẻ hộ. Ảnh có thời hạn lưu cấu hình được (mặc định 90 ngày).
-- Danh sách đồ bảo hộ bắt buộc **cấu hình được** (bật/tắt kiểm tra áo).
-- **Một kiosk dùng chung cho cả vào và ra.** Hệ thống tự nhận biết vào hay ra theo trạng thái hiện tại của công nhân.
+**Tổng hợp cả lượt:**
+- `vectors`: tối đa `face.max_vectors` (mặc định 5) vector có chất lượng cao nhất.
+- `so_khung_co_mat`, `ty_le_khung_nhieu_mat` = số khung đếm được ≥ 2 mặt / tổng số khung.
+- Không có vector nào → trạng thái khuôn mặt `KHONG_THAY_MAT`.
 
-### Ca làm (thuộc phần lõi, bắt buộc)
+**So khớp (ở backend, `app/services/nhan_dien.py`):**
+- Mỗi công nhân **đang làm** có từ 3 đến 10 mẫu khuôn mặt (vector 128 chiều).
+- Điểm của một công nhân = trung bình qua các vector của lượt, mỗi vector lấy cosine lớn nhất với các mẫu của công nhân đó.
+- Chọn công nhân có điểm cao nhất. **Nhận ra** nếu điểm ≥ `face.match_threshold` (mặc định 0,40) VÀ hơn công nhân thứ hai
+  ít nhất `face.match_margin` (mặc định 0,05). Ngược lại → `KHONG_NHAN_RA`.
+- Ghi lại điểm tương đồng vào lượt kiểm tra để xem lại và hiệu chỉnh ngưỡng.
 
-- Mỗi ca có: tên, giờ bắt đầu, giờ kết thúc, thời gian nghỉ giữa ca (phút), số phút ân hạn đi muộn (mặc định 5),
-  được quét vào sớm tối đa bao nhiêu phút trước giờ bắt đầu (mặc định 60), có phải ca qua đêm không, có phải ca tăng ca không.
-- Phân ca: gán ca cho **tổ đội** theo khoảng ngày; có thể ghi đè cho **từng công nhân** theo ngày.
-  Một công nhân có thể có nhiều ca trong một ngày (ví dụ ca ngày + ca tăng ca tối).
-- Khi quét vào: tìm ca của công nhân sao cho thời điểm quét nằm trong khung [giờ bắt đầu − quét sớm tối đa, giờ kết thúc].
-  Không tìm thấy ca nào → ghi nhận với trạng thái "ngoài ca", chờ quản lý duyệt.
-- **Giờ vào ca = thời điểm của lượt kiểm tra ĐẠT đầu tiên** trong ca đó. Các lượt KHÔNG ĐẠT trước đó không tính là giờ vào.
-- Đi muộn (phút) = giờ vào − giờ bắt đầu ca, nếu số phút này lớn hơn số phút ân hạn; ngược lại bằng 0.
-- Về sớm (phút) = giờ kết thúc ca − giờ ra, nếu lớn hơn 0.
-- Số phút làm = min(giờ ra, giờ kết thúc) − max(giờ vào, giờ bắt đầu) − nghỉ giữa ca, không âm.
-- **Tăng ca chỉ tính khi công nhân được phân vào một ca có đánh dấu tăng ca.** Ở lại muộn mà không được phân thì không tự tính.
-- Ra ngoài giữa ca rồi quay lại (ví dụ đi ăn trưa): **lần vào lại vẫn phải kiểm tra bảo hộ**. Giữ giờ vào đầu tiên,
-  giờ ra lấy lần quét ra cuối cùng. Thời gian ra ngoài không trừ riêng (đã trừ bằng nghỉ giữa ca).
-- Ca qua đêm: bản ghi công thuộc về **ngày bắt đầu ca**.
-- Quá giờ kết thúc ca một khoảng thời gian cấu hình được (mặc định 4 giờ) mà chưa quét ra → trạng thái "thiếu giờ ra".
+### 6.3. Kết hợp kết quả một lượt (module `src/gate/`)
 
-## 7. Phạm vi
+1. Nếu `ty_le_khung_nhieu_mat` ≥ `multi_person_ratio` (dùng chung ngưỡng 0,5) → ghi đè kết quả thành `NHIEU_NGUOI`,
+   `ly_do = "nhieu_mat"`. Mục đích: bắt trường hợp người đứng sau bị che thân nhưng vẫn thấy mặt.
+   **Không sửa `evaluate_frames`/`aggregate`**; việc ghi đè làm ở hàm kết hợp mới.
+2. Các trường hợp còn lại giữ kết quả bảo hộ.
+3. Kết quả gửi backend: kết quả bảo hộ (đủ các trường như 6.1) + `khuon_mat` (`vectors`, `so_khung_co_mat`,
+   `ty_le_khung_nhieu_mat`, `trang_thai`) + `anh_jpeg` (vẽ khung người, khung mặt, kết quả).
 
-**Phần lõi (bắt buộc, ưu tiên làm trước):**
-- M1. Tài khoản và phân quyền: quản trị viên, cán bộ an toàn, tổ trưởng (tổ trưởng chỉ xem dữ liệu tổ mình).
-- M2. Công nhân và tổ đội: hồ sơ, cấp thẻ QR, in thẻ PDF, cấp lại, khóa thẻ.
-- M3. Cổng và cấu hình: địa chỉ camera, vẽ vùng kiểm tra, đồ bảo hộ bắt buộc, khung giờ hoạt động, thời hạn lưu ảnh.
-- M4. Dịch vụ AI chế độ cổng kiểm tra.
-- M5. Kiosk và chấm công vào/ra (một kiosk dùng chung), chấm công thủ công có ghi lý do.
-- **M6. Ca làm: định nghĩa ca, phân ca theo tổ đội và theo cá nhân, tính đi muộn, về sớm, số giờ làm, tăng ca.**
-- M7. Lịch sử lượt quét có ảnh, lọc theo ngày/người/kết quả; cán bộ an toàn xác nhận "đúng/báo nhầm".
-- M8. Tổng quan và báo cáo cơ bản: trang tổng quan hôm nay (đã vào, đang có mặt, số lượt không đạt, tỷ lệ tuân thủ,
-  lượt quét mới nhất tự cập nhật), bảng công theo tháng, xuất Excel.
+Vòng lặp cổng (`GateWorker`) là **máy trạng thái** CHO → KIEM_TRA → CHO_ROI_DI → CHO như mục 5. Phần quyết định chuyển trạng thái
+viết thành hàm thuần (nhận thời gian và kết quả tìm mặt) để test được không cần camera.
 
-**Phần mở rộng (chỉ làm khi phần lõi đã xong và chạy ổn):**
-- Thống kê nâng cao: tỷ lệ tuân thủ theo giờ trong ngày, theo tổ đội, xu hướng theo tuần.
-- Công nhân tự tra cứu công của mình (ví dụ quét thẻ ở kiosk để xem số công tháng này).
-- Thông báo Telegram/Zalo cho tổ trưởng, cán bộ an toàn.
-- Dùng mô hình AI đa phương thức làm "ý kiến thứ hai" khi kết quả là KHONG_XAC_DINH.
+## 7. Quy tắc nghiệp vụ
 
-**Không làm:**
-- Tính lương, thuế, bảo hiểm.
-- Nhận diện khuôn mặt, vân tay.
-- Giám sát toàn bộ công trường, cảnh báo đông người.
-- Lưu tạm offline khi mất mạng (chỉ ghi ở hướng phát triển).
+- **Vào hay ra** theo trạng thái công nhân trong ngày: chưa có giờ vào, hoặc đã có cả giờ vào và giờ ra → lượt này là **vào**;
+  đã vào mà chưa ra → lượt này là **ra**.
+- **Lượt vào**: chỉ khi nhận ra công nhân VÀ kết quả bảo hộ `DAT` mới ghi giờ vào. Không đạt thì **chưa ghi công**
+  (không phải mất công), bổ sung đủ rồi kiểm tra lại. Giờ vào = thời điểm lượt `DAT` đầu tiên.
+- **Lượt ra**: ghi giờ ra, **không yêu cầu bảo hộ**. Nếu lượt ra cách giờ vào dưới `duplicate_minutes` (mặc định 2 phút)
+  thì bỏ qua (coi là đứng lại trước camera), ghi lượt với hành động `bo_qua_trung`.
+- Vào lại sau khi đã ra (ví dụ đi ăn trưa): phải kiểm tra bảo hộ lại; giữ giờ vào đầu tiên, giờ ra lấy lần ra cuối cùng.
+- `KHONG_NHAN_RA` / `KHONG_THAY_MAT`: không ghi công, vẫn lưu lượt và ảnh để cán bộ xem. Cán bộ có thể **chấm công thủ công**
+  trên web, **bắt buộc ghi lý do**.
+- Công nhân **nghỉ việc**: không còn được nhận diện; **xoá toàn bộ mẫu khuôn mặt** (vector và ảnh mẫu) của người đó.
+- Mọi lượt kiểm tra đều lưu 1 ảnh. Ảnh có thời hạn lưu cấu hình được (mặc định 90 ngày; giai đoạn nước rút chưa cần tự xoá).
 
-## 8. Kiến trúc và công nghệ
+**Dữ liệu khuôn mặt (Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, Nghị định 356/2025/NĐ-CP: dữ liệu sinh trắc học là dữ liệu nhạy cảm):**
+- Chỉ đăng ký khuôn mặt khi đã **ghi nhận sự đồng ý** của công nhân: ô xác nhận trên trang đăng ký, lưu thời điểm đồng ý
+  và người thực hiện; nội dung ghi rõ đây là dữ liệu sinh trắc học (dữ liệu cá nhân nhạy cảm), dùng để chấm công.
+- Lưu vector đặc trưng và ảnh mẫu mặt đã căn chỉnh 112×112; không lưu ảnh gốc khi đăng ký.
+- Chỉ tài khoản quản trị xem, xoá được dữ liệu khuôn mặt. Có nút "Xoá dữ liệu khuôn mặt" cho từng công nhân.
 
-Nếu dự án đã có sẵn công nghệ khác, giữ nguyên và báo lại cho tôi, không tự ý thay.
+### Ca làm
 
-| Thành phần | Công nghệ đề xuất |
-|---|---|
-| Dịch vụ AI | Python, Ultralytics YOLO11s, OpenCV |
-| Backend | FastAPI, SQLAlchemy, PostgreSQL, WebSocket |
-| Frontend | React (Vite): trang kiosk + web quản lý |
-| Quét QR | thư viện `html5-qrcode` trên trang kiosk |
-| Sinh mã QR, in thẻ | thư viện `qrcode` (Python), xuất PDF |
-| Lưu ảnh | thư mục trên máy (cấu hình được) |
-| Đóng gói | Docker Compose |
+- **Bản demo TTTN:** một ca mặc định trong bảng `shifts` (ví dụ 07:00–17:00, nghỉ 60 phút, ân hạn 5 phút, cho vào sớm 60 phút).
+  Tính: phút đi muộn (vượt ân hạn mới tính), phút về sớm, số phút làm = min(ra, kết thúc) − max(vào, bắt đầu) − nghỉ, không âm.
+  Giờ vào ngoài khung [bắt đầu − 60 phút, kết thúc] → trạng thái `ngoai_ca`. Chưa có giờ ra sau giờ kết thúc ca 4 giờ → hiển thị "thiếu giờ ra".
+- **Đồ án:** nhiều ca, phân ca theo tổ đội và cá nhân, ca qua đêm, tăng ca (giữ nguyên quy tắc ở bản cũ).
 
-Lý do chọn PostgreSQL: dữ liệu có nhiều quan hệ (tổ đội, công nhân, ca, chấm công, lượt kiểm tra); hỗ trợ tốt kiểu thời gian,
-múi giờ và phép tính khoảng thời gian (tính công, ca qua đêm); có JSONB để lưu vùng kiểm tra; ràng buộc dữ liệu chặt
-(mỗi công nhân chỉ một bản ghi công cho mỗi ca, kể cả khi hai lượt quét đến cùng lúc).
+## 8. Kiến trúc và cấu trúc thư mục
 
-**Nguyên tắc kiến trúc:**
-- **Backend là trung tâm.** Kiosk và web quản lý chỉ giao tiếp với backend, không gọi thẳng dịch vụ AI.
-- **Dịch vụ AI chỉ "nhìn và trả lời":** không ghi cơ sở dữ liệu, không biết công nhân là ai, không quyết định ghi công.
-  Backend gửi kèm vùng kiểm tra và danh sách đồ bảo hộ bắt buộc trong mỗi yêu cầu kiểm tra.
-  Dịch vụ AI trả về kết quả + ảnh (JPEG); backend tự lưu ảnh và ghi dữ liệu.
-- Dịch vụ AI đọc camera liên tục bằng **một luồng riêng tự viết** (`cv2.VideoCapture`), chỉ giữ khung hình mới nhất
-  (tránh trễ do bộ đệm). **Chỉ chạy model khi có yêu cầu kiểm tra**; không dùng `model.predict(source=luồng camera)`
-  chạy liên tục, vì trên CPU sẽ chiếm hết tài nguyên.
-- Luồng hình xem trực tiếp cho kiosk/web: hiển thị khung hình gốc có vẽ **vùng kiểm tra**; khung nhận diện chỉ vẽ
-  trong lúc đang kiểm tra (tiết kiệm CPU).
-- Nguồn hình nhận được: file video (để chạy thử), webcam (số), URL RTSP/HTTP từ điện thoại.
-  Đặt tên file kết quả không được dựa vào `Path(source).stem` khi nguồn là webcam hoặc URL.
-- Kiosk không đăng nhập bằng tài khoản người dùng; mỗi kiosk được cấp **khóa riêng của cổng** để gửi lượt quét.
-- Nếu dịch vụ AI không phản hồi: kiosk báo "Hệ thống kiểm tra tạm gián đoạn, vui lòng gặp cán bộ an toàn",
-  cán bộ chấm công thủ công. Cổng không bao giờ bị kẹt.
+```
+SafeSite-AI/
+  src/checkpoint/   (đã có) kiểm tra bảo hộ
+  src/face/         (mới) face_detector.py, face_embedder.py, analyze.py (hàm thuần mục 6.2)
+  src/gate/         (mới) combine.py (mục 6.3), state.py (máy trạng thái), worker.py (GateWorker, thread nền)
+  app/              (mới) FastAPI
+    main.py, config.py, db.py, models.py, auth.py
+    services/       nhan_dien.py (so khớp), cham_cong.py (vào/ra, tính công), luot.py (xử lý một lượt), dang_ky_mat.py
+    routers/        pages (HTML), api (JSON), ws (WebSocket), stream (MJPEG)
+    templates/, static/
+  data/             anh_luot/, anh_mau_mat/ (không đưa vào git)
+  configs/settings.yaml, .env (DATABASE_URL, SECRET_KEY, mật khẩu admin ban đầu)
+  scripts/          download_face_models.py, enroll_from_images.py, evaluate_faces.py, seed_demo.py
+  tests/
+```
 
-## 9. Cơ sở dữ liệu (bản nháp)
+- `GateWorker` chạy trong thread nền khi ứng dụng khởi động; giữ một `CameraReader` dùng chung cho vòng lặp cổng,
+  luồng hình trực tiếp và chức năng chụp mẫu khuôn mặt. Model YOLO, YuNet, SFace nạp một lần.
+- Mỗi lượt xong, `GateWorker` gọi `app.services.luot.xu_ly_luot(...)` (ghi CSDL bằng session riêng), rồi phát sự kiện tới các
+  WebSocket đang kết nối.
+- Luồng hình trực tiếp: MJPEG (`multipart/x-mixed-replace`), khoảng 10 khung/giây, vẽ vùng kiểm tra; trong lúc kiểm tra thì vẽ thêm
+  khung người, khung mặt.
+- Nguồn hình: file video (chạy thử, có tuỳ chọn lặp lại), webcam (số), URL camera điện thoại. **Bản demo phải chạy được
+  từ file video** để phòng trường hợp camera ở phòng thi có sự cố.
+- Lỗi camera hoặc model: màn hình cổng báo "Hệ thống kiểm tra tạm gián đoạn, vui lòng gặp cán bộ"; web vẫn chạy, cán bộ chấm thủ công.
 
-- `users`: tài khoản đăng nhập, vai trò.
-- `teams`: tổ đội, nhà thầu phụ.
-- `workers`: mã, họ tên, ảnh, tổ đội, nghề, qr_token (UUID), trạng thái (đang làm/nghỉ/khóa).
-- `gates`: cổng, địa chỉ camera, vùng kiểm tra (đa giác dạng JSON), cấu hình bảo hộ bắt buộc.
-- `ppe_checks`: công nhân, cổng, thời gian, kết quả, thiếu gì, đường dẫn ảnh, độ tin cậy, trạng thái xác nhận.
-- `shifts`: tên ca, giờ bắt đầu, giờ kết thúc, nghỉ giữa ca, ân hạn đi muộn, quét sớm tối đa, ca qua đêm, ca tăng ca.
-- `shift_assignments`: ca, tổ đội HOẶC công nhân, từ ngày, đến ngày (phân theo cá nhân được ưu tiên hơn phân theo tổ).
-- `attendance`: công nhân, ngày công, ca, giờ vào, giờ ra, ppe_check_id (lượt đạt cho phép vào ca),
-  phút đi muộn, phút về sớm, số phút làm, trạng thái (bình thường/ngoài ca/thiếu giờ ra/chấm thủ công),
-  lý do, người sửa, thời điểm sửa. Ràng buộc duy nhất: (công nhân, ngày công, ca).
-- `settings`: thời hạn lưu ảnh, khung giờ hoạt động.
+## 9. Phạm vi
 
-## 10. Các giai đoạn và tiêu chí hoàn thành
+### 9.1. Giai đoạn nước rút TTTN (đến khoảng 07/11/2026)
 
-**Giai đoạn 0: Khảo sát code: ĐÃ XONG** (`docs/RA_SOAT.md`). Các quyết định rút ra ghi ở mục 12.
+**Bắt buộc:**
+1. Nhận diện khuôn mặt + máy trạng thái cổng + kết hợp với kiểm tra bảo hộ (mục 5, 6).
+2. CSDL và xử lý lượt: so khớp, vào/ra, ghi công, chống trùng, ca mặc định (mục 7).
+3. Web: đăng nhập quản trị; **quản lý công nhân** (danh sách, tìm kiếm, lọc theo tổ, thêm, sửa, cho nghỉ việc);
+   **tổ đội** (thêm, sửa); **đăng ký khuôn mặt** (ghi nhận đồng ý, chụp từ camera cổng hoặc tải ảnh lên, xem và xoá mẫu);
+   **màn hình cổng** (hình trực tiếp, kết quả, loa); **lịch sử lượt kiểm tra** có ảnh, lọc theo ngày, công nhân, kết quả;
+   **bảng công theo ngày**; **trang tổng quan hôm nay** (số công nhân, đã vào, đang có mặt, lượt không đạt, lượt mới nhất).
+4. Script đánh giá nhận diện khuôn mặt (mục 11) và số liệu thời gian chạy thực tế.
 
-**Giai đoạn 1a: Dọn dẹp và chuẩn bị (làm trước, xong thì báo tôi)**
-- Chuyển vào `_old/` các mục được xếp loại "CHUYỂN VÀO _old/" trong `docs/RA_SOAT.md` mục G
-  (`run_tracking_demo.py`, `sanity_check.py`, `botsort_tracking_reid.yaml`, `zones.yaml`, `yolo11n.pt`, `yolo11m.pt`).
-- Viết lại `README.md` theo hướng mới (ngắn: dự án là gì, cách cài, cách chạy chế độ cổng).
-- Tạo **một file cấu hình chung** (ví dụ `configs/settings.yaml`): đường dẫn model, imgsz, conf, iou, vùng đầu/thân,
-  các ngưỡng ở mục 5, thời gian kiểm tra, thư mục lưu ảnh. Code đọc tham số từ file này.
-- Tra lớp theo tên (mục 4); sửa `test_compliance.py` cho phù hợp. **24 test cũ phải vẫn chạy OK.**
-- Ghim phiên bản thư viện đang chạy được vào `requirements.txt` (kể cả torch).
-- Kiểm tra máy có card NVIDIA không (`nvidia-smi`). Nếu có: **chỉ báo lại và đề xuất** cài torch bản CUDA, không tự cài.
+**Nên có (làm nếu kịp, theo thứ tự):** chấm công thủ công có lý do; bảng công theo tháng; xuất Excel bảng công;
+xác nhận "đúng / báo nhầm" cho lượt kiểm tra; vẽ vùng kiểm tra trên web.
 
-**Giai đoạn 1b: Dịch vụ AI chế độ cổng**
-- `evaluate_frames` và `check` theo mục 5 "Thuật toán kiểm tra". Viết test tự động cho `evaluate_frames`
-  bằng dữ liệu giả (box giả), phủ đủ: DAT, KHONG_DAT thiếu mũ, thiếu áo, NHIEU_NGUOI, KHONG_CO_NGUOI,
-  KHONG_XAC_DINH do ít khung hợp lệ, do đầu bị cắt, do tỷ lệ nằm giữa hai ngưỡng.
-- Luồng đọc camera riêng, chỉ giữ khung mới nhất. **Chạy thử thật** với webcam và với điện thoại (app IP Webcam/DroidCam).
-- Sửa `define_zone.py` để lưu tọa độ tỷ lệ 0–1; sửa `zone.py` quy đổi sang pixel lúc chạy (kèm test).
-- Script chạy thử: đọc 1 file video hoặc camera, chạy `check`, in kết quả và lưu ảnh ra thư mục tạm.
-- Hoàn thành khi: test tự động chạy OK, và chạy được trên video tôi tự quay với kết quả đúng với mắt thường
-  ở các ca đủ đồ / thiếu mũ / thiếu áo / 2 người.
+### 9.2. Đồ án tốt nghiệp (sau khi thi TTTN)
+Phân quyền nhiều vai trò (cán bộ an toàn, tổ trưởng); nhiều ca, phân ca, ca qua đêm, tăng ca; nhiều cổng; tự xoá ảnh quá hạn;
+chống giả mạo khuôn mặt bằng mô hình riêng (ví dụ MiniFASNet); train thêm cho nón lá, áo cam; so sánh SFace với ArcFace;
+thông báo Zalo/Telegram; tách dịch vụ AI riêng, React nếu cần; Docker.
 
-**Giai đoạn 2: Script đánh giá**
-- Đầu vào: thư mục video ngắn, mỗi video 1 lượt (người đã đứng trong vùng kiểm tra), kèm file CSV đáp án
-  (tên file, kết quả đúng, ghi chú điều kiện).
-- **Mô phỏng tốc độ thật**: lấy mẫu khung theo FPS cấu hình (mặc định bằng FPS đo được trên máy), trong `timeout` giây
-  tính từ đầu video, rồi gọi `evaluate_frames`.
-- Đầu ra: độ chính xác, precision/recall cho "vi phạm", tỷ lệ không xác định, thời gian trung bình mỗi lượt,
-  ma trận nhầm lẫn, và bảng lỗi theo từng điều kiện. Chạy với imgsz 640 và 960 để so sánh.
-- Bộ video test phải có các trường hợp: đủ đồ; thiếu mũ; thiếu áo; thiếu cả hai; **mũ trắng**; mũ vàng/cam/xanh;
-  **áo cam**, áo xanh lá, áo lưới; **nón lá, mũ lưỡi trai, mũ vải** (phải ra thiếu mũ); áo màu thường không phản quang
-  (phải ra thiếu áo); 2 người cùng lúc; ngược sáng; thiếu sáng.
+### 9.3. Không làm
+Thẻ QR, kiosk quét thẻ, vân tay; tính lương, thuế, bảo hiểm; giám sát toàn bộ công trường; lưu tạm offline khi mất mạng.
 
-**Giai đoạn 3: Backend lõi**
-Cơ sở dữ liệu, đăng nhập và phân quyền, API công nhân/tổ đội, sinh và in thẻ QR, API ca làm và phân ca,
-API quét thẻ gọi dịch vụ AI, ghi chấm công và tính công theo mục "Ca làm", WebSocket.
-**Bắt buộc viết test tự động cho phần tính công**: đi muộn trong/ngoài ân hạn, về sớm, ca qua đêm,
-vào lại giữa ca, quét ngoài ca, thiếu giờ ra, hai ca trong một ngày, lượt không đạt rồi mới đạt.
+## 10. Cơ sở dữ liệu
 
-**Giai đoạn 4: Trang kiosk**
-Quét QR, các trạng thái màn hình (chờ / đang kiểm tra / đạt / không đạt / không xác định / lỗi thẻ), phát loa, tự quay về màn hình chờ.
+- `users`: id, username (duy nhất), password_hash, full_name, role (giai đoạn nước rút chỉ `admin`), is_active.
+- `teams`: id, name, contractor (nhà thầu phụ), leader_name.
+- `workers`: id, code (duy nhất, ví dụ CN001), full_name, phone, trade (nghề), team_id, status (`dang_lam` / `nghi_viec`),
+  consent_at, consent_by (users.id), created_at. **Không còn `qr_token`.**
+- `face_samples`: id, worker_id, embedding (LargeBinary, 128 × float32 = 512 byte), quality, thumb_path (ảnh mặt 112×112),
+  source (`camera` / `upload`), created_at.
+- `gates`: id, name, camera_source, zone (JSON, tỷ lệ 0–1), required_ppe (JSON). Giai đoạn nước rút: 1 cổng, tạo sẵn từ cấu hình.
+- `ppe_checks` (lượt kiểm tra): id, gate_id, worker_id (có thể rỗng), checked_at, face_status (`DA_NHAN_RA` / `KHONG_NHAN_RA` /
+  `KHONG_THAY_MAT`), face_score, result (5 kết quả bảo hộ), missing (JSON), presence_ratio (JSON), reason, duration_ms,
+  direction (`vao` / `ra` / rỗng), action (`ghi_vao` / `ghi_ra` / `khong_ghi` / `bo_qua_trung`), image_path, review_status.
+- `shifts`: id, name, start_time, end_time, break_minutes, grace_minutes, early_checkin_minutes, is_overnight, is_overtime.
+- `attendance`: id, worker_id, work_date, shift_id, check_in, check_out, ppe_check_id, late_minutes, early_leave_minutes,
+  worked_minutes, status (`binh_thuong` / `ngoai_ca` / `cham_thu_cong`), note, updated_by, updated_at.
+  Ràng buộc duy nhất (worker_id, work_date, shift_id).
 
-**Giai đoạn 5: Web quản lý**
-Trang tổng quan (tự cập nhật qua WebSocket), quản lý công nhân và tổ đội, in thẻ, quản lý ca và phân ca,
-lịch sử lượt quét có ảnh và xác nhận đúng/báo nhầm, bảng công theo tháng và xuất Excel, chấm công thủ công,
-cấu hình cổng và vẽ vùng kiểm tra.
+Thời gian lưu kèm múi giờ; hiển thị theo giờ Việt Nam (Asia/Ho_Chi_Minh).
 
-**Giai đoạn 6: Phần mở rộng, Docker Compose, viết hướng dẫn chạy.**
+## 11. Đánh giá (số liệu cho báo cáo)
 
-## 11. Quy tắc làm việc cho trợ lý AI
+1. **Nhận diện trên bộ `cong_gia_v1` có sẵn:** thêm cột `nguoi` (mã người, ví dụ A, B) vào file đáp án; đăng ký mặt hai người
+   **từ ảnh riêng, không lấy từ video test**; chạy lại toàn bộ luồng (khuôn mặt + bảo hộ). Báo: tỷ lệ nhận đúng người,
+   nhận nhầm, không nhận ra; kết quả bảo hộ sau khi thêm luật `nhieu_mat` (đặc biệt nhóm "2 người trước–sau", và kiểm tra
+   không làm hỏng các nhóm khác).
+2. **Bộ `cong_gia_v2`** (quay mới, điện thoại dọc 720×1280): 5–8 người đã đăng ký + 2–3 người chưa đăng ký. Mỗi người 3–4 lượt:
+   đội mũ bảo hộ, không đội mũ, đội mũ lưỡi trai hoặc nón lá, thiếu áo. Tên file: `<ma_nguoi>_<tinh_huong>_<so>.mp4`,
+   người chưa đăng ký dùng mã `LA1`, `LA2`… Báo: tỷ lệ nhận đúng, **tỷ lệ người lạ bị nhận nhầm thành công nhân** (phải bằng 0
+   ở ngưỡng đã chọn), ảnh hưởng của mũ, phân bố điểm tương đồng cùng người / khác người, thời gian mỗi lượt.
+3. `scripts/evaluate_faces.py` chạy luồng cổng trên từng video (mô phỏng tốc độ như `evaluate_videos.py`), ghi CSV chi tiết
+   và file `tom_tat.md`. Thêm tuỳ chọn quét nhiều ngưỡng `match_threshold` (0,30 → 0,60) để chọn ngưỡng.
+4. **Chạy thực tế trên ứng dụng**: đo thời gian từ lúc đứng vào đến lúc có kết quả (khoảng 10 lượt), ghi trung bình, nhỏ nhất, lớn nhất.
 
-1. **Làm từng giai đoạn một.** Xong mỗi bước: tóm tắt đã làm gì, chạy thử thế nào, kết quả ra sao, rồi chờ tôi xác nhận.
-2. **Đọc code hiện có trước khi viết.** Ưu tiên sửa và tái sử dụng, không viết lại từ đầu những gì đã chạy được.
-3. **Không tự ý** đổi model, đổi dataset, train lại, đổi công nghệ chính, hoặc thêm tính năng ngoài phạm vi. Muốn đổi thì đề xuất và giải thích lý do.
-4. **Chạy thử code sau khi viết.** Không báo "xong" nếu chưa chạy được. Nếu không chạy được thì nói rõ lỗi gì.
-5. Không xóa file cũ; nếu cần bỏ thì chuyển vào thư mục `_old/` và báo tôi.
-6. Tham số (ngưỡng tin cậy, vùng đầu/thân, thời gian kiểm tra, đường dẫn) đặt trong file cấu hình, không hard-code.
-7. Giải thích ngắn gọn bằng tiếng Việt. Tôi cần hiểu code để bảo vệ đồ án.
-8. Không đưa API key, mật khẩu vào code; dùng file `.env`.
-9. **Mọi test hiện có phải vẫn chạy OK** sau mỗi thay đổi. Đổi giao diện hàm thì sửa test tương ứng; code mới phải có test.
-10. Khi `DE_TAI.md` mâu thuẫn với code hoặc với `docs/RA_SOAT.md`, dừng lại và hỏi tôi.
+## 12. Các giai đoạn nước rút và tiêu chí hoàn thành
 
-## 12. Nhật ký quyết định
+Lịch dự kiến (tính từ 29/10): F1 xong 30/10 · F2 xong 01/11 · F3 xong 03/11 · F4 xong 05/11 · 06–07/11: sửa lỗi, tập demo.
 
-**2026-10-17, sau rà soát (`docs/RA_SOAT.md` mục J):**
-- J1: `ppe_monitor.py`, `clean_dataset.py` không có trong dự án. **Lấy `src/ppe/compliance.py` làm bản chính thức**,
-  không viết lại hàm trùng chức năng.
-- J2: **Giữ vùng đầu (-0.1, 0.35)** và các ngưỡng hiện tại, chỉ chuyển ra file cấu hình.
-- J3: **Chế độ cổng không dùng tracking**; xét từng khung rồi bỏ phiếu (mục 5).
-- J4: **Tọa độ vùng kiểm tra dạng tỷ lệ 0–1.**
-- J5: **imgsz mặc định 640**, so sánh với 960 ở Giai đoạn 2 rồi chốt.
-- J6: **Chuyển code hướng cũ vào `_old/` và viết lại README ngay đầu Giai đoạn 1** (Giai đoạn 1a).
-- J7: **Commit `DE_TAI.md` và `docs/RA_SOAT.md` vào git.**
+**F1. Khuôn mặt + vòng lặp cổng (phần AI)**
+- `scripts/download_face_models.py`; `src/face/` theo mục 6.2; `src/gate/combine.py`, `src/gate/state.py` theo mục 5, 6.3.
+- `scripts/enroll_from_images.py`: đọc thư mục `anh_dang_ky/<ma_nguoi>/*.jpg`, lấy vector, lưu ra file `.npz`
+  (dùng cho chạy thử và đánh giá khi chưa có CSDL).
+- `scripts/run_gate.py`: chạy vòng lặp cổng trên webcam / điện thoại / file video, so khớp với file `.npz`, in và hiện kết quả
+  trong cửa sổ OpenCV (bản demo dòng lệnh, phòng khi web chưa xong).
+- Mở rộng đánh giá: chạy lại `cong_gia_v1` theo mục 11.1.
+- Test tự động: gắn mặt với người trong vùng, loại mặt nằm ngoài vùng đầu, đếm mặt nhiều người (kể cả người xếp hàng xa không bị tính),
+  chọn vector chất lượng cao, so khớp (ngưỡng, khoảng cách với người thứ hai, không nhận ra), máy trạng thái (đủ 3 khung mới bắt đầu,
+  cooldown, kiểm tra lại khi chưa ghi công).
+- Hoàn thành khi: test OK; chạy `run_gate.py` với webcam nhận đúng người đã đăng ký, báo không nhận ra với người chưa đăng ký;
+  có bảng kết quả `cong_gia_v1` mới.
 
-**2026-10-17, sau Giai đoạn 1b-1:**
-- Chấp nhận các quyết định của trợ lý: tham số `detector` không bắt buộc trong `evaluate_frames` (để test dùng bộ phát hiện giả);
-  làm sớm `zone_to_pixels`; thêm `missing_code`, `snapshot_jpeg_quality` vào cấu hình; thêm trường `dem_khung`, `ly_do`;
-  gán đồ bảo hộ có xét cả người ngoài vùng.
-- Mỗi khung mất khoảng 100 ms trên CPU. `check` phải **xử lý khung ngay khi lấy được**, không gom rồi mới xử lý.
-- Chưa làm dừng sớm (trả kết quả trước khi hết `timeout` khi đã chắc chắn). Để sau, khi có số liệu Giai đoạn 2.
+**F2. Backend + CSDL**
+- `app/` theo mục 8; models theo mục 10; tạo bảng tự động khi khởi động (giai đoạn nước rút chưa cần Alembic);
+  `scripts/seed_demo.py` tạo admin, 1 cổng, 1 ca mặc định, 2 tổ đội mẫu.
+- Services: `nhan_dien.py`, `dang_ky_mat.py` (kiểm tra ảnh có đúng 1 mặt, đủ lớn, score ≥ 0,85), `cham_cong.py`, `luot.py`.
+- Đăng nhập (session cookie, mật khẩu băm), API JSON cho công nhân, tổ đội, mẫu mặt, lượt kiểm tra, chấm công; WebSocket sự kiện.
+- `GateWorker` chạy nền trong ứng dụng, gọi `xu_ly_luot`.
+- **Test bắt buộc cho phần chấm công**: vào đạt → ghi giờ vào; vào không đạt → không ghi; không đạt rồi đạt → giờ vào là lượt đạt;
+  ra → ghi giờ ra; ra trong 2 phút sau khi vào → bỏ qua; vào lại sau khi ra → giữ giờ vào đầu, cập nhật giờ ra lần sau;
+  đi muộn trong/ngoài ân hạn; ngoài ca; người lạ không ghi; nghỉ việc → không nhận diện và mẫu mặt bị xoá.
+
+**F3. Giao diện web**
+- Bố cục chung (thanh menu: Tổng quan, Màn hình cổng, Công nhân, Tổ đội, Lịch sử kiểm tra, Bảng công), Bootstrap 5.
+- Các trang theo mục 9.1. Màn hình cổng: hình trực tiếp + ô kết quả lớn, đổi màu theo kết quả; đọc thông báo bằng
+  `speechSynthesis` giọng `vi-VN` nếu trình duyệt có, nếu không thì phát tiếng bíp (1 tiếng: đạt, 2 tiếng: không đạt).
+  Khuyến nghị mở bằng Microsoft Edge (có giọng tiếng Việt).
+- Đăng ký khuôn mặt: ô đồng ý (bắt buộc tích mới cho chụp); nút "Chụp từ camera cổng" (lấy khung hiện tại, cần đúng 1 mặt đủ lớn);
+  tải nhiều ảnh lên; hiển thị số mẫu (cần ít nhất 3), ảnh mẫu, xoá từng mẫu, xoá tất cả.
+- Hoàn thành khi: thao tác được toàn bộ kịch bản demo (mục 13) trên trình duyệt.
+
+**F4. Đánh giá v2 + hoàn thiện demo**
+- Chạy `evaluate_faces.py` trên `cong_gia_v2`, chọn ngưỡng, ghi `docs/ket_qua_danh_gia_khuon_mat.md`.
+- Đo thời gian thực tế; chụp màn hình các trang; viết `README.md` hướng dẫn cài và chạy demo; kiểm tra chạy từ file video.
+- Làm các mục "nên có" nếu còn thời gian.
+
+## 13. Kịch bản demo trước giảng viên (khoảng 5 phút)
+
+1. Trang tổng quan: số công nhân, tình hình hôm nay.
+2. Thêm công nhân mới, tích đồng ý, chụp 3 mẫu khuôn mặt từ camera cổng.
+3. Màn hình cổng: người đó đứng vào không đội mũ → đỏ "thiếu mũ bảo hộ, chưa ghi công"; đội mũ, mặc áo → xanh "đã ghi giờ vào".
+4. Một người chưa đăng ký đứng vào → vàng "chưa nhận diện được".
+5. Hai người cùng đứng vào → "mời từng người một".
+6. Lịch sử kiểm tra (có ảnh từng lượt) và bảng công hôm nay (giờ vào, đi muộn).
+7. Lượt ra → ghi giờ ra, số giờ làm.
+8. Cho một công nhân nghỉ việc → mẫu khuôn mặt bị xoá, đứng vào không còn được nhận ra.
+Dự phòng: chạy nguồn hình từ file video đã quay sẵn.
+
+## 14. Quy tắc làm việc cho trợ lý AI
+
+1. **Giai đoạn nước rút**: làm lần lượt F1 → F4. Hết mỗi giai đoạn: tóm tắt ngắn đã làm gì, cách chạy thử, kết quả, rồi **dừng chờ tôi
+   xác nhận**. Trong một giai đoạn, tự quyết các chi tiết nhỏ (tên hàm, bố cục trang) để làm nhanh; ghi lại các quyết định đó trong tóm tắt.
+2. **Đọc code hiện có trước khi viết.** Tái sử dụng (`classify_frame`, `aggregate`, `assign_ppe`, `zone_to_pixels`, luồng đọc camera,
+   `evaluate_videos.py`…), không viết lại những gì đã chạy được. **Không sửa logic kiểm tra bảo hộ đã đánh giá.**
+3. **Không tự ý** đổi model, train lại, thêm thư viện lớn ngoài danh sách (FastAPI, uvicorn, SQLAlchemy, psycopg, Jinja2,
+   python-multipart, passlib/bcrypt hoặc hashlib, itsdangerous, openpyxl). Cần thêm thì hỏi.
+4. **Chạy thử code sau khi viết.** Không báo "xong" nếu chưa chạy được thật. Không chạy được thì nói rõ lỗi.
+5. Không xoá file cũ; cần bỏ thì chuyển vào `_old/` và báo tôi.
+6. Tham số đặt trong `configs/settings.yaml` (mục `face:`, `gate:`, `attendance:`), bí mật đặt trong `.env`. Không hard-code.
+7. Giải thích ngắn gọn bằng tiếng Việt. Tôi cần hiểu code để bảo vệ.
+8. **Mọi test hiện có phải vẫn chạy OK**; code mới phải có test (phần chấm công và so khớp bắt buộc).
+9. Commit sau mỗi giai đoạn với thông điệp rõ ràng. Không đưa trọng số model, ảnh, video, `.env` vào git.
+10. Khi `DE_TAI.md` mâu thuẫn với code, dừng lại và hỏi tôi.
+
+## 15. Tham số cấu hình mới (giá trị ban đầu)
+
+```yaml
+face:
+  detector_model: weights/face/face_detection_yunet_2023mar.onnx
+  recognizer_model: weights/face/face_recognition_sface_2021dec.onnx
+  score_threshold: 0.7        # YuNet
+  enroll_min_score: 0.85      # ảnh đăng ký
+  min_face_px: 50             # chiều rộng mặt tối thiểu để nhận dạng
+  multi_min_px: 40
+  multi_min_ratio: 0.7
+  max_vectors: 5
+  match_threshold: 0.40       # OpenCV khuyến nghị 0.363 trên LFW; hiệu chỉnh bằng mục 11
+  match_margin: 0.05
+  min_samples: 3
+  max_samples: 10
+gate:
+  idle_long_side: 640
+  idle_max_fps: 10
+  trigger_frames: 3
+  cooldown_seconds: 4
+  empty_seconds: 1.0
+attendance:
+  duplicate_minutes: 2
+  missing_checkout_hours: 4
+  timezone: Asia/Ho_Chi_Minh
+```
+
+## 16. Nhật ký quyết định
+
+**2026-10-17 (sau rà soát):** dùng `src/ppe/compliance.py` làm bản chính thức; giữ vùng đầu (-0.1, 0.35); chế độ cổng không tracking;
+vùng kiểm tra tỷ lệ 0–1; chuyển code cũ vào `_old/`.
+
+**2026-10-17 (sau 1b-1):** chấp nhận tham số `detector` không bắt buộc, `zone_to_pixels`, `missing_code`, `dem_khung`, `ly_do`,
+gán đồ bảo hộ có xét người ngoài vùng; `check` xử lý khung ngay khi lấy được.
+
+**2026-10-21 (sau đánh giá `cong_gia_v1`):** chốt imgsz 640; nón lá và hai người trước–sau là lỗi đã biết, xử lý trong đồ án.
+
+**2026-10-29 (góp ý của giảng viên, còn 10 ngày tới thi TTTN):**
+- Bỏ thẻ QR và kiosk quét thẻ; **chấm công bằng khuôn mặt, dùng chung camera với module AI**.
+- Dùng YuNet + SFace có sẵn trong OpenCV; so khớp ở backend; ghi nhận đồng ý và xoá mẫu mặt khi nghỉ việc.
+- Thêm luật `nhieu_mat` (đếm khuôn mặt) để bắt trường hợp hai người đứng trước–sau, không sửa thuật toán bảo hộ cũ.
+- Bản demo: một ứng dụng FastAPI + Jinja2 + Bootstrap, PostgreSQL qua SQLAlchemy; React, Docker, phân quyền để sang đồ án.
+- Làm thêm các chức năng quản lý công nhân: công nhân, tổ đội, đăng ký khuôn mặt, lịch sử, bảng công, tổng quan.

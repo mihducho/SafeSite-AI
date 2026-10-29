@@ -61,6 +61,9 @@ vùng đầu/thân, các ngưỡng của thuật toán kiểm tra tại cổng, 
 .venv\Scripts\python.exe scripts\evaluate_videos.py --videos <thu_muc_video> --gate cong_video --imgsz 640   # 3. -> runs\eval\
 .venv\Scripts\python.exe scripts\evaluate_videos.py --videos <thu_muc_video> --gate cong_video --imgsz 960
 
+# Menu demo (báo cáo tiến độ): chọn số thay vì gõ lệnh dài. Cấu hình ở mục demo trong configs\settings.yaml
+.\demo
+
 # Công cụ khác
 .venv\Scripts\python.exe scripts\extract_frames.py --source data\raw\<video>.mp4          # cắt khung để gán nhãn
 .venv\Scripts\python.exe scripts\run_safety_demo.py --source data\raw\<video>.mp4         # [hướng cũ] giám sát công trường, giữ để tham khảo

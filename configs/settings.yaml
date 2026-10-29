@@ -76,6 +76,23 @@ evaluation:
   # Tien to dieu kien anh sang: dap an theo phan duoi (vd nguoc_sang_du_do -> DAT, dieu kien nguoc_sang_du_do)
   condition_prefixes: [nguoc_sang, thieu_sang]
 
+demo:
+  # Menu demo bao cao tien do (demo.bat / scripts/demo.py): chon so thay vi go lenh dai.
+  videos_dir: data/raw/cong_gia_v1
+  answers: data/annotations/cong_gia_v1.csv
+  gate: cong_gia_v1
+  imgsz: 640
+  sample_fps: 11.7             # bang lan danh gia chinh thuc (docs/ket_qua_danh_gia_cong_v1.md) -> ket qua trung 38/43
+  images_dir: runs/eval/bao_cao_cong_gia_v1/anh    # anh minh hoa da chon cho bao cao
+  report: docs/ket_qua_danh_gia_cong_v1.md
+  videos:                      # chay le tung video, theo thu tu nay
+    - {name: du_do_01, note: "Du mu va ao -> DAT"}
+    - {name: mubaohiem_01, note: "Mu bao hiem xe may -> KHONG_DAT thieu mu"}
+    - {name: thieu_ao_01, note: "Co mu, khong ao -> KHONG_DAT thieu ao"}
+    - {name: hai_nguoi_canhnhau_01, note: "Hai nguoi -> NHIEU_NGUOI"}
+    - {name: trong_01, note: "Khong co nguoi -> KHONG_CO_NGUOI"}
+    - {name: non_la_01, note: "Non la -> he thong SAI (nhan nham la mu bao ho)"}
+
 paths:
   snapshot_dir: data/snapshots              # thu muc luu anh moi luot kiem tra (backend dung o Giai doan 3)
   eval_videos: data/eval                    # video danh gia Giai doan 2 (khong commit)
