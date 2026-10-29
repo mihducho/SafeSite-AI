@@ -18,19 +18,20 @@ from app.models import Attendance  # noqa: E402
 from app.services.cham_cong import mui_gio  # noqa: E402
 from src.checkpoint.evaluate import KHONG_DAT  # noqa: E402
 
-PAGES = ["/", "/cong", "/cong-nhan", "/to-doi", "/lich-su", "/bang-cong", "/bang-cong/thang", "/ca-lam", "/cau-hinh-cong"]
+PAGES = ["/cu/", "/cu/cong", "/cu/cong-nhan", "/cu/to-doi", "/cu/lich-su", "/cu/bang-cong", "/cu/bang-cong/thang", "/cu/ca-lam",
+         "/cu/cau-hinh-cong"]  # giao dien cu (du phong)
 
 
 class PagesTest(AppCase):
     def test_chua_dang_nhap_chuyen_ve_login(self):
-        for path in PAGES + ["/cong-nhan/1"]:
+        for path in PAGES + ["/cu/cong-nhan/1"]:
             with self.subTest(path=path):
                 r = self.client.get(path, follow_redirects=False)
-                self.assertEqual((r.status_code, r.headers["location"]), (303, f"/login?next={path}"))
+                self.assertEqual((r.status_code, r.headers["location"]), (303, f"/cu/login?next={path}"))
 
     def test_da_dang_nhap_moi_trang_200_tieng_viet_khong_cdn(self):
         self.login()
-        for path in PAGES + [f"/cong-nhan/{self.an_id}"]:
+        for path in PAGES + [f"/cu/cong-nhan/{self.an_id}"]:
             with self.subTest(path=path):
                 r = self.client.get(path)
                 self.assertEqual(r.status_code, 200)
@@ -38,28 +39,28 @@ class PagesTest(AppCase):
                 self.assertIn('lang="vi"', r.text)
                 self.assertIn("/static/vendor/bootstrap-5.3.3/bootstrap.min.css", r.text)
                 self.assertIsNone(re.search(r'(src|href)="https?://', r.text), "khong tai file tu mang ngoai (CDN)")
-        menu = self.client.get("/").text
+        menu = self.client.get("/cu/").text
         for label in ("Tổng quan", "Màn hình cổng", "Công nhân", "Tổ đội", "Lịch sử kiểm tra", "Bảng công", "Ca làm", "Cấu hình cổng",
                       "Đăng xuất", "Quản trị"):
             self.assertIn(label, menu)
-        self.assertIn("Nguyễn Văn An", self.client.get(f"/cong-nhan/{self.an_id}").text)
-        self.assertEqual(self.client.get("/cong-nhan/999").status_code, 404)
+        self.assertIn("Nguyễn Văn An", self.client.get(f"/cu/cong-nhan/{self.an_id}").text)
+        self.assertEqual(self.client.get("/cu/cong-nhan/999").status_code, 404)
 
     def test_trang_dang_nhap_va_file_tinh_khong_can_dang_nhap(self):
-        r = self.client.get("/login")
+        r = self.client.get("/cu/login")
         self.assertEqual(r.status_code, 200)
         self.assertIn("Đăng nhập", r.text)
         for path in ("/static/vendor/bootstrap-5.3.3/bootstrap.min.css", "/static/vendor/bootstrap-5.3.3/bootstrap.bundle.min.js",
                      "/static/js/common.js", "/static/js/cong.js", "/static/css/app.css"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 200)
-        r = self.client.post("/login", data={"username": "admin", "password": "sai", "next": "/"})
+        r = self.client.post("/cu/login", data={"username": "admin", "password": "sai", "next": "/cu/"})
         self.assertEqual(r.status_code, 401)
         self.assertIn("Sai tên đăng nhập hoặc mật khẩu", r.text)
 
     def test_moi_file_js_trang_deu_ton_tai(self):
         self.login()
-        for path in PAGES + [f"/cong-nhan/{self.an_id}"]:
+        for path in PAGES + [f"/cu/cong-nhan/{self.an_id}"]:
             for js in re.findall(r'src="(/static/[^"?]+)', self.client.get(path).text):
                 with self.subTest(page=path, js=js):
                     self.assertEqual(self.client.get(js).status_code, 200)

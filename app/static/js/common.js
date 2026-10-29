@@ -36,7 +36,7 @@ const SG = (() => {
       throw new Error("Không kết nối được máy chủ");
     }
     if (r.status === 401) {
-      location.href = "/login?next=" + encodeURIComponent(location.pathname + location.search);
+      location.href = "/cu/login?next=" + encodeURIComponent(location.pathname + location.search);
       throw new Error("Chưa đăng nhập");
     }
     const data = (r.headers.get("content-type") || "").includes("json") ? await r.json() : null;
@@ -139,7 +139,7 @@ const SG = (() => {
       handlers.forEach(h => { try { h(ev); } catch (err) { console.error(err); } });
     };
     ws.onclose = e => {
-      if (e.code === 1008) { location.href = "/login?next=" + encodeURIComponent(location.pathname); return; }
+      if (e.code === 1008) { location.href = "/cu/login?next=" + encodeURIComponent(location.pathname); return; }
       setGateBadge(null, ["Mất kết nối máy chủ", "danger"]);
       handlers.forEach(h => { try { h({loai: "mat_ket_noi"}); } catch (err) { console.error(err); } });
       setTimeout(connect, 2000);

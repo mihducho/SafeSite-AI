@@ -1,0 +1,145 @@
+/* ═══ Màn hình cổng (/man-hinh-cong): toàn màn hình, chữ đủ lớn để đọc từ khoảng 3 m ═══ */
+.gate-screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+  background: #070b10;
+  color: #fff;
+  overflow: hidden;
+}
+
+/* Cột trái: hình camera. Chiều cao = cả màn hình, chiều rộng theo đúng tỉ lệ hình (dọc 720x1280 -> hẹp) */
+.gate-cam {
+  position: relative;
+  height: calc(100vh - 36px);
+  max-width: 62vw;
+  min-width: 260px;
+  background: #000;
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.gate-cam img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.gate-cam__tag {
+  position: absolute; left: 12px; bottom: 12px;
+  padding: 4px 12px; border-radius: 999px; font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.6); color: #cfd8e3;
+}
+.gate-cam__wait { color: #8a99ab; text-align: center; font-size: 1.2rem; padding: 2rem; }
+
+/* Cột phải */
+.gate-side { display: flex; flex-direction: column; gap: 14px; min-height: 0; min-width: 0; }
+
+.gate-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gate-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.35rem; margin-right: auto; }
+.gate-brand img { width: 36px; height: 36px; }
+.gate-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 999px; font-size: 0.95rem; font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+}
+.gate-chip__dot { width: 12px; height: 12px; border-radius: 50%; background: #6c757d; }
+.gate-chip--ok .gate-chip__dot { background: #2ed573; box-shadow: 0 0 10px #2ed573; animation: pulse-dot 1.6s infinite; }
+.gate-chip--warn .gate-chip__dot { background: #ffc107; }
+.gate-chip--err .gate-chip__dot { background: #ff4d4f; box-shadow: 0 0 10px #ff4d4f; }
+.gate-btn {
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06); color: #fff;
+  border-radius: 10px; padding: 7px 14px; font-size: 0.95rem; font-weight: 600; cursor: pointer; text-decoration: none;
+}
+.gate-btn:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.gate-btn--sound { background: #f7931e; border-color: #f7931e; animation: pulse-dot 1.4s infinite; }
+.gate-btn--sound-on { background: #198754; border-color: #198754; animation: none; }
+.gate-voice { font-size: 0.85rem; color: #8a99ab; margin-top: -6px; }
+
+/* Ô kết quả: đổi màu nền theo trạng thái, chuyển màu nhẹ */
+.gate-result {
+  flex: 1;
+  min-height: 0;
+  border-radius: 22px;
+  padding: clamp(18px, 3vw, 44px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;   /* nội dung cao hơn ô thì không bị cắt mất phần trên */
+  text-align: center;
+  gap: clamp(6px, 1.2vh, 16px);
+  transition: background-color 0.45s ease, color 0.45s ease;
+  overflow-y: auto;
+}
+.gate-result--cho      { background: #1b2635; }
+.gate-result--kiem-tra { background: #1d4ed8; }
+.gate-result--xanh     { background: #15803d; }
+.gate-result--do       { background: #b91c1c; }
+.gate-result--vang     { background: #eab308; color: #1a1300; }
+.gate-result__body { display: contents; }
+.gate-result__anim { animation: gateIn 0.35s ease; display: flex; flex-direction: column; align-items: center; gap: inherit; width: 100%; }
+@keyframes gateIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+
+.gate-icon {
+  width: clamp(80px, 12vh, 170px); height: clamp(80px, 12vh, 170px); border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(48px, 7.5vh, 110px); font-weight: 900; line-height: 1;
+  background: rgba(255, 255, 255, 0.18); border: 6px solid rgba(255, 255, 255, 0.55);
+}
+.gate-result--vang .gate-icon { background: rgba(0, 0, 0, 0.1); border-color: rgba(0, 0, 0, 0.45); }
+.gate-name { font-size: clamp(2.4rem, min(5.2vw, 9vh), 6rem); font-weight: 900; line-height: 1.05; letter-spacing: -0.01em; word-break: break-word; }
+.gate-code { font-size: clamp(1.2rem, 1.8vw, 2rem); opacity: 0.85; font-weight: 600; }
+.gate-msg  { font-size: clamp(1.4rem, min(2.6vw, 4.6vh), 3rem); font-weight: 700; line-height: 1.25; max-width: 30ch; }
+.gate-missing { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.gate-missing span {
+  background: rgba(0, 0, 0, 0.28); border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px; padding: 6px 16px; font-size: clamp(1.2rem, 2vw, 2rem); font-weight: 700;
+}
+.gate-time { font-size: clamp(1.1rem, 1.6vw, 1.7rem); opacity: 0.9; font-variant-numeric: tabular-nums; }
+.gate-photo {
+  max-height: 19vh; max-width: 60%; border-radius: 14px; flex-shrink: 1; min-height: 0; border: 4px solid rgba(255, 255, 255, 0.7);
+  object-fit: contain; background: rgba(0, 0, 0, 0.25);
+}
+
+/* Trạng thái chờ: hướng dẫn + đồng hồ lớn */
+.gate-clock { font-size: clamp(4rem, 10vw, 10rem); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.gate-date { font-size: clamp(1.2rem, 1.9vw, 2rem); color: #b8c4d2; }
+.gate-guide { font-size: clamp(1.6rem, 2.8vw, 3rem); font-weight: 700; margin-top: 1vh; }
+.gate-steps { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.gate-steps span { background: rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 8px 16px; font-size: clamp(1.05rem, 1.6vw, 1.6rem); color: #dbe4ee; }
+.gate-spinner {
+  width: clamp(90px, 12vh, 150px); height: clamp(90px, 12vh, 150px); border-radius: 50%;
+  border: 10px solid rgba(255, 255, 255, 0.25); border-top-color: #fff; animation: gateSpin 1s linear infinite;
+}
+@keyframes gateSpin { to { transform: rotate(360deg); } }
+
+/* Lượt gần đây (nhỏ, cuối cột phải) */
+.gate-recent { display: flex; gap: 10px; overflow: hidden; }
+.gate-recent__item {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06); border-left: 6px solid #6c757d; font-size: 0.95rem;
+}
+.gate-recent__item--xanh { border-left-color: #22c55e; }
+.gate-recent__item--do   { border-left-color: #ef4444; }
+.gate-recent__item--vang { border-left-color: #eab308; }
+.gate-recent__item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Lớp phủ khi hệ thống gián đoạn (mất camera, lỗi, mất kết nối máy chủ) */
+.gate-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  gap: 2vh; padding: 40px; background: rgba(110, 10, 10, 0.95); animation: gateIn 0.3s ease;
+}
+.gate-overlay--camera { background: rgba(60, 40, 0, 0.95); }
+.gate-overlay__icon { font-size: clamp(4rem, 9vw, 8rem); line-height: 1; }
+.gate-overlay__title { font-size: clamp(2.2rem, 4.6vw, 4.6rem); font-weight: 900; line-height: 1.15; }
+.gate-overlay--camera .gate-overlay__title { color: #ffd166; }
+.gate-overlay__sub { font-size: clamp(1.4rem, 2.6vw, 2.6rem); font-weight: 600; }
+.gate-overlay__detail { font-size: clamp(1rem, 1.4vw, 1.4rem); opacity: 0.85; max-width: 70ch; }
+.gate-overlay .gate-btn { margin-top: 2vh; }
+
+@media (max-width: 900px) {
+  .gate-screen { grid-template-columns: 1fr; grid-template-rows: 45vh 1fr; overflow-y: auto; }
+  .gate-cam { height: 100%; max-width: none; }
+}

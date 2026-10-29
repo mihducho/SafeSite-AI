@@ -19,7 +19,7 @@ async function load() {
   if ($("d-team").value) p.set("to_doi", $("d-team").value);
   try { rows = (await SG.api("GET", "/api/bang-cong?" + p)).ds; } catch (e) { SG.toast(e.message, "danger"); return; }
   $("d-rows").innerHTML = rows.length ? rows.map((r, i) => `<tr>
-      <td class="fw-semibold">${SG.esc(r.ma)}</td><td><a href="/cong-nhan/${r.worker_id}">${SG.esc(r.ho_ten)}</a></td>
+      <td class="fw-semibold">${SG.esc(r.ma)}</td><td><a href="/cu/cong-nhan/${r.worker_id}">${SG.esc(r.ho_ten)}</a></td>
       <td>${SG.esc(r.to_doi || "")}</td>
       <td>${r.gio_vao || ""}</td>
       <td>${r.gio_ra || (r.thieu_gio_ra ? '<span class="badge text-bg-danger">Thiếu giờ ra</span>' : (r.gio_vao ? '<span class="text-muted">đang có mặt</span>' : ""))}</td>

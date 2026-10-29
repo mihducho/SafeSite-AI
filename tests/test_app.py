@@ -83,15 +83,15 @@ class AuthTest(AppCase):
         for path in ("/api/cong-nhan", "/api/tong-quan", "/api/luot", "/stream/gate?so_khung=1"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 401)
-        for path in ("/docs", "/openapi.json", "/"):
-            with self.subTest(path=path):
+        for path, login in (("/docs", "/login"), ("/openapi.json", "/login"), ("/cu/", "/cu/login")):
+            with self.subTest(path=path):  # /docs -> dang nhap o giao dien React; giao dien cu -> /cu/login
                 r = self.client.get(path, follow_redirects=False)
-                self.assertEqual((r.status_code, r.headers["location"]), (303, f"/login?next={path}"))
+                self.assertEqual((r.status_code, r.headers["location"]), (303, f"{login}?next={path}"))
         with self.assertRaises(WebSocketDisconnect) as cm:
             with self.client.websocket_connect("/ws/events") as ws:
                 ws.receive_json()
         self.assertEqual(cm.exception.code, 1008)
-        self.assertEqual(self.client.get("/login").status_code, 200)  # trang dang nhap khong can dang nhap
+        self.assertEqual(self.client.get("/cu/login").status_code, 200)  # trang dang nhap khong can dang nhap
 
     def test_dang_nhap_sai_dung_va_dang_xuat(self):
         r = self.client.post("/api/dang-nhap", json={"username": "admin", "password": "sai"})
@@ -104,10 +104,10 @@ class AuthTest(AppCase):
         self.assertEqual(self.client.get("/api/toi").status_code, 401)
 
     def test_form_dang_nhap(self):
-        r = self.client.post("/login", data={"username": "admin", "password": PASSWORD, "next": "/docs"},
+        r = self.client.post("/cu/login", data={"username": "admin", "password": PASSWORD, "next": "/docs"},
                              follow_redirects=False)
         self.assertEqual((r.status_code, r.headers["location"]), (303, "/docs"))
-        r = self.client.post("/login", data={"username": "admin", "password": "sai", "next": "//trang-ngoai.com"})
+        r = self.client.post("/cu/login", data={"username": "admin", "password": "sai", "next": "//trang-ngoai.com"})
         self.assertEqual(r.status_code, 401)
         self.assertNotIn("trang-ngoai", r.text)  # khong cho chuyen huong ra trang ngoai
 

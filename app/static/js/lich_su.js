@@ -47,7 +47,7 @@ async function load() {
   $("ls-rows").innerHTML = d.ds.length ? d.ds.map(c => `<tr>
       <td>${c.anh ? `<img class="thumb" src="${c.anh}" data-check="${c.id}" alt="Ảnh lượt ${c.id}" loading="lazy">` : `<span class="thumb-empty"></span>`}</td>
       <td class="text-nowrap">${SG.ngay(c.thoi_diem)}<br><b>${SG.gio(c.thoi_diem, true)}</b></td>
-      <td>${c.cong_nhan ? `<a href="/cong-nhan/${c.cong_nhan.id}">${SG.esc(c.cong_nhan.ten)}</a><div class="small text-muted">${SG.esc(c.cong_nhan.ma)}</div>` : "–"}</td>
+      <td>${c.cong_nhan ? `<a href="/cu/cong-nhan/${c.cong_nhan.id}">${SG.esc(c.cong_nhan.ten)}</a><div class="small text-muted">${SG.esc(c.cong_nhan.ma)}</div>` : "–"}</td>
       <td>${SG.badge(SG.KET_QUA, c.ket_qua)}</td>
       <td class="small text-danger">${SG.esc(SG.thieu(c.thieu))}</td>
       <td>${SG.badge(SG.MAT, c.trang_thai_mat)}${c.diem != null ? `<div class="small">điểm ${c.diem.toFixed(2)}</div>` : ""}</td>

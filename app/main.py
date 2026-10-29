@@ -1,7 +1,7 @@
 """Ung dung FastAPI SafeGate (DE_TAI.md muc 8, 12 F2). Chay tu thu muc goc du an:
 
-    .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8000
-    -> mo http://127.0.0.1:8000/login, dang nhap roi thu API o /docs
+    .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8000     (hoac  .\\web)
+    -> mo http://127.0.0.1:8000 (giao dien React da build, frontend/dist), thu API o /docs, giao dien cu o /cu/
 
 Khoi dong (lifespan): tao bang neu chua co -> lay event loop cho Broadcaster -> bat cong (GateService, thread nen)
 -> theo doi trang thai cong. Tat ung dung: dung vong lap cong va camera.
@@ -29,7 +29,7 @@ from app.db import Database
 from app.events import Broadcaster
 from app.gate_service import GateService
 from app.models import User
-from app.routers import api, pages, stream, ws
+from app.routers import api, frontend, pages, stream, ws
 from app.services.cham_cong import ChamCongError
 from app.services.cong_nhan import CongNhanError
 from app.services.dang_ky_mat import DangKyMat, DangKyMatError
@@ -122,7 +122,9 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
 
     @app.exception_handler(LoginRequired)
     async def _login_required(request: Request, exc: LoginRequired):
-        return RedirectResponse(f"/login?next={quote(exc.next_url)}", status_code=303)
+        # trang giao dien cu -> dang nhap cua giao dien cu; con lai (/docs...) -> trang dang nhap cua giao dien React
+        login = "/cu/login" if exc.next_url.startswith(pages.PREFIX) else "/login"
+        return RedirectResponse(f"{login}?next={quote(exc.next_url)}", status_code=303)
 
     async def _bad_request(request: Request, exc: Exception):
         return JSONResponse({"detail": str(exc)}, status_code=400)
@@ -134,10 +136,11 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
     async def _conflict(request: Request, exc: IntegrityError):
         return JSONResponse({"detail": "Dữ liệu bị trùng hoặc tham chiếu không hợp lệ"}, status_code=409)
 
-    for r in (pages.router, api.public, api.router, ws.router, stream.router):
+    for r in (pages.router, pages.docs_router, api.public, api.router, ws.router, stream.router):
         app.include_router(r)
-    # Bootstrap, CSS, JavaScript: phuc vu tu may (khong CDN), khong can dang nhap (trang /login cung dung)
+    # Bootstrap, CSS, JavaScript cua giao dien cu: phuc vu tu may (khong CDN), khong can dang nhap (trang /cu/login dung)
     app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"), name="static")
+    app.include_router(frontend.frontend_router(settings["paths"]["frontend_dist"]))  # SAU CUNG: nhan moi duong dan con lai
     return app
 
 

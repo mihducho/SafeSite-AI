@@ -209,7 +209,7 @@ class GateConfigApiTest(AppCase):
         self.assertEqual((r.status_code, r.headers["content-type"]), (200, "image/jpeg"))
         img = cv2.imdecode(np.frombuffer(r.content, np.uint8), cv2.IMREAD_COLOR)
         self.assertEqual(img.shape[:2], (1280, 720))  # khung doc sau khi xoay, khong bi doi kich thuoc
-        page = self.client.get("/cau-hinh-cong")
+        page = self.client.get("/cu/cau-hinh-cong")
         self.assertEqual(page.status_code, 200)
         self.assertIn("Vùng kiểm tra", page.text)
 

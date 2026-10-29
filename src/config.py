@@ -29,7 +29,7 @@ REQUIRED_KEYS = {
     "web": ["session_hours", "page_size", "max_page_size", "max_upload_mb", "gate_result_seconds"],
     "evaluation": ["sample_fps", "fps_probe_frames", "video_exts", "answer_prefixes", "condition_prefixes"],
     "paths": ["gates_file", "checkpoint_runs", "eval_videos", "eval_answers", "eval_runs", "enroll_images",
-              "face_gallery", "face_thumbs", "gate_runs", "check_images", "face_samples"],
+              "face_gallery", "face_thumbs", "gate_runs", "check_images", "face_samples", "frontend_dist"],
 }
 ITEM_KEYS = ["class_name", "region", "missing_code"]  # moi mon trong ppe.items
 

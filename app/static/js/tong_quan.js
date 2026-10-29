@@ -4,7 +4,7 @@
 let lastTopId = null;
 
 function luotItem(c, isNew) {
-  const who = c.cong_nhan ? `<a href="/cong-nhan/${c.cong_nhan.id}">${SG.esc(c.cong_nhan.ten)}</a>
+  const who = c.cong_nhan ? `<a href="/cu/cong-nhan/${c.cong_nhan.id}">${SG.esc(c.cong_nhan.ten)}</a>
       <span class="text-muted small">${SG.esc(c.cong_nhan.ma)}</span>` : `<span class="text-muted">${SG.MAT[c.trang_thai_mat][0]}</span>`;
   const img = c.anh ? `<img class="thumb" src="${c.anh}" alt="Ảnh lượt" data-check="${c.id}" loading="lazy">` : `<span class="thumb-empty"></span>`;
   return `<li class="list-group-item d-flex align-items-center gap-3${isNew ? " new-item" : ""}">
@@ -40,7 +40,7 @@ async function load() {
   document.getElementById("tq-co-mat-n").textContent = d.dang_co_mat_ds.length;
   document.getElementById("tq-co-mat").innerHTML = d.dang_co_mat_ds.length
     ? d.dang_co_mat_ds.map(p => `<li class="list-group-item d-flex justify-content-between">
-        <span><a href="/cong-nhan/${p.worker_id}">${SG.esc(p.ho_ten)}</a> <span class="small text-muted">${SG.esc(p.ma)}${p.to_doi ? " · " + SG.esc(p.to_doi) : ""}</span></span>
+        <span><a href="/cu/cong-nhan/${p.worker_id}">${SG.esc(p.ho_ten)}</a> <span class="small text-muted">${SG.esc(p.ma)}${p.to_doi ? " · " + SG.esc(p.to_doi) : ""}</span></span>
         <span class="text-nowrap">vào ${p.gio_vao}</span></li>`).join("")
     : `<li class="list-group-item text-muted">Chưa có ai.</li>`;
 }

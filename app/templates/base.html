@@ -11,7 +11,7 @@
 <body data-today="{{ today }}" data-page="{{ active }}" data-min-samples="{{ min_samples }}" data-max-samples="{{ max_samples }}">
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="/">SafeGate</a>
+    <a class="navbar-brand fw-bold" href="/cu/">SafeGate</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav-menu"
             aria-controls="nav-menu" aria-expanded="false" aria-label="Mở menu">
       <span class="navbar-toggler-icon"></span>
@@ -24,7 +24,7 @@
       </ul>
       <span id="gate-badge" class="badge text-bg-secondary me-3" title="Trạng thái camera và vòng lặp cổng">Cổng: đang kết nối…</span>
       <span class="navbar-text text-light me-3">{{ user.full_name or user.username }}</span>
-      <a class="btn btn-outline-light btn-sm" href="/logout">Đăng xuất</a>
+      <a class="btn btn-outline-light btn-sm" href="/cu/logout">Đăng xuất</a>
     </div>
   </div>
 </nav>

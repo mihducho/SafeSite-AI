@@ -156,6 +156,7 @@ demo:
 paths:
   check_images: data/anh_luot               # ung dung web: anh moi luot kiem tra <ngay>/<gio>_<ma>.jpg (khong commit)
   face_samples: data/anh_mau_mat            # ung dung web: anh mat 112x112 cua mau <worker_id>/*.jpg (khong commit)
+  frontend_dist: frontend/dist              # giao dien React da build (npm run build), FastAPI phuc vu o / (khong commit)
   eval_videos: data/eval                    # video danh gia Giai doan 2 (khong commit)
   eval_answers: data/eval/dap_an.csv        # file dap an: ten_file, ket_qua_dung, thieu_dung, dieu_kien
   eval_runs: runs/eval                      # ket qua danh gia: CSV, tom_tat.md, anh cac luot sai

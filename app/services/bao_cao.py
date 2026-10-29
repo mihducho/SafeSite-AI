@@ -131,7 +131,8 @@ def excel_bang_cong_thang(data: dict) -> bytes:
 
 
 def tong_quan(db: Session, att_cfg: dict, now: datetime, latest: int = 10) -> dict:
-    """So cong nhan, da vao, dang co mat (kem danh sach), luot khong dat, ti le dat bao ho hom nay, luot moi nhat."""
+    """So cong nhan, da vao, dang co mat (kem danh sach), luot khong dat, ti le dat bao ho hom nay, so luot theo gio,
+    luot moi nhat."""
     tz = mui_gio(att_cfg)
     today = ngay_cong(now, tz)
     start, end = khoang_ngay(today, tz)
@@ -140,6 +141,10 @@ def tong_quan(db: Session, att_cfg: dict, now: datetime, latest: int = 10) -> di
     dat = db.scalar(checks_today.where(PpeCheck.result == DAT)) or 0
     khong_dat = db.scalar(checks_today.where(PpeCheck.result == KHONG_DAT)) or 0
     present = sorted((a for a in came if a.check_out is None), key=lambda a: a.check_in)
+    theo_gio = [{"gio": h, "dat": 0, "khong_dat": 0, "khac": 0} for h in range(24)]  # bieu do so luot theo gio
+    for t, kq in db.execute(select(PpeCheck.checked_at, PpeCheck.result)
+                            .where(PpeCheck.checked_at >= start, PpeCheck.checked_at < end)).all():
+        theo_gio[t.astimezone(tz).hour]["dat" if kq == DAT else "khong_dat" if kq == KHONG_DAT else "khac"] += 1
     return {
         "ngay": today.isoformat(),
         "so_cong_nhan": db.scalar(select(func.count(Worker.id)).where(Worker.status == DANG_LAM)) or 0,
@@ -153,6 +158,7 @@ def tong_quan(db: Session, att_cfg: dict, now: datetime, latest: int = 10) -> di
         "dang_co_mat_ds": [{"worker_id": a.worker_id, "ma": a.worker.code, "ho_ten": a.worker.full_name,
                             "to_doi": a.worker.team.name if a.worker.team else None,
                             "gio_vao": gio_phut(a.check_in, tz)} for a in present],
+        "luot_theo_gio": theo_gio,  # 24 gio (gio Viet Nam): dat / khong_dat / khac (khong xac dinh, nhieu nguoi...)
         "luot_moi_nhat": db.scalars(select(PpeCheck).order_by(PpeCheck.checked_at.desc(), PpeCheck.id.desc())
                                     .limit(latest)).all(),  # API doi sang JSON
     }

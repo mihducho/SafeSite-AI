@@ -32,7 +32,8 @@ Mô tả đầy đủ, phạm vi, các giai đoạn nước rút F1–F4 nằm �
       `/ws/events`, luồng hình `/stream/gate`, vòng lặp cổng chạy nền trong ứng dụng, `scripts/seed_demo.py`
 - [x] **F3. Giao diện web** (Jinja2 + Bootstrap 5 + JavaScript thuần, chạy không cần mạng): Tổng quan, Màn hình cổng
       (toàn màn hình, đọc thông báo bằng giọng tiếng Việt), Công nhân + chi tiết (đồng ý, chụp/tải mẫu mặt), Tổ đội,
-      Lịch sử kiểm tra, Bảng công ngày/tháng (xuất Excel), Ca làm
+      Lịch sử kiểm tra, Bảng công ngày/tháng (xuất Excel), Ca làm. Nay là **giao diện dự phòng** ở `/cu/`
+- [x] **Giao diện chính mới (React)** trong `frontend/`: cùng các chức năng trên + Cấu hình cổng, nối dữ liệu thật của backend
 - [ ] F4. Đánh giá `cong_gia_v2` + hoàn thiện demo
 
 ## Cài đặt (Windows, Python 3.13)
@@ -58,12 +59,34 @@ GRANT ALL PRIVILEGES ON safegate.* TO 'safegate'@'localhost';
 ```
 copy .env.example .env                                   # 1. điền DATABASE_URL (mật khẩu MySQL), SECRET_KEY, ADMIN_PASSWORD
 .venv\Scripts\python.exe scripts\seed_demo.py --source 0 --zone ca_khung        # 2. tạo bảng, tài khoản admin, cổng (webcam), ca, tổ đội
-.\web                                                                            # 3. chạy (web.bat); mở http://127.0.0.1:8000 (Ctrl+C: dừng)
+cd frontend; npm install; npm run build; cd ..                                   # 3. build giao diện React một lần (cần Node 18+)
+.\web                                                                            # 4. chạy (web.bat); mở http://127.0.0.1:8000 (Ctrl+C: dừng)
 ```
 
-- Trang: `/` Tổng quan · `/cong` Màn hình cổng (bấm "Bật âm thanh", "Toàn màn hình"; nên mở bằng Microsoft Edge vì có sẵn giọng
-  tiếng Việt "Microsoft An") · `/cong-nhan` · `/to-doi` · `/lich-su` · `/bang-cong` (+ `/bang-cong/thang`, xuất Excel) · `/ca-lam`.
-  Bootstrap và mọi file tĩnh nằm trong `app\static\` nên giao diện chạy được khi không có mạng (riêng trang thử API `/docs` cần mạng).
+### Giao diện React (`frontend/`): hai cách chạy
+
+Công nghệ: React 18 + Vite 6, react-router 6, react-bootstrap (Bootstrap 5), TanStack Query, axios; font Inter để trong máy
+(`@fontsource-variable/inter`), không dùng CDN hay Google Fonts. Frontend chỉ gọi đường dẫn tương đối (`/api/...`, `/ws/events`,
+`/stream/gate`), không mở thẳng URL camera (DroidCam chỉ nhận một kết nối).
+
+| | Chế độ phát triển (sửa giao diện) | **Chế độ demo** (hôm thi) |
+|---|---|---|
+| Lệnh | cửa sổ 1: `.\web` · cửa sổ 2: `cd frontend; npm run dev` | `.\web` (đã `npm run build` trước) |
+| Mở | `http://localhost:3000` (Vite chuyển `/api`, `/ws`, `/stream`, `/docs`, `/cu` sang cổng 8000) | `http://127.0.0.1:8000` |
+| Cần Node | có | **không** (FastAPI phục vụ `frontend\dist`) |
+
+- Sửa code giao diện xong muốn dùng ở chế độ demo thì chạy lại `npm run build` (FastAPI đọc `frontend\dist` lúc có yêu cầu,
+  không cần khởi động lại). Chưa build thì `http://127.0.0.1:8000` tự chuyển sang giao diện dự phòng `/cu/`.
+- Trang: `/` Tổng quan · `/man-hinh-cong` Màn hình cổng (bấm "Bật âm thanh", "Toàn màn hình"; nên mở bằng Microsoft Edge vì có sẵn
+  giọng tiếng Việt "Microsoft An") · `/cong-nhan` (+ chi tiết: đồng ý, chụp / tải mẫu mặt) · `/to-doi` · `/lich-su` · `/bang-cong`
+  (chấm công thủ công) · `/bang-cong-thang` (xuất Excel) · `/cau-hinh-ca` · `/cau-hinh-cong` (nguồn camera, góc xoay, vùng kiểm tra).
+- **Giao diện dự phòng** (Jinja2, F3) vẫn giữ ở `http://127.0.0.1:8000/cu/` (đăng nhập `/cu/login`), dùng khi giao diện React gặp sự cố.
+  Bootstrap và file tĩnh của nó nằm trong `app\static\`.
+- Kiểm thử giao diện tự động (Playwright, chạy trên Edge có sẵn trong máy, cần backend đang chạy ở chế độ demo):
+  ```
+  cd frontend
+  $env:SAFEGATE_PASSWORD = "<ADMIN_PASSWORD trong .env>"; npm run test:ui; Remove-Item Env:SAFEGATE_PASSWORD
+  ```
 - **Trước buổi demo**: `seed_demo.py --reset` (xoá sạch CSDL, ảnh lượt, ảnh mẫu mặt rồi tạo lại dữ liệu ban đầu; hỏi xác nhận)
   và chỉnh giờ ca cho hợp giờ thi: `seed_demo.py --ca 13:00-17:00` (hoặc trang Ca làm).
 - Thử API ở `http://127.0.0.1:8000/docs` (đăng nhập trước). Luồng hình: `/stream/gate`. Sự kiện từng lượt: WebSocket `/ws/events`.
@@ -125,8 +148,11 @@ Dùng điện thoại làm camera: [docs/huong_dan_camera_dien_thoai.md](docs/hu
 ```
 configs/   settings.yaml (cấu hình chung), gates.yaml (vùng kiểm tra, tạo bởi define_zone), data_ppe.yaml (dataset)
 app/       ứng dụng web FastAPI: main.py, config.py (.env), db.py, models.py (các bảng), auth.py, gate_service.py (cổng chạy nền),
-           events.py (WebSocket), services/ (nhan_dien, dang_ky_mat, cham_cong, luot, cong_nhan, bao_cao), routers/ (api, pages, ws, stream),
-           templates/ (trang Jinja2), static/ (Bootstrap 5.3.3, CSS, JavaScript từng trang)
+           events.py (WebSocket), services/ (nhan_dien, dang_ky_mat, cham_cong, luot, cong_nhan, bao_cao),
+           routers/ (api, pages = giao diện cũ /cu, frontend = phục vụ bản build React, ws, stream),
+           templates/ + static/ (giao diện cũ Jinja2, Bootstrap 5.3.3)
+frontend/  giao diện chính React + Vite: src/api (gọi API), src/lib (WebSocket, định dạng ngày giờ, nhãn), src/pages (từng trang),
+           tests/ (Playwright). node_modules/, dist/ không commit
 src/       config.py, checkpoint/ (kiểm tra bảo hộ: camera, evaluate, check), face/ (YuNet, SFace, phân tích mặt,
            so khớp, đăng ký), gate/ (kết hợp, máy trạng thái, một lượt, vòng lặp cổng), detection/, ppe/ (luật vùng
            đầu/thân), zone/, evaluation/, utils/

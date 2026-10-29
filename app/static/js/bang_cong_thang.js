@@ -16,13 +16,13 @@ async function load() {
     <th>Ngày công</th><th>Tổng giờ</th><th>Lần muộn</th></tr>`;
   $("m-rows").innerHTML = d.ds.length ? d.ds.map(r => `<tr>
       <td class="text-start fw-semibold">${SG.esc(r.ma)}</td>
-      <td class="text-start text-nowrap"><a href="/cong-nhan/${r.worker_id}">${SG.esc(r.ho_ten)}</a></td>
+      <td class="text-start text-nowrap"><a href="/cu/cong-nhan/${r.worker_id}">${SG.esc(r.ho_ten)}</a></td>
       ${days.map(x => {
         const c = r.ngay[x];
         if (!c || !c.gio_vao) return "<td></td>";
         const cls = c.di_muon_phut > 0 ? "table-warning" : "";
         const text = c.gio_ra ? SG.phut(c.so_phut_lam) : "vào";
-        return `<td class="${cls}" title="${c.gio_vao}–${c.gio_ra || "?"}"><a class="text-reset text-decoration-none" href="/bang-cong?ngay=${c.ngay}">${text}</a></td>`;
+        return `<td class="${cls}" title="${c.gio_vao}–${c.gio_ra || "?"}"><a class="text-reset text-decoration-none" href="/cu/bang-cong?ngay=${c.ngay}">${text}</a></td>`;
       }).join("")}
       <td class="fw-semibold">${r.so_ngay_cong}</td><td class="fw-semibold">${SG.phut(r.tong_phut)}</td><td>${r.so_lan_muon}</td>
     </tr>`).join("") : `<tr><td colspan="${d.so_ngay + 5}" class="text-muted">Không có dữ liệu.</td></tr>`;

@@ -114,6 +114,19 @@ def me(user: User = Depends(current_user)):
     return {"id": user.id, "username": user.username, "full_name": user.full_name, "role": user.role}
 
 
+@router.get("/cau-hinh-web", tags=["dang nhap"])
+def web_config(request: Request):
+    """Tham số cho giao diện web (React) lấy từ settings.yaml (giao diện Jinja2 cũ nhận qua template), và ngày hôm nay
+    theo giờ Việt Nam (không phụ thuộc giờ máy của trình duyệt)."""
+    s = _state(request).settings
+    return {"ngay_hom_nay": cham_cong.ngay_cong(utcnow(), _tz(request)).isoformat(),
+            "mui_gio": s["attendance"]["timezone"],
+            "mau_toi_thieu": s["face"]["min_samples"], "mau_toi_da": s["face"]["max_samples"],
+            "giay_hien_ket_qua": s["web"]["gate_result_seconds"],
+            "so_dong_trang": s["web"]["page_size"], "so_dong_toi_da": s["web"]["max_page_size"],
+            "tai_len_toi_da_mb": s["web"]["max_upload_mb"]}
+
+
 # ---------- cong nhan ----------
 class WorkerIn(BaseModel):
     code: str = Field(min_length=1, max_length=20, examples=["CN001"])

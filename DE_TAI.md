@@ -206,8 +206,9 @@ SafeSite-AI/
   app/              (mới) FastAPI
     main.py, config.py, db.py, models.py, auth.py
     services/       nhan_dien.py (so khớp), cham_cong.py (vào/ra, tính công), luot.py (xử lý một lượt), dang_ky_mat.py
-    routers/        pages (HTML), api (JSON), ws (WebSocket), stream (MJPEG)
-    templates/, static/
+    routers/        pages (HTML, giao diện dự phòng /cu), api (JSON), ws (WebSocket), stream (MJPEG), frontend (phục vụ frontend/dist)
+    templates/, static/   giao diện Jinja2 (F3), nay là dự phòng ở /cu/
+  frontend/         (30/10/2026) giao diện chính React + Vite; chế độ demo: build ra frontend/dist, FastAPI phục vụ ở /
   data/             anh_luot/, anh_mau_mat/ (không đưa vào git)
   configs/settings.yaml, .env (DATABASE_URL, SECRET_KEY, mật khẩu admin ban đầu)
   scripts/          download_face_models.py, enroll_from_images.py, evaluate_faces.py, seed_demo.py
@@ -448,3 +449,16 @@ gán đồ bảo hộ có xét người ngoài vùng; `check` xử lý khung nga
   `seed_demo.py --reset` xoá sạch CSDL, `data/anh_luot/`, `data/anh_mau_mat/` rồi tạo lại dữ liệu ban đầu (chạy trước buổi demo).
 - Số phút làm chỉ trừ phần giao nhau với giờ nghỉ trưa (cột mới `shifts.break_start`, mặc định 11:30): vào 12:12, ra 12:15 → 0 phút
   (nằm trong giờ nghỉ); làm buổi sáng 08:00–11:00 → 180 phút (không trừ). `seed_demo.py --ca 07:00-17:00` để chỉnh giờ ca hôm demo.
+
+**2026-10-30 (theo yêu cầu của tôi): giao diện chính chuyển sang React** (thư mục `frontend/`, tôi dựng bằng Antigravity),
+mọi chức năng chạy bằng dữ liệu thật của backend; không đổi logic AI, chấm công, luật nghiệp vụ.
+- Giao diện Jinja2 (F3) giữ làm dự phòng, chuyển sang `/cu/...` (đăng nhập `/cu/login`). `/docs`, `/openapi.json` giữ ở gốc;
+  chưa đăng nhập mà mở `/docs` thì về trang đăng nhập của giao diện React (`/login?next=/docs`).
+- Chế độ phát triển: `npm run dev` (cổng 3000), Vite chuyển `/api`, `/ws`, `/stream`, `/docs`, `/cu` sang cổng 8000 (không bật CORS).
+  Chế độ demo: `npm run build`, FastAPI phục vụ `frontend/dist` ở `/` (đường dẫn của giao diện trả `index.html`; tham số mới
+  `paths.frontend_dist`), hôm thi chỉ chạy `uvicorn`, không cần Node. Chưa build thì `/` chuyển sang `/cu/`.
+- Thêm tối thiểu cho giao diện React (có test): API `GET /api/cau-hinh-web` (tham số settings.yaml mà Jinja2 truyền qua template:
+  ngày hôm nay theo giờ Việt Nam, số mẫu tối thiểu/tối đa, số giây hiện kết quả, số dòng mỗi trang); trường `luot_theo_gio` trong
+  `GET /api/tong-quan` (biểu đồ số lượt theo giờ hôm nay: đạt / không đạt / khác).
+- Font Inter để trong bản build (`@fontsource-variable/inter`, OFL), bỏ Google Fonts. Kiểm thử giao diện bằng Playwright
+  (`npm run test:ui`, chạy trên Edge có sẵn).

@@ -26,12 +26,12 @@ async function load() {
       : `<span class="badge text-bg-${enough ? "success" : "warning"}">${w.so_mau} mẫu · ${enough ? "đủ" : `chưa đủ ${minSamples}`}</span>`;
     return `<tr>
       <td class="fw-semibold">${SG.esc(w.code)}</td>
-      <td><a href="/cong-nhan/${w.id}">${SG.esc(w.full_name)}</a></td>
+      <td><a href="/cu/cong-nhan/${w.id}">${SG.esc(w.full_name)}</a></td>
       <td>${SG.esc(w.team_name || "")}</td><td>${SG.esc(w.trade || "")}</td><td>${SG.esc(w.phone || "")}</td>
       <td>${SG.badge(SG.CONG_NHAN, w.status)}</td>
       <td>${w.consent_at ? `<span class="text-success" title="${SG.ngayGio(w.consent_at)}">✔ Đã đồng ý</span>` : `<span class="text-muted">Chưa</span>`}</td>
       <td>${faces}</td>
-      <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/cong-nhan/${w.id}">Chi tiết</a></td>
+      <td class="text-end"><a class="btn btn-outline-primary btn-sm" href="/cu/cong-nhan/${w.id}">Chi tiết</a></td>
     </tr>`;
   }).join("") : `<tr><td colspan="9" class="text-muted">Không có công nhân nào.</td></tr>`;
 }
@@ -56,7 +56,7 @@ $("add-form").addEventListener("submit", async e => {
   try {
     const w = await SG.api("POST", "/api/cong-nhan", body);
     addModal.hide();
-    location.href = `/cong-nhan/${w.id}`;  // sang trang chi tiet de ghi nhan dong y va chup mau
+    location.href = `/cu/cong-nhan/${w.id}`;  // sang trang chi tiet de ghi nhan dong y va chup mau
   } catch (err) {
     $("add-error").textContent = err.message;
     $("add-error").classList.remove("d-none");

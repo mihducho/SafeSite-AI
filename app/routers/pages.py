@@ -1,8 +1,10 @@
-"""Trang HTML (DE_TAI.md muc 9.1, 12 F3): Jinja2 + Bootstrap 5 + JavaScript thuan.
+"""Giao dien cu (F3, Jinja2 + Bootstrap 5 + JavaScript thuan), giu lam DU PHONG o /cu/... (giao dien chinh la React
+trong frontend/, xem main.py). DE_TAI.md muc 9.1, 12 F3.
 
 Trang chi la khung (bo cuc, form, bang trong); du lieu do JavaScript (app/static/js/) lay tu API JSON cua F2 va cap nhat
-truc tiep qua WebSocket /ws/events. Moi trang tru /login deu can dang nhap (chua dang nhap -> /login?next=...).
+truc tiep qua WebSocket /ws/events. Moi trang tru /cu/login deu can dang nhap (chua dang nhap -> /cu/login?next=...).
 Bootstrap va moi file tinh nam trong app/static/ (khong dung CDN: phong thi co the khong co mang).
+/docs, /openapi.json (thu API) nam o docs_router, khong co tien to /cu.
 """
 from pathlib import Path
 
@@ -17,19 +19,21 @@ from app.db import get_db, utcnow
 from app.models import User, Worker
 from app.services.cham_cong import mui_gio, ngay_cong
 
-router = APIRouter(include_in_schema=False)
+PREFIX = "/cu"
+router = APIRouter(prefix=PREFIX, include_in_schema=False)
+docs_router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parents[1] / "templates"))
-ASSET_VERSION = "f3c"  # doi khi sua file tinh de trinh duyet tai lai (khong dung ban cu trong bo nho dem)
+ASSET_VERSION = "f3d"  # doi khi sua file tinh de trinh duyet tai lai (khong dung ban cu trong bo nho dem)
 
 NAV = [  # (khoa, duong dan, ten tren menu)
-    ("tong_quan", "/", "Tổng quan"),
-    ("cong", "/cong", "Màn hình cổng"),
-    ("cong_nhan", "/cong-nhan", "Công nhân"),
-    ("to_doi", "/to-doi", "Tổ đội"),
-    ("lich_su", "/lich-su", "Lịch sử kiểm tra"),
-    ("bang_cong", "/bang-cong", "Bảng công"),
-    ("ca_lam", "/ca-lam", "Ca làm"),
-    ("cau_hinh_cong", "/cau-hinh-cong", "Cấu hình cổng"),
+    ("tong_quan", "/cu/", "Tổng quan"),
+    ("cong", "/cu/cong", "Màn hình cổng"),
+    ("cong_nhan", "/cu/cong-nhan", "Công nhân"),
+    ("to_doi", "/cu/to-doi", "Tổ đội"),
+    ("lich_su", "/cu/lich-su", "Lịch sử kiểm tra"),
+    ("bang_cong", "/cu/bang-cong", "Bảng công"),
+    ("ca_lam", "/cu/ca-lam", "Ca làm"),
+    ("cau_hinh_cong", "/cu/cau-hinh-cong", "Cấu hình cổng"),
 ]
 
 
@@ -45,17 +49,22 @@ def render(request: Request, name: str, user: User | None, active: str = "", tit
 
 def _safe_next(url: str | None) -> str:
     """Chi cho chuyen toi duong dan trong ung dung (chan chuyen huong ra trang ngoai)."""
-    return url if url and url.startswith("/") and not url.startswith("//") else "/"
+    return url if url and url.startswith("/") and not url.startswith("//") else "/cu/"
 
 
 # ---------- dang nhap ----------
+@router.get("", include_in_schema=False)
+def old_root():
+    return RedirectResponse("/cu/", status_code=307)
+
+
 @router.get("/login", response_class=HTMLResponse)
-def login_form(request: Request, next: str = "/"):
+def login_form(request: Request, next: str = "/cu/"):
     return render(request, "login.html", None, title="Đăng nhập", next=_safe_next(next), error=None)
 
 
 @router.post("/login")
-def login_submit(request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/"),
+def login_submit(request: Request, username: str = Form(...), password: str = Form(...), next: str = Form("/cu/"),
                  db: Session = Depends(get_db)):
     user = authenticate(db, username, password)
     if user is None:
@@ -68,7 +77,7 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
 @router.get("/logout")
 def logout(request: Request):
     request.session.clear()
-    return RedirectResponse("/login", status_code=303)
+    return RedirectResponse("/cu/login", status_code=303)
 
 
 # ---------- cac trang ----------
@@ -127,11 +136,11 @@ def gate_config_page(request: Request, user: User = Depends(page_user)):
 
 
 # ---------- thu API (Swagger) ----------
-@router.get("/docs", response_class=HTMLResponse)
+@docs_router.get("/docs", response_class=HTMLResponse)
 def docs(user: User = Depends(page_user)):
     return get_swagger_ui_html(openapi_url="/openapi.json", title="SafeGate API")  # can mang (Swagger tai tu CDN)
 
 
-@router.get("/openapi.json")
+@docs_router.get("/openapi.json")
 def openapi(request: Request, user: User = Depends(page_user)):
     return JSONResponse(request.app.openapi())

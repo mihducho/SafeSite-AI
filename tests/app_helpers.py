@@ -158,12 +158,14 @@ def fake_face_models():
 
 
 def app_config(database_url: str = TEST_DB, tmp: str | None = None) -> AppConfig:
-    """Cau hinh ung dung cho test: CSDL test (trong), anh luot + anh mau ghi vao thu muc tam."""
+    """Cau hinh ung dung cho test: CSDL test (trong), anh luot + anh mau ghi vao thu muc tam; giao dien React chua build
+    (thu muc frontend_dist trong thu muc tam, chua co; test giao dien React tu tao)."""
     reset_db(database_url)
     s = copy.deepcopy(SETTINGS)
     tmp = Path(tmp or tempfile.mkdtemp())
     s["paths"]["check_images"] = tmp / "anh_luot"
     s["paths"]["face_samples"] = tmp / "anh_mau_mat"
+    s["paths"]["frontend_dist"] = tmp / "frontend_dist"
     return AppConfig(settings=s, database_url=database_url, secret_key="khoa-test", admin_password=PASSWORD,
                      gate_enabled=False)
 

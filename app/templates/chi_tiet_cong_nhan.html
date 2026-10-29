@@ -2,7 +2,7 @@
 {% block content %}
 <div id="worker-page" data-worker-id="{{ worker.id }}">
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-  <a class="btn btn-outline-secondary btn-sm" href="/cong-nhan">← Danh sách</a>
+  <a class="btn btn-outline-secondary btn-sm" href="/cu/cong-nhan">← Danh sách</a>
   <h1 class="page-title ms-2" id="w-title">{{ worker.full_name }}</h1>
   <span class="text-muted fs-5" id="w-code">{{ worker.code }}</span>
   <span id="w-status"></span>
@@ -84,7 +84,7 @@
   <div class="col-xl-7">
     <div class="card">
       <div class="card-header d-flex"><span class="fw-semibold">Lượt kiểm tra gần đây</span>
-        <a class="ms-auto small" href="/lich-su?cong_nhan_id={{ worker.id }}">Xem tất cả</a></div>
+        <a class="ms-auto small" href="/cu/lich-su?cong_nhan_id={{ worker.id }}">Xem tất cả</a></div>
       <div class="table-responsive"><table class="table table-sm mb-0">
         <thead class="table-light"><tr><th></th><th>Thời điểm</th><th>Kết quả</th><th>Nhận diện</th><th>Hành động</th></tr></thead>
         <tbody id="w-checks"></tbody>

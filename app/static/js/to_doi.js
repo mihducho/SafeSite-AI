@@ -9,7 +9,7 @@ async function load() {
   try { teams = (await SG.api("GET", "/api/to-doi")).ds; } catch (e) { SG.toast(e.message, "danger"); return; }
   $("td-rows").innerHTML = teams.length ? teams.map(t => `<tr>
       <td class="fw-semibold">${SG.esc(t.name)}</td><td>${SG.esc(t.contractor || "")}</td><td>${SG.esc(t.leader_name || "")}</td>
-      <td><a href="/cong-nhan?to_doi=${t.id}">${t.so_cong_nhan}</a></td>
+      <td><a href="/cu/cong-nhan?to_doi=${t.id}">${t.so_cong_nhan}</a></td>
       <td class="text-end"><button class="btn btn-outline-primary btn-sm" data-edit="${t.id}">Sửa</button></td></tr>`).join("")
     : `<tr><td colspan="5" class="text-muted">Chưa có tổ đội nào.</td></tr>`;
 }
