@@ -22,6 +22,8 @@ data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
+# Anh chup man hinh giao dien: co hinh camera, anh mat nguoi that -> chi de tren may
+docs/anh_giao_dien/
 data/eval/*
 !data/eval/.gitkeep
 !data/eval/dap_an.csv

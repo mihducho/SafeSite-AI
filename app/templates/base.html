@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>{{ title }} - SafeGate</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap-5.3.3/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ v }}">
+</head>
+<body data-today="{{ today }}" data-page="{{ active }}" data-min-samples="{{ min_samples }}" data-max-samples="{{ max_samples }}">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="/">SafeGate</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav-menu"
+            aria-controls="nav-menu" aria-expanded="false" aria-label="Mở menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="nav-menu">
+      <ul class="navbar-nav me-auto">
+        {% for key, href, label in nav %}
+        <li class="nav-item"><a class="nav-link{% if key == active %} active{% endif %}" href="{{ href }}">{{ label }}</a></li>
+        {% endfor %}
+      </ul>
+      <span id="gate-badge" class="badge text-bg-secondary me-3" title="Trạng thái camera và vòng lặp cổng">Cổng: đang kết nối…</span>
+      <span class="navbar-text text-light me-3">{{ user.full_name or user.username }}</span>
+      <a class="btn btn-outline-light btn-sm" href="/logout">Đăng xuất</a>
+    </div>
+  </div>
+</nav>
+
+<main class="container-fluid py-3">
+  {% block content %}{% endblock %}
+</main>
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts"></div>
+
+{# Hop xac nhan dung chung (thay cho confirm() cua trinh duyet) #}
+<div class="modal fade" id="confirm-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="confirm-title">Xác nhận</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+      <div class="modal-body" id="confirm-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+        <button type="button" class="btn btn-danger" id="confirm-ok">Đồng ý</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Hop xem chi tiet 1 luot kiem tra (anh lon + so lieu) #}
+<div class="modal fade" id="check-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="check-title">Lượt kiểm tra</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-lg-6 text-center"><img id="check-img" class="img-fluid rounded check-big" alt="Ảnh lượt kiểm tra"></div>
+          <div class="col-lg-6"><table class="table table-sm mb-2"><tbody id="check-info"></tbody></table>
+            <div class="d-flex gap-2 align-items-center">
+              <span class="text-muted">Đánh giá kết quả:</span>
+              <button class="btn btn-outline-success btn-sm" id="check-dung">Đúng</button>
+              <button class="btn btn-outline-danger btn-sm" id="check-nham">Báo nhầm</button>
+              <span id="check-review"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/vendor/bootstrap-5.3.3/bootstrap.bundle.min.js"></script>
+<script src="/static/js/common.js?v={{ v }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

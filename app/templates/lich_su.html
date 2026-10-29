@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3">
+  <h1 class="page-title">Lịch sử kiểm tra</h1>
+  <span class="text-muted" id="ls-tong"></span>
+</div>
+
+<div class="card mb-3"><div class="card-body row g-2 align-items-end">
+  <div class="col-md-2"><label class="form-label" for="f-ngay">Ngày</label>
+    <input class="form-control" type="date" id="f-ngay"></div>
+  <div class="col-md-3"><label class="form-label" for="f-cn">Công nhân</label>
+    <select class="form-select" id="f-cn"><option value="">Tất cả</option></select></div>
+  <div class="col-md-2"><label class="form-label" for="f-kq">Kết quả</label>
+    <select class="form-select" id="f-kq"><option value="">Tất cả</option></select></div>
+  <div class="col-md-2"><label class="form-label" for="f-hd">Hành động</label>
+    <select class="form-select" id="f-hd"><option value="">Tất cả</option></select></div>
+  <div class="col-md-3 d-flex gap-2">
+    <button class="btn btn-outline-secondary" id="btn-all-days" title="Bỏ lọc ngày">Mọi ngày</button>
+    <button class="btn btn-outline-secondary" id="btn-reset">Bỏ lọc</button>
+  </div>
+</div></div>
+
+<div class="card"><div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light"><tr>
+      <th>Ảnh</th><th>Thời điểm</th><th>Công nhân</th><th>Kết quả</th><th>Thiếu</th><th>Nhận diện</th>
+      <th>Hướng</th><th>Hành động</th><th>Thời gian</th><th>Đánh giá</th>
+    </tr></thead>
+    <tbody id="ls-rows"><tr><td colspan="10" class="text-muted">Đang tải…</td></tr></tbody>
+  </table>
+</div>
+<div class="card-footer d-flex align-items-center gap-2">
+  <button class="btn btn-outline-secondary btn-sm" id="pg-prev">‹ Trước</button>
+  <span id="pg-info" class="small"></span>
+  <button class="btn btn-outline-secondary btn-sm" id="pg-next">Sau ›</button>
+</div></div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/lich_su.js?v={{ v }}"></script>{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-baseline gap-3 mb-3">
+  <h1 class="page-title">Tổng quan hôm nay</h1>
+  <span class="text-muted" id="tq-ngay"></span>
+</div>
+
+<div class="row g-3 mb-3">
+  {% for key, label, color in [("so_cong_nhan", "Công nhân đang làm", "dark"), ("da_vao", "Đã vào hôm nay", "success"),
+                               ("dang_co_mat", "Đang có mặt", "primary"), ("luot_khong_dat", "Lượt không đạt", "danger"),
+                               ("ty_le_dat", "Tỷ lệ đạt bảo hộ", "info")] %}
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card stat-card h-100 shadow-sm" style="border-left: 5px solid var(--bs-{{ color }})">
+      <div class="card-body">
+        <div class="stat-value text-{{ color }}" id="tq-{{ key }}">–</div>
+        <div class="stat-label">{{ label }}</div>
+        {% if key == "ty_le_dat" %}<div class="small text-muted" id="tq-ty-le-ghi-chu"></div>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center">
+        <span class="fw-semibold">Lượt kiểm tra mới nhất</span>
+        <span class="badge text-bg-success ms-2" id="tq-live">● Trực tiếp</span>
+        <a class="ms-auto small" href="/lich-su">Xem tất cả</a>
+      </div>
+      <ul class="list-group list-group-flush" id="tq-luot"><li class="list-group-item text-muted">Đang tải…</li></ul>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="card-header fw-semibold">Đang có mặt (<span id="tq-co-mat-n">0</span>)</div>
+      <ul class="list-group list-group-flush" id="tq-co-mat"><li class="list-group-item text-muted">Đang tải…</li></ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/tong_quan.js?v={{ v }}"></script>{% endblock %}

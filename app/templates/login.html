@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Đăng nhập - SafeGate</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap-5.3.3/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ v }}">
+</head>
+<body class="d-flex align-items-center justify-content-center" style="min-height: 100vh">
+  <form method="post" action="/login" class="card shadow-sm p-4" style="width: 360px">
+    <h1 class="h3 mb-1 fw-bold">SafeGate</h1>
+    <p class="text-muted mb-4">Chấm công bằng khuôn mặt và kiểm tra bảo hộ tại cổng</p>
+    {% if error %}<div class="alert alert-danger py-2">{{ error }}</div>{% endif %}
+    <div class="mb-3">
+      <label class="form-label" for="username">Tên đăng nhập</label>
+      <input class="form-control" id="username" name="username" value="{{ username or '' }}" autocomplete="username" required autofocus>
+    </div>
+    <div class="mb-3">
+      <label class="form-label" for="password">Mật khẩu</label>
+      <input class="form-control" id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button class="btn btn-primary w-100" type="submit">Đăng nhập</button>
+  </form>
+</body>
+</html>

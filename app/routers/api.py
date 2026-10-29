@@ -2,20 +2,21 @@
 Thu bang trang /docs (dang nhap o /login truoc). Gio tra ve theo gio Viet Nam (ISO 8601, +07:00).
 Loi nghiep vu (chua dong y, thieu ly do, anh khong dat...) -> 400 {"detail": "cau tieng Viet"} (xem main.py).
 """
+import re
 from datetime import date, datetime, time
 from typing import Literal
 
 import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import authenticate, current_user, login_session
 from app.db import get_db, utcnow
-from app.models import DANG_LAM, Attendance, FaceSample, PpeCheck, Team, User, Worker
+from app.models import DANG_LAM, Attendance, FaceSample, PpeCheck, Shift, Team, User, Worker
 from app.services import bao_cao, cham_cong, cong_nhan
 from app.services.dang_ky_mat import CAMERA, NOI_DUNG_DONG_Y, UPLOAD, DangKyMatError
 
@@ -49,8 +50,9 @@ def _get(db: Session, model, obj_id: int, name: str):
 def worker_json(w: Worker, tz, so_mau: int | None = None) -> dict:
     return {"id": w.id, "code": w.code, "full_name": w.full_name, "phone": w.phone, "trade": w.trade,
             "team_id": w.team_id, "team_name": w.team.name if w.team else None, "status": w.status,
-            "consent_at": _iso(w.consent_at, tz), "consent_by": w.consent_by, "created_at": _iso(w.created_at, tz),
-            "so_mau": so_mau}
+            "consent_at": _iso(w.consent_at, tz), "consent_by": w.consent_by,
+            "consent_by_name": (w.consent_user.full_name or w.consent_user.username) if w.consent_user else None,
+            "created_at": _iso(w.created_at, tz), "so_mau": so_mau}
 
 
 def team_json(t: Team, so_cong_nhan: int | None = None) -> dict:
@@ -181,6 +183,14 @@ def worker_rejoin(worker_id: int, request: Request, db: Session = Depends(get_db
     """Nhận lại công nhân đã nghỉ: phải ghi nhận đồng ý và đăng ký khuôn mặt lại."""
     w = cong_nhan.di_lam_lai(db, _get(db, Worker, worker_id, "công nhân"), _state(request).dang_ky)
     return worker_json(w, _tz(request), 0)
+
+
+@router.get("/cong-nhan/{worker_id}/bang-cong", tags=["cong nhan"])
+def worker_recent_attendance(worker_id: int, request: Request, so_ngay: int = Query(14, ge=1, le=366),
+                             db: Session = Depends(get_db)):
+    """Bảng công các ngày gần đây của 1 công nhân (mới nhất trước)."""
+    w = _get(db, Worker, worker_id, "công nhân")
+    return {"ds": bao_cao.bang_cong_gan_day(db, w, _state(request).settings["attendance"], utcnow(), so_ngay)}
 
 
 @router.get("/dong-y/noi-dung", tags=["mau mat"])
@@ -331,6 +341,19 @@ def get_check(check_id: int, request: Request, db: Session = Depends(get_db)):
     return check_json(_get(db, PpeCheck, check_id, "lượt kiểm tra"), _tz(request))
 
 
+class ReviewIn(BaseModel):
+    danh_gia: Literal["dung", "bao_nham"] | None = Field(description="dung / bao_nham; null = bỏ đánh giá")
+
+
+@router.patch("/luot/{check_id}/danh-gia", tags=["luot kiem tra"])
+def review_check(check_id: int, body: ReviewIn, request: Request, db: Session = Depends(get_db)):
+    """Cán bộ xác nhận kết quả lượt kiểm tra đúng hay báo nhầm (số liệu để đánh giá hệ thống)."""
+    c = _get(db, PpeCheck, check_id, "lượt kiểm tra")
+    c.review_status = body.danh_gia
+    db.commit()
+    return check_json(c, _tz(request))
+
+
 @router.get("/luot/{check_id}/anh", tags=["luot kiem tra"])
 def check_image(check_id: int, request: Request, db: Session = Depends(get_db)):
     c = _get(db, PpeCheck, check_id, "lượt kiểm tra")
@@ -357,6 +380,34 @@ def daily_sheet(request: Request, ngay: date | None = Query(None, description="Y
     return {"ngay": ngay.isoformat(), "ds": bao_cao.bang_cong_ngay(db, ngay, att_cfg, now, to_doi)}
 
 
+def _month(thang: str | None, request: Request) -> tuple[int, int]:
+    if thang is None:
+        today = cham_cong.ngay_cong(utcnow(), _tz(request))
+        return today.year, today.month
+    m = re.fullmatch(r"(\d{4})-(\d{2})", thang)
+    if not m or not 1 <= int(m.group(2)) <= 12:
+        raise HTTPException(422, "Tháng phải có dạng YYYY-MM, vd 2026-10")
+    return int(m.group(1)), int(m.group(2))
+
+
+@router.get("/bang-cong/thang", tags=["cham cong"])
+def monthly_sheet(request: Request, thang: str | None = Query(None, description="YYYY-MM, mặc định tháng này"),
+                  to_doi: int | None = None, db: Session = Depends(get_db)):
+    nam, th = _month(thang, request)
+    return bao_cao.bang_cong_thang(db, nam, th, _state(request).settings["attendance"], utcnow(), to_doi)
+
+
+@router.get("/bang-cong/thang/excel", tags=["cham cong"])
+def monthly_excel(request: Request, thang: str | None = Query(None, description="YYYY-MM"), to_doi: int | None = None,
+                  db: Session = Depends(get_db)):
+    """Xuất bảng công tháng ra file Excel (.xlsx)."""
+    nam, th = _month(thang, request)
+    data = bao_cao.bang_cong_thang(db, nam, th, _state(request).settings["attendance"], utcnow(), to_doi)
+    return Response(bao_cao.excel_bang_cong_thang(data),
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="bang_cong_{nam:04d}_{th:02d}.xlsx"'})
+
+
 @router.post("/cham-cong-thu-cong", tags=["cham cong"])
 def manual_attendance(body: ManualIn, request: Request, db: Session = Depends(get_db),
                       user: User = Depends(current_user)):
@@ -374,6 +425,36 @@ def overview(request: Request, db: Session = Depends(get_db)):
     data["luot_moi_nhat"] = [check_json(c, tz) for c in data["luot_moi_nhat"]]
     data["cong"] = st.gate.status()
     return data
+
+
+# ---------- ca lam ----------
+class ShiftPatch(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=50)
+    start_time: time | None = Field(None, examples=["07:00"])
+    end_time: time | None = Field(None, examples=["17:00"])
+    break_start: time | None = Field(None, examples=["11:30"])
+    break_minutes: int | None = Field(None, ge=0, le=240)
+    grace_minutes: int | None = Field(None, ge=0, le=120)
+    early_checkin_minutes: int | None = Field(None, ge=0, le=240)
+
+
+def shift_json(s: Shift) -> dict:
+    return {"id": s.id, "name": s.name, "start_time": f"{s.start_time:%H:%M}", "end_time": f"{s.end_time:%H:%M}",
+            "break_start": f"{s.break_start:%H:%M}", "break_minutes": s.break_minutes, "grace_minutes": s.grace_minutes,
+            "early_checkin_minutes": s.early_checkin_minutes}
+
+
+@router.get("/ca-lam", tags=["ca lam"])
+def get_shift(db: Session = Depends(get_db)):
+    return shift_json(cham_cong.ca_mac_dinh(db))
+
+
+@router.patch("/ca-lam", tags=["ca lam"])
+def update_shift(body: ShiftPatch, request: Request, db: Session = Depends(get_db)):
+    """Sửa ca mặc định. Bảng công HÔM NAY được tính lại theo ca mới; các ngày trước giữ nguyên."""
+    shift = cham_cong.ca_mac_dinh(db)
+    n = cham_cong.sua_ca(db, shift, body.model_dump(exclude_unset=True), _state(request).settings["attendance"])
+    return {**shift_json(shift), "so_dong_tinh_lai": n}
 
 
 # ---------- cong ----------

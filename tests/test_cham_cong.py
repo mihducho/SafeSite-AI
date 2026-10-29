@@ -20,7 +20,7 @@ from sqlalchemy import func, select
 from app.models import NGHI_VIEC, Attendance, FaceSample, PpeCheck
 from app.services import bao_cao, cong_nhan
 from app.services.cham_cong import (BINH_THUONG, BO_QUA_TRUNG, CHAM_THU_CONG, GHI_RA, GHI_VAO, KHONG_GHI, NGOAI_CA, RA,
-                                    VAO, ChamCongError, cham_thu_cong, ngay_cong, thieu_gio_ra)
+                                    VAO, ChamCongError, cham_thu_cong, ngay_cong, thieu_gio_ra, tinh_cong)
 from app.services.dang_ky_mat import CAMERA, DangKyMat, DangKyMatError
 from app.services.luot import DA_NHAN_RA, DO, KHONG_NHAN_RA, KHONG_THAY_MAT, VANG, XANH, xu_ly_luot
 from src.checkpoint.evaluate import DAT, KHONG_CO_NGUOI, KHONG_DAT, KHONG_XAC_DINH, NHIEU_NGUOI
@@ -318,6 +318,34 @@ class ChamThuCongTest(ServiceCase):
     def test_cham_vao_thu_cong_roi_dung_truoc_camera_khong_ghi_ra_ngay(self):
         self.manual(time(7, 0))
         self.assertEqual(self.run_luot(vn(29, 7, 1))["hanh_dong"], BO_QUA_TRUNG)  # cach gio vao < 2 phut
+
+
+class GioNghiTest(ServiceCase):
+    """So phut lam chi tru phan giao nhau voi gio nghi trua 11:30-12:30 (ca 07:00-17:00)."""
+
+    def worked(self, vao, ra) -> int:
+        a = Attendance(worker_id=self.an.id, work_date=date(2026, 10, 29), shift_id=self.shift.id,
+                       check_in=vn(29, *vao), check_out=vn(29, *ra))
+        tinh_cong(a, self.shift, TZ)
+        return a.worked_minutes
+
+    def test_lam_ca_ngay_tru_nghi_trua(self):
+        self.assertEqual(self.worked((7, 0), (17, 0)), 540)    # 600 - 60
+        self.assertEqual(self.worked((6, 30), (17, 30)), 540)  # ngoai gio ca khong tinh
+
+    def test_vao_ra_trong_buoi_sang_khong_tru(self):
+        self.assertEqual(self.worked((7, 0), (11, 0)), 240)
+        self.assertEqual(self.worked((8, 0), (11, 30)), 210)   # ra dung luc bat dau nghi
+
+    def test_buoi_chieu_khong_tru_va_giao_mot_phan(self):
+        self.assertEqual(self.worked((13, 0), (17, 0)), 240)
+        self.assertEqual(self.worked((7, 0), (12, 0)), 270)    # 300 - 30 phut nghi (11:30-12:00)
+        self.assertEqual(self.worked((12, 12), (12, 15)), 0)   # vao, ra trong gio nghi
+
+    def test_luot_vao_ra_ghi_so_phut_lam_theo_gio_nghi(self):
+        self.run_luot(vn(29, 8, 0))
+        self.run_luot(vn(29, 11, 0))
+        self.assertEqual(self.att(self.an).worked_minutes, 180)  # sang 3 gio, khong tru nghi
 
 
 class BaoCaoTest(ServiceCase):

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>Màn hình cổng - SafeGate</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap-5.3.3/bootstrap.min.css">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ v }}">
+</head>
+<body class="gate-body" data-today="{{ today }}" data-page="cong" data-result-seconds="{{ web.gate_result_seconds }}">
+<div class="gate-wrap">
+  <div class="gate-video"><img id="gate-stream" src="/stream/gate" alt="Hình trực tiếp camera cổng"></div>
+
+  <div class="gate-panel">
+    <div class="gate-top">
+      <a class="btn btn-outline-light btn-sm" href="/" id="btn-back">← Quản lý</a>
+      <button class="btn btn-warning btn-sm" id="btn-sound">🔊 Bật âm thanh</button>
+      <button class="btn btn-outline-light btn-sm" id="btn-full">⛶ Toàn màn hình</button>
+      <span class="gate-clock" id="gate-clock"></span>
+    </div>
+    <div class="voice-info" id="voice-info">Âm thanh đang tắt (trình duyệt cần bấm nút trước khi phát).</div>
+
+    <div class="result-box cho" id="result-box">
+      <div class="result-title" id="result-title">Mời đứng vào vị trí, nhìn vào camera</div>
+      <div class="result-msg" id="result-msg"></div>
+      <div class="result-time" id="result-time"></div>
+      <img class="result-img" id="result-img" alt="" style="display:none">
+    </div>
+  </div>
+</div>
+
+<div class="gate-error" id="gate-error">
+  <div class="big">Hệ thống kiểm tra tạm gián đoạn</div>
+  <div class="big" style="font-size: clamp(1.4rem, 3vw, 2.6rem)">Vui lòng gặp cán bộ</div>
+  <div class="small-text" id="gate-error-detail"></div>
+</div>
+
+<script src="/static/vendor/bootstrap-5.3.3/bootstrap.bundle.min.js"></script>
+<script src="/static/js/common.js?v={{ v }}"></script>
+<script src="/static/js/cong.js?v={{ v }}"></script>
+</body>
+</html>

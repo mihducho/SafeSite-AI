@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <h1 class="page-title me-2">Bảng công tháng</h1>
+  <input class="form-control" style="width: 11rem" type="month" id="m-thang">
+  <select class="form-select" style="width: 12rem" id="m-team"><option value="">Tất cả tổ</option></select>
+  <a class="btn btn-success" id="m-excel" href="#">⬇ Xuất Excel</a>
+  <a class="btn btn-outline-secondary ms-auto" href="/bang-cong">← Bảng công theo ngày</a>
+</div>
+<div class="card"><div class="table-responsive">
+  <table class="table table-sm table-bordered mb-0 small text-center align-middle">
+    <thead class="table-light" id="m-head"></thead>
+    <tbody id="m-rows"><tr><td class="text-muted">Đang tải…</td></tr></tbody>
+  </table>
+</div><div class="card-footer small text-muted">Mỗi ô là số giờ làm (giờ:phút); ô màu cam là ngày đi muộn. Bấm vào ô để xem bảng công ngày đó.</div></div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/bang_cong_thang.js?v={{ v }}"></script>{% endblock %}

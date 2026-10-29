@@ -2,8 +2,9 @@
 khuon mat gia (vector don vi), LuotKiemTra gia, bo tim mat / lay vector gia cho dang ky khuon mat. Khong can camera,
 khong can mo hinh.
 
-Mac dinh CSDL SQLite trong bo nho. Chay cung bo test tren PostgreSQL: dat bien moi truong SAFEGATE_TEST_DB, vd
-  SAFEGATE_TEST_DB=postgresql+psycopg://user:mk@localhost:5432/safegate_test  (CSDL RIENG cho test: bi xoa sach moi test)
+Mac dinh CSDL SQLite trong bo nho. Chay toan bo test tren MySQL / MariaDB / PostgreSQL: dat bien moi truong
+TEST_DATABASE_URL tro toi 1 CSDL RIENG cho test (moi test XOA SACH cac bang), ten CSDL phai co chu "test", vd
+  TEST_DATABASE_URL=mysql+pymysql://safegate:mat_khau@127.0.0.1:3307/safegate_test?charset=utf8mb4
 """
 import copy
 import os
@@ -19,8 +20,10 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from sqlalchemy.engine import make_url
+
 from app.auth import hash_password
-from app.config import AppConfig
+from app.config import AppConfig, normalize_database_url
 from app.db import Base, Database, utcnow
 from app.models import FaceSample, Shift, User, Worker
 from app.services.luot import LuotKiemTra
@@ -60,7 +63,11 @@ def near(i: int, noise: float = 0.05, seed: int = 0) -> np.ndarray:
     return l2_normalize(unit(i) + noise * rng.standard_normal(128).astype(np.float32))
 
 
-TEST_DB = os.environ.get("SAFEGATE_TEST_DB", "sqlite://")
+TEST_DB = normalize_database_url(os.environ.get("TEST_DATABASE_URL", "sqlite://"))
+if not TEST_DB.startswith("sqlite") and "test" not in (make_url(TEST_DB).database or ""):
+    # chot an toan: test xoa sach cac bang, khong duoc chay nham len CSDL that (du lieu cong nhan, cham cong)
+    raise RuntimeError(f"TEST_DATABASE_URL phai tro toi CSDL rieng cho test (ten co chu 'test'), "
+                       f"khong phai '{make_url(TEST_DB).database}'")
 
 
 def reset_db(url: str = TEST_DB) -> None:
@@ -87,8 +94,8 @@ def add_admin(s, username: str = "admin") -> User:
 
 
 def add_shift(s) -> Shift:
-    shift = Shift(name="Ca hành chính", start_time=time(7, 0), end_time=time(17, 0), break_minutes=60, grace_minutes=5,
-                  early_checkin_minutes=60)
+    shift = Shift(name="Ca hành chính", start_time=time(7, 0), end_time=time(17, 0), break_start=time(11, 30),
+                  break_minutes=60, grace_minutes=5, early_checkin_minutes=60)
     s.add(shift)
     s.commit()
     return shift

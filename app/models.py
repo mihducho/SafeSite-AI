@@ -1,4 +1,7 @@
-"""Cac bang CSDL (DE_TAI.md muc 10). Ten bang, ten cot theo dung muc 10; them 2 cot:
+"""Cac bang CSDL (DE_TAI.md muc 10), viet bang SQLAlchemy nen chay tren MySQL 8 / MariaDB, SQLite, PostgreSQL.
+Moi chuoi (String) deu co do dai (MySQL bat buoc VARCHAR(n)); thoi diem dung UTCDateTime (gio UTC, app/db.py);
+JSON -> kieu JSON (MariaDB: LONGTEXT co kiem tra JSON); LargeBinary -> BLOB.
+Ten bang, ten cot theo dung muc 10; them cac cot:
   gates.rotate        goc xoay hinh camera (truoc day luu cung vung trong configs/gates.yaml)
   ppe_checks.detail   so lieu de xem lai/hieu chinh nguong: ket qua bao ho goc, so khung, ti le khung nhieu mat,
                       nguoi giong nhat va diem nguoi thu hai... KHONG chua vector khuon mat.
@@ -48,6 +51,7 @@ class Worker(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     team: Mapped[Team | None] = relationship()
+    consent_user: Mapped[User | None] = relationship(foreign_keys=[consent_by])  # nguoi ghi nhan dong y
     samples: Mapped[list["FaceSample"]] = relationship(back_populates="worker", cascade="all, delete-orphan")
 
 
@@ -103,6 +107,7 @@ class Shift(Base):
     name: Mapped[str] = mapped_column(String(50))
     start_time: Mapped[time] = mapped_column(Time)  # gio Viet Nam
     end_time: Mapped[time] = mapped_column(Time)
+    break_start: Mapped[time] = mapped_column(Time, default=time(11, 30))  # gio bat dau nghi trua
     break_minutes: Mapped[int] = mapped_column(Integer, default=60)
     grace_minutes: Mapped[int] = mapped_column(Integer, default=5)
     early_checkin_minutes: Mapped[int] = mapped_column(Integer, default=60)
@@ -113,7 +118,7 @@ class Shift(Base):
 class Attendance(Base):
     """Bang cong: 1 dong / cong nhan / ngay / ca."""
     __tablename__ = "attendance"
-    __table_args__ = (UniqueConstraint("worker_id", "work_date", "shift_id"),)
+    __table_args__ = (UniqueConstraint("worker_id", "work_date", "shift_id", name="uq_attendance_worker_ngay_ca"),)
     id: Mapped[int] = mapped_column(primary_key=True)
     worker_id: Mapped[int] = mapped_column(ForeignKey("workers.id", ondelete="CASCADE"), index=True)
     work_date: Mapped[date] = mapped_column(Date, index=True)  # ngay theo gio Viet Nam

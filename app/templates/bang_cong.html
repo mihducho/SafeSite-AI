@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <h1 class="page-title me-2">Bảng công</h1>
+  <button class="btn btn-outline-secondary" id="d-prev" title="Ngày trước">‹</button>
+  <input class="form-control" style="width: 11rem" type="date" id="d-ngay">
+  <button class="btn btn-outline-secondary" id="d-next" title="Ngày sau">›</button>
+  <button class="btn btn-outline-secondary" id="d-today">Hôm nay</button>
+  <span class="fs-5 ms-2" id="d-label"></span>
+  <select class="form-select ms-2" style="width: 12rem" id="d-team"><option value="">Tất cả tổ</option></select>
+  <a class="btn btn-outline-primary ms-auto" href="/bang-cong/thang">Bảng công tháng</a>
+</div>
+
+<div class="card"><div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light"><tr>
+      <th>Mã</th><th>Họ tên</th><th>Tổ đội</th><th>Giờ vào</th><th>Giờ ra</th><th>Đi muộn</th><th>Về sớm</th>
+      <th>Số giờ làm</th><th>Trạng thái</th><th>Ghi chú</th><th></th>
+    </tr></thead>
+    <tbody id="d-rows"><tr><td colspan="11" class="text-muted">Đang tải…</td></tr></tbody>
+  </table>
+</div><div class="card-footer small text-muted" id="d-sum"></div></div>
+
+<div class="modal fade" id="manual-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog"><form class="modal-content" id="manual-form" novalidate>
+    <div class="modal-header"><h5 class="modal-title">Chấm công thủ công</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+    <div class="modal-body">
+      <p class="mb-2"><b id="m-who"></b> · ngày <b id="m-day"></b></p>
+      <div class="row g-2">
+        <div class="col-6"><label class="form-label" for="m-in">Giờ vào</label><input class="form-control" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" id="m-in"></div>
+        <div class="col-6"><label class="form-label" for="m-out">Giờ ra</label><input class="form-control" type="text" inputmode="numeric" maxlength="5" placeholder="HH:MM" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" id="m-out"></div>
+      </div>
+      <div class="mt-2"><label class="form-label" for="m-reason">Lý do (bắt buộc)</label>
+        <textarea class="form-control" id="m-reason" rows="2" maxlength="500"
+                  placeholder="vd Camera cổng hỏng, cán bộ xác nhận có mặt lúc 07:00"></textarea></div>
+      <div class="small text-muted mt-2">Giờ dạng 24 giờ HH:MM. Để trống ô giờ nào thì giữ nguyên giờ đó. Dòng công chuyển sang trạng thái "chấm thủ công", lưu người sửa.</div>
+      <div class="alert alert-danger mt-3 mb-0 d-none" id="m-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+      <button type="submit" class="btn btn-primary">Lưu chấm công</button>
+    </div>
+  </form></div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/bang_cong.js?v={{ v }}"></script>{% endblock %}

@@ -86,8 +86,11 @@ bỏ phiếu nhiều khung; imgsz 640; mọi tham số trong `configs/settings.y
 - **Một ứng dụng FastAPI duy nhất** chạy trên laptop: luồng camera + vòng lặp cổng chạy trong một thread nền của ứng dụng.
   Code vẫn tách module rõ ràng (`src/` cho AI, `app/` cho backend và web) để sau này tách dịch vụ được.
 - Giao diện: **trang HTML render phía server (Jinja2) + Bootstrap 5 + JavaScript thuần**. Không dùng React trong giai đoạn nước rút.
-- CSDL: **SQLAlchemy 2**, chạy **PostgreSQL** theo thiết kế (`DATABASE_URL` trong `.env`). Code không dùng tính năng riêng
-  của một hệ CSDL, để đổi sang SQLite chỉ bằng `DATABASE_URL` khi cần. Test tự động dùng SQLite trong bộ nhớ.
+- CSDL: **SQLAlchemy 2**, chạy **MySQL 8 / MariaDB** (driver `pymysql`, cộng `cryptography` để đăng nhập MySQL 8;
+  `DATABASE_URL=mysql+pymysql://...?charset=utf8mb4` trong `.env`). Máy demo: MariaDB 12.2 cổng 3307, quản lý bằng HeidiSQL.
+  Code không dùng tính năng riêng của một hệ CSDL: chạy được cả SQLite và PostgreSQL chỉ bằng đổi `DATABASE_URL`.
+  Test tự động dùng SQLite trong bộ nhớ; chạy lại toàn bộ test trên MySQL/MariaDB/PostgreSQL bằng biến `TEST_DATABASE_URL`
+  (CSDL riêng có chữ `test` trong tên, ví dụ `test_safegate`).
 - Không Docker, không phân quyền nhiều vai trò trong giai đoạn nước rút (chỉ tài khoản quản trị).
 - Ảnh lưu thành **file**, CSDL lưu đường dẫn. Không lưu video liên tục.
 
@@ -187,7 +190,9 @@ viết thành hàm thuần (nhận thời gian và kết quả tìm mặt) để
 ### Ca làm
 
 - **Bản demo TTTN:** một ca mặc định trong bảng `shifts` (ví dụ 07:00–17:00, nghỉ 60 phút, ân hạn 5 phút, cho vào sớm 60 phút).
-  Tính: phút đi muộn (vượt ân hạn mới tính), phút về sớm, số phút làm = min(ra, kết thúc) − max(vào, bắt đầu) − nghỉ, không âm.
+  Tính: phút đi muộn (vượt ân hạn mới tính), phút về sớm, số phút làm = min(ra, kết thúc) − max(vào, bắt đầu) − **phần giao nhau
+  với giờ nghỉ trưa** [`break_start`, `break_start` + `break_minutes`] (mặc định 11:30, 60 phút), không âm: làm cả ngày trừ đủ nghỉ trưa,
+  vào rồi ra trong buổi sáng thì không trừ.
   Giờ vào ngoài khung [bắt đầu − 60 phút, kết thúc] → trạng thái `ngoai_ca`. Chưa có giờ ra sau giờ kết thúc ca 4 giờ → hiển thị "thiếu giờ ra".
 - **Đồ án:** nhiều ca, phân ca theo tổ đội và cá nhân, ca qua đêm, tăng ca (giữ nguyên quy tắc ở bản cũ).
 
@@ -251,16 +256,22 @@ Thẻ QR, kiosk quét thẻ, vân tay; tính lương, thuế, bảo hiểm; giá
   consent_at, consent_by (users.id), created_at. **Không còn `qr_token`.**
 - `face_samples`: id, worker_id, embedding (LargeBinary, 128 × float32 = 512 byte), quality, thumb_path (ảnh mặt 112×112),
   source (`camera` / `upload`), created_at.
-- `gates`: id, name, camera_source, zone (JSON, tỷ lệ 0–1), required_ppe (JSON). Giai đoạn nước rút: 1 cổng, tạo sẵn từ cấu hình.
+- `gates`: id, name, camera_source, zone (JSON, tỷ lệ 0–1), required_ppe (JSON), rotate (góc xoay hình). Giai đoạn nước rút:
+  1 cổng, tạo sẵn từ cấu hình.
 - `ppe_checks` (lượt kiểm tra): id, gate_id, worker_id (có thể rỗng), checked_at, face_status (`DA_NHAN_RA` / `KHONG_NHAN_RA` /
   `KHONG_THAY_MAT`), face_score, result (5 kết quả bảo hộ), missing (JSON), presence_ratio (JSON), reason, duration_ms,
-  direction (`vao` / `ra` / rỗng), action (`ghi_vao` / `ghi_ra` / `khong_ghi` / `bo_qua_trung`), image_path, review_status.
-- `shifts`: id, name, start_time, end_time, break_minutes, grace_minutes, early_checkin_minutes, is_overnight, is_overtime.
+  direction (`vao` / `ra` / rỗng), action (`ghi_vao` / `ghi_ra` / `khong_ghi` / `bo_qua_trung`), image_path,
+  review_status (`dung` / `bao_nham`), detail (JSON: số liệu xem lại, không có vector).
+- `shifts`: id, name, start_time, end_time, break_start (giờ bắt đầu nghỉ trưa), break_minutes, grace_minutes,
+  early_checkin_minutes, is_overnight, is_overtime.
 - `attendance`: id, worker_id, work_date, shift_id, check_in, check_out, ppe_check_id, late_minutes, early_leave_minutes,
   worked_minutes, status (`binh_thuong` / `ngoai_ca` / `cham_thu_cong`), note, updated_by, updated_at.
   Ràng buộc duy nhất (worker_id, work_date, shift_id).
 
-Thời gian lưu kèm múi giờ; hiển thị theo giờ Việt Nam (Asia/Ho_Chi_Minh).
+Thời gian lưu theo giờ **UTC**; MySQL/MariaDB không lưu múi giờ nên dùng `DATETIME(6)` và một kiểu chung (`UTCDateTime`,
+`app/db.py`) gắn lại múi giờ UTC khi đọc. `work_date` và hiển thị tính theo giờ Việt Nam (Asia/Ho_Chi_Minh).
+Trên MySQL: mọi chuỗi là `VARCHAR(n)`, JSON là kiểu `JSON` (MariaDB: `LONGTEXT` có kiểm tra JSON), vector là `BLOB`, bảng InnoDB,
+bộ mã `utf8mb4`. Ràng buộc duy nhất `uq_attendance_worker_ngay_ca` (worker_id, work_date, shift_id).
 
 ## 11. Đánh giá (số liệu cho báo cáo)
 
@@ -407,3 +418,33 @@ gán đồ bảo hộ có xét người ngoài vùng; `check` xử lý khung nga
   "người xếp hàng sau vạch chờ" ở bộ `cong_gia_v2` rồi mới xem lại ngưỡng này.
 - Tỷ lệ nhận đúng người trên `cong_gia_v1`: người dùng tự điền cột `nguoi` và chuẩn bị ảnh đăng ký riêng của A/B rồi chạy
   `evaluate_faces.py --enroll-dir`. Mẫu chụp bằng webcam laptop cho điểm ở cổng thấp hơn (0,40–0,60) → đăng ký bằng camera cổng.
+
+**2026-10-29 (sau F2, commit 3352ac0), đã đồng ý:**
+- Vào lại sau khi đã ra: phải đạt bảo hộ; giữ giờ vào đầu tiên, xoá giờ ra cũ (đang có mặt), lần ra sau ghi giờ ra mới.
+  Chống trùng 2 phút tính từ **lần vào gần nhất** trong ngày (không phải giờ vào đầu tiên).
+- Lượt ra không xét bảo hộ, trừ `NHIEU_NGUOI` và `KHONG_CO_NGUOI` (không ghi công cả vào lẫn ra).
+- Đi muộn: vượt ân hạn thì tính toàn bộ số phút từ giờ bắt đầu ca (vào 07:06 → muộn 6 phút).
+- Màn hình cổng: `bo_qua_trung` màu xanh "…đã ghi giờ vào HH:MM, không ghi lặp", sau đó chờ người rời đi; lượt không đạt
+  hoặc không nhận ra thì cho kiểm tra lại ngay tại chỗ. Vào lại hiện "Đã ghi vào lại HH:MM".
+- Chỉ so khớp công nhân có ≥ `face.min_samples` (3) mẫu.
+- Thêm cột `gates.rotate` (góc xoay hình) và `ppe_checks.detail` (số liệu xem lại, không có vector); chấm công thủ công
+  ghi thêm 1 dòng vào `note` (giờ, người sửa, lý do) để giữ lịch sử.
+- Nguồn hình: `GATE_SOURCE` trong `.env`, không có thì `gates.camera_source`; đổi bằng `seed_demo.py --source` +
+  `POST /api/cong/khoi-dong-lai`. URL có mật khẩu không lưu vào CSDL.
+- Mật khẩu băm bằng `hashlib` (PBKDF2-SHA256, 600 000 vòng), không dùng passlib.
+- Thêm 2 gói ngoài danh sách mục 14.3: `websockets` (uvicorn cần để chạy WebSocket), `tzdata` (dữ liệu múi giờ trên Windows).
+- Thêm 3 API: cho đi làm lại (phải ghi nhận đồng ý lại từ đầu), khởi động lại cổng, nội dung câu đồng ý.
+- Code F1 chỉ thêm, không sửa logic bảo hộ: `GateWorker` nhận `required_ppe`, `GateRound.last` (khung vừa xử lý, để vẽ luồng hình),
+  `sample_from_image(long_side=...)`.
+
+**2026-10-29 (trước F3, theo yêu cầu của tôi):**
+- **CSDL chuyển sang MySQL 8 / MariaDB** (tôi thành thạo MySQL nhất, cần trả lời được khi bảo vệ); không dùng PostgreSQL cài trên máy.
+  Máy demo: MariaDB 12.2.2, cổng 3307, CSDL `safegate` (utf8mb4), tài khoản `safegate`. Driver `pymysql` + `cryptography`.
+  Code vẫn chạy được trên SQLite và PostgreSQL (toàn bộ test đã chạy trên cả MariaDB 12.2 và PostgreSQL 17).
+- Giờ lưu UTC bằng một kiểu chung `UTCDateTime` (MySQL: `DATETIME(6)`, đọc ra gắn lại múi giờ UTC).
+- Test trên MySQL thật: biến môi trường `TEST_DATABASE_URL` trỏ tới CSDL riêng có chữ `test` trong tên (máy demo: `test_safegate`,
+  MariaDB mặc định cho phép tạo CSDL tên `test_...`); test tự xoá sạch bảng nên có chốt chặn không chạy nhầm lên CSDL thật.
+- Dữ liệu thử CN001 chép từ `data/safegate.db` (SQLite, giữ lại làm bản dự phòng) sang MariaDB; giữ tới hết F3.
+  `seed_demo.py --reset` xoá sạch CSDL, `data/anh_luot/`, `data/anh_mau_mat/` rồi tạo lại dữ liệu ban đầu (chạy trước buổi demo).
+- Số phút làm chỉ trừ phần giao nhau với giờ nghỉ trưa (cột mới `shifts.break_start`, mặc định 11:30): vào 12:12, ra 12:15 → 0 phút
+  (nằm trong giờ nghỉ); làm buổi sáng 08:00–11:00 → 180 phút (không trừ). `seed_demo.py --ca 07:00-17:00` để chỉnh giờ ca hôm demo.

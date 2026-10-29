@@ -1,0 +1,48 @@
+/* Giao dien SafeGate (F3). Bootstrap 5 lo phan lon; o day chi them vai lop rieng. */
+body { background: #f4f6f9; }
+.page-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 0; }
+
+/* the so lieu trang tong quan */
+.stat-card .stat-value { font-size: 2.2rem; font-weight: 700; line-height: 1.1; }
+.stat-card .stat-label { color: #6c757d; }
+
+/* anh nho cua luot kiem tra, anh mau mat */
+.thumb { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; background: #dee2e6; cursor: zoom-in; }
+.thumb-empty { width: 64px; height: 64px; border-radius: 6px; background: #e9ecef; display: inline-block; }
+.face-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.face-item { position: relative; width: 112px; }
+.face-item img { width: 112px; height: 112px; object-fit: cover; border-radius: 6px; background: #dee2e6; }
+.face-item .btn-del { position: absolute; top: 4px; right: 4px; padding: 0 6px; line-height: 1.4; }
+.face-item .face-q { font-size: .75rem; color: #6c757d; text-align: center; }
+.live-view { width: 100%; max-height: 360px; object-fit: contain; background: #111; border-radius: 6px; }
+.check-big { max-height: 70vh; }
+.table td, .table th { vertical-align: middle; }
+.list-group-item.new-item { animation: flash 1.6s ease-out; }
+@keyframes flash { from { background: #fff3cd; } to { background: transparent; } }
+
+/* ---------- man hinh cong /cong (toan man hinh) ---------- */
+body.gate-body { background: #0f1115; color: #fff; height: 100vh; overflow: hidden; }
+.gate-wrap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; height: 100vh; padding: 16px; }
+.gate-video { background: #000; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+              overflow: hidden; min-height: 0; }
+.gate-video img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.gate-panel { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.gate-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gate-clock { font-size: 2rem; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+.result-box { flex: 1; border-radius: 16px; padding: 28px; display: flex; flex-direction: column; justify-content: center;
+              align-items: center; text-align: center; gap: 14px; transition: background-color .25s; min-height: 0; }
+.result-box.cho { background: #3f4652; }
+.result-box.kiem-tra { background: #1e4fbf; }
+.result-box.xanh { background: #15803d; }
+.result-box.do { background: #b91c1c; }
+.result-box.vang { background: #d4a10a; color: #111; }
+.result-title { font-size: clamp(1.8rem, 3.6vw, 3.6rem); font-weight: 800; line-height: 1.15; }
+.result-msg { font-size: clamp(1.3rem, 2.4vw, 2.4rem); line-height: 1.3; }
+.result-time { font-size: 1.4rem; opacity: .85; }
+.result-img { max-height: 28vh; max-width: 100%; border-radius: 10px; border: 3px solid rgba(255, 255, 255, .6); }
+.voice-info { font-size: .85rem; opacity: .7; }
+.gate-error { position: fixed; inset: 0; background: rgba(120, 0, 0, .94); display: none; flex-direction: column;
+              align-items: center; justify-content: center; text-align: center; padding: 40px; z-index: 1000; }
+.gate-error.show { display: flex; }
+.gate-error .big { font-size: clamp(2rem, 4.5vw, 4rem); font-weight: 800; }
+.gate-error .small-text { font-size: 1.4rem; margin-top: 16px; opacity: .9; }

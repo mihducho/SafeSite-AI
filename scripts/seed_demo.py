@@ -2,11 +2,15 @@
 
   1. Tai khoan quan tri: ADMIN_USERNAME / ADMIN_PASSWORD trong .env (mat khau doi trong .env thi chay lai de cap nhat).
   2. 1 cong: nguon hinh + vung kiem tra. Vung lay tu configs/gates.yaml (--zone ten_cong, vd cong_dt) hoac ca khung hinh.
-  3. Ca mac dinh (attendance.default_shift trong settings.yaml): 07:00-17:00, nghi 60, an han 5, vao som 60 phut.
+  3. Ca mac dinh (attendance.default_shift trong settings.yaml): 07:00-17:00, nghi trua 11:30 (60 phut), an han 5,
+     vao som 60 phut. --ca 08:00-16:00: doi gio bat dau/ket thuc ca (vd cho hop gio thi).
   4. 2 to doi mau (chi tao khi chua co to doi nao).
   5. (tuy chon) --faces <thu_muc>: nhap mau khuon mat tu <thu_muc>/<ma_cong_nhan>/*.jpg cho cong nhan DA CO trong CSDL
      (dung lai src/face/enroll.py). Cong nhan chua ghi nhan dong y thi bo qua, tru khi them --dong-y (xac nhan da co
      giay dong y cua cac cong nhan do; ghi consent_at, consent_by = admin).
+
+  --reset: XOA SACH CSDL (moi bang), data/anh_luot/, data/anh_mau_mat/ roi tao lai du lieu ban dau (hoi xac nhan;
+     them --yes de khong hoi). Chay truoc buoi demo.
 
 Chay:
   .venv\\Scripts\\python.exe scripts\\seed_demo.py
@@ -17,6 +21,7 @@ Chay:
 URL camera co mat khau: KHONG luu vao CSDL, dat GATE_SOURCE trong .env.
 """
 import argparse
+import shutil
 import sys
 from datetime import time
 from pathlib import Path
@@ -27,7 +32,7 @@ from sqlalchemy import func, select
 
 from app.auth import hash_password, verify_password
 from app.config import load_app_config, mask_source
-from app.db import Database
+from app.db import Base, Database
 from app.main import enroll_models
 from app.models import Gate, Shift, Team, User, Worker
 from app.services.dang_ky_mat import UPLOAD, DangKyMat, DangKyMatError
@@ -43,8 +48,32 @@ DEMO_TEAMS = [
 
 
 def parse_hhmm(s: str) -> time:
-    h, m = str(s).split(":")
+    h, m = str(s).strip().split(":")
     return time(int(h), int(m))
+
+
+def parse_shift_hours(s: str) -> tuple[time, time]:
+    """ "07:00-17:00" -> (07:00, 17:00)."""
+    try:
+        start, end = (parse_hhmm(x) for x in s.split("-"))
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"--ca can dang HH:MM-HH:MM, vd 07:00-17:00 (nhan duoc {s!r})")
+    if end <= start:
+        raise argparse.ArgumentTypeError("--ca: gio ket thuc phai sau gio bat dau (ca qua dem chua ho tro)")
+    return start, end
+
+
+def reset_all(db, settings, ask: bool) -> None:
+    """Xoa moi bang cua ung dung va anh luot, anh mau mat (du lieu sinh trac hoc) de bat dau lai tu dau."""
+    dirs = [settings["paths"]["check_images"], settings["paths"]["face_samples"]]
+    print(f"SE XOA SACH: moi bang trong CSDL {db.kind} + thu muc {', '.join(str(d) for d in dirs)}")
+    if ask and input("Go 'xoa' de xac nhan: ").strip().lower() != "xoa":
+        sys.exit("Da huy, khong xoa gi.")
+    Base.metadata.drop_all(db.engine)
+    for d in dirs:
+        shutil.rmtree(d, ignore_errors=True)
+    db.create_all()
+    print("Da xoa sach, tao lai bang trong")
 
 
 def seed_admin(db, cfg) -> User:
@@ -99,19 +128,24 @@ def seed_gate(db, settings, args) -> Gate:
     return gate
 
 
-def seed_shift(db, settings) -> Shift:
+def seed_shift(db, settings, hours: tuple[time, time] | None = None) -> Shift:
     shift = db.scalar(select(Shift).order_by(Shift.id).limit(1))
-    if shift is not None:
-        print(f"Ca '{shift.name}': da co ({shift.start_time:%H:%M}-{shift.end_time:%H:%M})")
-        return shift
-    d = settings["attendance"]["default_shift"]
-    shift = Shift(name=d["name"], start_time=parse_hhmm(d["start"]), end_time=parse_hhmm(d["end"]),
-                  break_minutes=d["break_minutes"], grace_minutes=d["grace_minutes"],
-                  early_checkin_minutes=d["early_checkin_minutes"], is_overnight=False, is_overtime=False)
-    db.add(shift)
+    if shift is None:
+        d = settings["attendance"]["default_shift"]
+        shift = Shift(name=d["name"], start_time=parse_hhmm(d["start"]), end_time=parse_hhmm(d["end"]),
+                      break_start=parse_hhmm(d["break_start"]), break_minutes=d["break_minutes"],
+                      grace_minutes=d["grace_minutes"], early_checkin_minutes=d["early_checkin_minutes"],
+                      is_overnight=False, is_overtime=False)
+        db.add(shift)
+        action = "Tao"
+    else:
+        action = "Ca da co:"
+    if hours is not None:
+        shift.start_time, shift.end_time = hours
+        action = "Doi gio" if action != "Tao" else action
     db.commit()
-    print(f"Tao ca '{shift.name}' {d['start']}-{d['end']}, nghi {d['break_minutes']}, an han {d['grace_minutes']}, "
-          f"vao som {d['early_checkin_minutes']} phut")
+    print(f"{action} ca '{shift.name}' {shift.start_time:%H:%M}-{shift.end_time:%H:%M}, nghi trua {shift.break_start:%H:%M} "
+          f"({shift.break_minutes} phut), an han {shift.grace_minutes}, vao som {shift.early_checkin_minutes} phut")
     return shift
 
 
@@ -165,17 +199,24 @@ def main():
     parser.add_argument("--faces", type=Path, default=None, help="Thu muc anh <ma_cong_nhan>/*.jpg.")
     parser.add_argument("--dong-y", action="store_true",
                         help="Xac nhan da co giay dong y cua cac cong nhan trong --faces (ghi nhan dong y khi nhap).")
+    parser.add_argument("--ca", type=parse_shift_hours, default=None, metavar="HH:MM-HH:MM",
+                        help="Doi gio bat dau-ket thuc cua ca mac dinh, vd 07:00-17:00.")
+    parser.add_argument("--reset", action="store_true",
+                        help="XOA SACH CSDL, anh luot, anh mau mat roi tao lai du lieu ban dau.")
+    parser.add_argument("--yes", action="store_true", help="Khong hoi xac nhan khi --reset.")
     args = parser.parse_args()
     if args.zone == "ca_khung":
         args.zone = ""
 
     db = Database(cfg.database_url)
-    db.create_all()
     print(f"CSDL: {db.kind}")
+    if args.reset:
+        reset_all(db, settings, ask=not args.yes)
+    db.create_all()
     with db.session() as s:
         admin = seed_admin(s, cfg)
         seed_gate(s, settings, args)
-        seed_shift(s, settings)
+        seed_shift(s, settings, args.ca)
         seed_teams(s)
         if args.faces is not None:
             print(f"Nhap mau khuon mat tu {args.faces}:")

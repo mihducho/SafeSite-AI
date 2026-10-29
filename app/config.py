@@ -1,7 +1,8 @@
 """Cau hinh ung dung web = configs/settings.yaml (tham so) + .env (bi mat), DE_TAI.md muc 8, 14.6.
 
 .env nam o thu muc goc du an, KHONG dua vao git (mau: .env.example). Bien moi truong cung ten ghi de .env.
-  DATABASE_URL     sqlite:///data/safegate.db  hoac  postgresql+psycopg://user:mat_khau@localhost:5432/safegate
+  DATABASE_URL     mysql+pymysql://safegate:mat_khau@127.0.0.1:3307/safegate?charset=utf8mb4  (MySQL 8 / MariaDB)
+                   hoac sqlite:///data/safegate.db, postgresql+psycopg://user:mat_khau@localhost:5432/safegate
   SECRET_KEY       chuoi ngau nhien de ky cookie dang nhap
   ADMIN_USERNAME, ADMIN_PASSWORD   tai khoan quan tri ban dau (scripts/seed_demo.py tao)
   GATE_SOURCE      (tuy chon) ghi de nguon hinh cua cong: so webcam, URL dien thoai, file video
@@ -32,11 +33,17 @@ class AppConfig:
 
 
 def normalize_database_url(url: str) -> str:
-    """postgresql:// -> postgresql+psycopg:// (dung psycopg 3); SQLite duong dan tuong doi -> tinh tu thu muc goc du an."""
+    """mysql:// -> mysql+pymysql:// va them charset=utf8mb4 (tieng Viet co dau, ca emoji); postgresql:// ->
+    postgresql+psycopg:// (psycopg 3); SQLite duong dan tuong doi -> tinh tu thu muc goc du an."""
     url = url.strip()
     for prefix in ("postgresql://", "postgres://"):
         if url.startswith(prefix):
             url = "postgresql+psycopg://" + url[len(prefix):]
+    for prefix in ("mysql://", "mariadb://"):
+        if url.startswith(prefix):
+            url = prefix[:-3] + "+pymysql://" + url[len(prefix):]
+    if url.startswith(("mysql", "mariadb")) and "charset=" not in url:
+        url += ("&" if "?" in url else "?") + "charset=utf8mb4"
     if url.startswith("sqlite:///") and url != "sqlite:///:memory:":
         path = Path(url[len("sqlite:///"):])
         if not path.is_absolute():

@@ -97,9 +97,10 @@ attendance:
   missing_checkout_hours: 4   # chua co gio ra sau gio ket thuc ca 4 gio -> hien "thieu gio ra"
   timezone: Asia/Ho_Chi_Minh  # CSDL luu gio UTC; ngay cong (work_date) va hien thi tinh theo mui gio nay
   default_shift:              # ca mac dinh tao boi seed_demo.py (bang shifts)
-    name: Ca hanh chinh
+    name: Ca hành chính
     start: "07:00"
     end: "17:00"
+    break_start: "11:30"      # nghi trua 11:30-12:30: chi tru phan nghi nam trong [gio vao, gio ra]
     break_minutes: 60
     grace_minutes: 5          # di muon <= 5 phut: khong tinh; > 5 phut: tinh tu gio bat dau ca
     early_checkin_minutes: 60 # cho vao som toi da 60 phut; vao ngoai [bat dau - 60 phut, ket thuc] -> ngoai_ca
@@ -109,6 +110,7 @@ web:
   page_size: 20               # so dong moi trang (lich su luot kiem tra)
   max_page_size: 200
   max_upload_mb: 10           # anh tai len de dang ky khuon mat
+  gate_result_seconds: 5      # man hinh cong /cong: hien ket qua bay nhieu giay roi ve man hinh cho
 
 evaluation:
   # Giai doan 2 (DE_TAI.md muc 10): moi video 1 luot, nguoi da dung trong vung tu dau video.

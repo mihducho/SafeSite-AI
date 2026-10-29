@@ -1,8 +1,10 @@
-"""Ket noi CSDL bang SQLAlchemy 2 (DE_TAI.md muc 4, 10). Chay duoc voi PostgreSQL va SQLite, chi doi DATABASE_URL.
+"""Ket noi CSDL bang SQLAlchemy 2 (DE_TAI.md muc 4, 10). Ban demo dung MySQL 8 / MariaDB; code chay duoc ca SQLite
+(test) va PostgreSQL, chi doi DATABASE_URL.
 
-- Thoi diem luu kem mui gio, quy ve UTC (UTCDateTime). SQLite khong luu mui gio nen ghi gio UTC khong kem mui gio
-  va khi doc ra gan lai UTC; PostgreSQL dung kieu timestamptz. Ngay cong va gio hien thi tinh theo Asia/Ho_Chi_Minh
-  o tang nghiep vu (services/cham_cong.py).
+- Thoi diem luu theo gio UTC (UTCDateTime, dung chung cho moi cot thoi diem). MySQL/MariaDB (DATETIME) va SQLite
+  khong luu mui gio: ghi gio UTC "tron" (khong kem mui gio), khi doc ra gan lai mui gio UTC. MySQL dung DATETIME(6)
+  de giu phan micro giay (DATETIME mac dinh lam tron toi giay). PostgreSQL dung kieu timestamptz.
+  Ngay cong va gio hien thi tinh theo Asia/Ho_Chi_Minh o tang nghiep vu (services/cham_cong.py).
 - Tao bang tu dong khi khoi dong (create_all), giai doan nuoc rut chua dung Alembic.
 """
 from datetime import datetime, timezone
@@ -10,6 +12,7 @@ from pathlib import Path
 
 from fastapi import Request
 from sqlalchemy import DateTime, create_engine, event
+from sqlalchemy.dialects import mysql
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.types import TypeDecorator
@@ -30,13 +33,18 @@ class UTCDateTime(TypeDecorator):
     impl = DateTime(timezone=True)
     cache_ok = True
 
+    def load_dialect_impl(self, dialect):
+        if dialect.name in ("mysql", "mariadb"):
+            return dialect.type_descriptor(mysql.DATETIME(fsp=6))
+        return dialect.type_descriptor(DateTime(timezone=True))
+
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
         if value.tzinfo is None:
             raise ValueError(f"Thoi diem phai co mui gio (nhan duoc {value!r})")
         value = value.astimezone(timezone.utc)
-        return value.replace(tzinfo=None) if dialect.name == "sqlite" else value
+        return value if dialect.name == "postgresql" else value.replace(tzinfo=None)  # chi PostgreSQL luu mui gio
 
     def process_result_value(self, value, dialect):
         if value is None:
@@ -45,6 +53,9 @@ class UTCDateTime(TypeDecorator):
 
 
 def make_engine(url: str):
+    if url.startswith(("mysql", "mariadb")):
+        # pool_recycle: MySQL tu dong ket noi ranh qua wait_timeout (mac dinh 8 gio) -> mo lai truoc khi bi dong
+        return create_engine(url, pool_pre_ping=True, pool_recycle=3600)
     if not url.startswith("sqlite"):
         return create_engine(url, pool_pre_ping=True)
     kw = {"connect_args": {"check_same_thread": False}}  # vong lap cong ghi CSDL tu thread rieng
@@ -71,7 +82,12 @@ class Database:
 
     @property
     def kind(self) -> str:
-        return self.engine.dialect.name  # "sqlite" | "postgresql"
+        """sqlite / postgresql / mysql / mariadb (mysql+pymysql noi toi MariaDB van bao "mysql" -> xem is_mariadb)."""
+        d = self.engine.dialect
+        if d.name == "mysql" and not getattr(self, "_connected", False):
+            with self.engine.connect():  # SQLAlchemy chi biet la MariaDB sau lan ket noi dau tien
+                self._connected = True
+        return "mariadb" if getattr(d, "is_mariadb", False) else d.name
 
     def create_all(self) -> None:
         from app import models  # noqa: F401  (dang ky cac bang voi Base.metadata)

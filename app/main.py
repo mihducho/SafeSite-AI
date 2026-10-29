@@ -10,10 +10,12 @@ create_app(start_gate=False): khong bat cong (test, hoac GATE_ENABLED=0 trong .e
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from starlette.concurrency import run_in_threadpool
@@ -97,6 +99,8 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
 
     for r in (pages.router, api.public, api.router, ws.router, stream.router):
         app.include_router(r)
+    # Bootstrap, CSS, JavaScript: phuc vu tu may (khong CDN), khong can dang nhap (trang /login cung dung)
+    app.mount("/static", StaticFiles(directory=Path(__file__).resolve().parent / "static"), name="static")
     return app
 
 

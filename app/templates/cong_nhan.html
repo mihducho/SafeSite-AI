@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3">
+  <h1 class="page-title">Công nhân</h1>
+  <span class="text-muted" id="cn-tong"></span>
+  <button class="btn btn-primary ms-auto" id="btn-add">+ Thêm công nhân</button>
+</div>
+
+<div class="card mb-3"><div class="card-body row g-2 align-items-end">
+  <div class="col-md-5"><label class="form-label" for="f-q">Tìm kiếm</label>
+    <input class="form-control" id="f-q" placeholder="Mã, họ tên hoặc số điện thoại"></div>
+  <div class="col-md-3"><label class="form-label" for="f-team">Tổ đội</label>
+    <select class="form-select" id="f-team"><option value="">Tất cả tổ</option></select></div>
+  <div class="col-md-2"><label class="form-label" for="f-status">Trạng thái</label>
+    <select class="form-select" id="f-status">
+      <option value="dang_lam">Đang làm</option><option value="nghi_viec">Nghỉ việc</option><option value="">Tất cả</option>
+    </select></div>
+</div></div>
+
+<div class="card"><div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light"><tr>
+      <th>Mã</th><th>Họ tên</th><th>Tổ đội</th><th>Nghề</th><th>Điện thoại</th><th>Trạng thái</th>
+      <th>Đồng ý</th><th>Mẫu khuôn mặt</th><th></th>
+    </tr></thead>
+    <tbody id="cn-rows"><tr><td colspan="9" class="text-muted">Đang tải…</td></tr></tbody>
+  </table>
+</div></div>
+
+<div class="modal fade" id="add-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog"><form class="modal-content" id="add-form" novalidate>
+    <div class="modal-header"><h5 class="modal-title">Thêm công nhân</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+    <div class="modal-body">
+      <div class="mb-2"><label class="form-label" for="a-code">Mã công nhân *</label>
+        <input class="form-control" id="a-code" maxlength="20" placeholder="vd CN002" required></div>
+      <div class="mb-2"><label class="form-label" for="a-name">Họ tên *</label>
+        <input class="form-control" id="a-name" maxlength="100" required></div>
+      <div class="row g-2">
+        <div class="col"><label class="form-label" for="a-phone">Điện thoại</label>
+          <input class="form-control" id="a-phone" maxlength="20"></div>
+        <div class="col"><label class="form-label" for="a-trade">Nghề</label>
+          <input class="form-control" id="a-trade" maxlength="50" placeholder="vd Thợ xây"></div>
+      </div>
+      <div class="mt-2"><label class="form-label" for="a-team">Tổ đội</label>
+        <select class="form-select" id="a-team"><option value="">(chưa xếp tổ)</option></select></div>
+      <div class="alert alert-danger mt-3 mb-0 d-none" id="add-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+      <button type="submit" class="btn btn-primary">Thêm và đăng ký khuôn mặt</button>
+    </div>
+  </form></div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/cong_nhan.js?v={{ v }}"></script>{% endblock %}

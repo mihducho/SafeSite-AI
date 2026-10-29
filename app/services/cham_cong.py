@@ -10,7 +10,9 @@ NHIEU_NGUOI / KHONG_CO_NGUOI: khong ghi cong ca vao lan ra.
 
 Ca lam (ban demo: 1 ca mac dinh, bang shifts):
   - di muon = gio vao - bat dau ca (phut), chi tinh khi > grace_minutes (an han);
-  - ve som = ket thuc ca - gio ra; so phut lam = min(ra, ket thuc) - max(vao, bat dau) - nghi, khong am;
+  - ve som = ket thuc ca - gio ra;
+  - so phut lam = [max(vao, bat dau), min(ra, ket thuc)] tru phan GIAO NHAU voi gio nghi [break_start, break_start +
+    break_minutes], khong am: lam ca ngay tru du nghi trua; vao roi ra trong buoi sang thi khong tru;
   - gio vao ngoai [bat dau - early_checkin_minutes, ket thuc] -> trang thai ngoai_ca;
   - chua co gio ra sau ket thuc ca missing_checkout_hours gio -> hien "thieu gio ra".
 Cham cong thu cong: them/sua gio vao, ra; BAT BUOC co ly do; trang thai cham_thu_cong; luu nguoi sua.
@@ -75,6 +77,16 @@ def moc_ca(shift: Shift, ngay: date, tz: ZoneInfo) -> tuple[datetime, datetime]:
     return start, end
 
 
+def moc_nghi(shift: Shift, ngay: date, tz: ZoneInfo) -> tuple[datetime, datetime]:
+    start = datetime.combine(ngay, shift.break_start, tzinfo=tz)
+    return start, start + timedelta(minutes=shift.break_minutes)
+
+
+def giao_nhau(a1: datetime, a2: datetime, b1: datetime, b2: datetime) -> timedelta:
+    """Do dai phan chung cua 2 khoang [a1, a2] va [b1, b2] (0 neu khong giao nhau)."""
+    return max(timedelta(0), min(a2, b2) - max(a1, b1))
+
+
 def trong_khung_vao(shift: Shift, t: datetime, ngay: date, tz: ZoneInfo) -> bool:
     start, end = moc_ca(shift, ngay, tz)
     return start - timedelta(minutes=shift.early_checkin_minutes) <= t <= end
@@ -87,7 +99,9 @@ def tinh_cong(att: Attendance, shift: Shift, tz: ZoneInfo) -> None:
     att.late_minutes = late if late > shift.grace_minutes else 0
     if att.check_in and att.check_out:
         att.early_leave_minutes = _phut(end - att.check_out)
-        att.worked_minutes = max(0, _phut(min(att.check_out, end) - max(att.check_in, start)) - shift.break_minutes)
+        lam_tu, lam_den = max(att.check_in, start), min(att.check_out, end)  # chi tinh trong gio ca
+        nghi = giao_nhau(lam_tu, lam_den, *moc_nghi(shift, att.work_date, tz))
+        att.worked_minutes = _phut(lam_den - lam_tu - nghi)
     else:
         att.early_leave_minutes = att.worked_minutes = 0
 
@@ -194,3 +208,39 @@ def cham_thu_cong(db: Session, worker: Worker, ngay: date, gio_vao: time | None,
     tinh_cong(att, shift, tz)
     db.commit()
     return att
+
+
+# --- sua ca lam (trang /ca-lam) ---
+SHIFT_FIELDS = ("name", "start_time", "end_time", "break_start", "break_minutes", "grace_minutes", "early_checkin_minutes")
+
+
+def sua_ca(db: Session, shift: Shift, data: dict, att_cfg: dict, now: datetime | None = None) -> int:
+    """Sua ca (ban demo: 1 ca, khong qua dem). Kiem tra hop le roi tinh lai bang cong HOM NAY theo ca moi
+    (ngay cu giu nguyen nhu da ghi). Tra ve so dong bang cong da tinh lai."""
+    values = {k: data[k] for k in SHIFT_FIELDS if k in data and data[k] is not None}
+    new = {k: values.get(k, getattr(shift, k)) for k in SHIFT_FIELDS}
+    if not str(new["name"]).strip():
+        raise ChamCongError("Tên ca không được để trống")
+    if new["end_time"] <= new["start_time"]:
+        raise ChamCongError("Giờ kết thúc ca phải sau giờ bắt đầu (ca qua đêm chưa hỗ trợ)")
+    for k, lo, hi, label in (("break_minutes", 0, 240, "Số phút nghỉ"), ("grace_minutes", 0, 120, "Số phút ân hạn"),
+                             ("early_checkin_minutes", 0, 240, "Số phút cho vào sớm")):
+        if not lo <= int(new[k]) <= hi:
+            raise ChamCongError(f"{label} phải từ {lo} đến {hi}")
+    if new["break_minutes"]:
+        b_start = datetime.combine(date(2000, 1, 1), new["break_start"])
+        b_end = b_start + timedelta(minutes=int(new["break_minutes"]))
+        if not (datetime.combine(date(2000, 1, 1), new["start_time"]) <= b_start
+                and b_end <= datetime.combine(date(2000, 1, 1), new["end_time"])):
+            raise ChamCongError("Giờ nghỉ phải nằm trong giờ ca")
+    for k, v in values.items():
+        setattr(shift, k, v.strip() if isinstance(v, str) else v)
+    tz = mui_gio(att_cfg)
+    today = ngay_cong(now or utcnow(), tz)
+    rows = db.scalars(select(Attendance).where(Attendance.shift_id == shift.id, Attendance.work_date == today)).all()
+    for a in rows:
+        tinh_cong(a, shift, tz)
+        if a.status != CHAM_THU_CONG and a.check_in is not None:
+            a.status = BINH_THUONG if trong_khung_vao(shift, a.check_in, today, tz) else NGOAI_CA
+    db.commit()
+    return len(rows)

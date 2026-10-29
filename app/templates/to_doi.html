@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-3">
+  <h1 class="page-title">Tổ đội</h1>
+  <button class="btn btn-primary ms-auto" id="btn-add">+ Thêm tổ đội</button>
+</div>
+<div class="card"><div class="table-responsive">
+  <table class="table table-hover mb-0">
+    <thead class="table-light"><tr><th>Tên tổ</th><th>Nhà thầu phụ</th><th>Tổ trưởng</th><th>Số công nhân đang làm</th><th></th></tr></thead>
+    <tbody id="td-rows"><tr><td colspan="5" class="text-muted">Đang tải…</td></tr></tbody>
+  </table>
+</div></div>
+
+<div class="modal fade" id="team-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog"><form class="modal-content" id="team-form" novalidate>
+    <div class="modal-header"><h5 class="modal-title" id="team-title">Thêm tổ đội</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+    <div class="modal-body">
+      <div class="mb-2"><label class="form-label" for="t-name">Tên tổ *</label><input class="form-control" id="t-name" maxlength="100"></div>
+      <div class="mb-2"><label class="form-label" for="t-contractor">Nhà thầu phụ</label><input class="form-control" id="t-contractor" maxlength="100"></div>
+      <div class="mb-2"><label class="form-label" for="t-leader">Tổ trưởng</label><input class="form-control" id="t-leader" maxlength="100"></div>
+      <div class="alert alert-danger mt-3 mb-0 d-none" id="team-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Huỷ</button>
+      <button type="submit" class="btn btn-primary">Lưu</button>
+    </div>
+  </form></div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/to_doi.js?v={{ v }}"></script>{% endblock %}
