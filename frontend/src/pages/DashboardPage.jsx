@@ -11,8 +11,8 @@ import { gio, thuNgay } from '../lib/format.js'
 import { HANH_DONG, KET_QUA, MAT, thieuText, trangThaiCong } from '../lib/labels.js'
 
 // ─── biểu đồ cột: số lượt Đạt / Không đạt theo giờ hôm nay (không cần thư viện biểu đồ) ──
-const C_DAT = '#22C55E'
-const C_KHONG = '#EF4444'
+const C_DAT = '#059669'
+const C_KHONG = '#DC2626'
 
 function HourChart({ rows, nowHour }) {
   const used = rows.filter((r) => r.dat + r.khong_dat > 0).map((r) => r.gio)
@@ -55,22 +55,22 @@ function GateCard({ last }) {
   return (
     <Card title="Trạng thái cổng" className="h-100">
       <div className={`note ${tone === 'ok' ? 'ok' : tone === 'bad' ? 'bad' : 'warn'}`} style={{ fontWeight: 600 }}>
-        <span className={`gate-pill ${tone}`} style={{ background: 'transparent', padding: 0, height: 'auto' }}><i /></span>
+        <span className={`gate-pill ${tone}`} style={{ background: 'transparent', borderColor: 'transparent', padding: 0, height: 'auto' }}><i /></span>
         {sentence}
       </div>
       <div className="small muted mt-3 mb-2">Lượt gần nhất</div>
       {last ? (
         <div className="d-flex gap-3 align-items-center">
-          {last.anh ? <img className="thumb" style={{ width: 72, height: 96 }} src={last.anh} alt="" />
-            : <span className="thumb thumb--empty" style={{ width: 72, height: 96 }}><ImageOff size={20} /></span>}
+          {last.anh ? <img className="thumb" style={{ width: 64, height: 84 }} src={last.anh} alt="" />
+            : <span className="thumb thumb--empty" style={{ width: 64, height: 84 }}><ImageOff size={18} strokeWidth={1.5} /></span>}
           <div style={{ minWidth: 0 }}>
             <div className="person__name">{last.cong_nhan?.ten ?? (MAT[last.trang_thai_mat] ?? ['Không nhận ra'])[0]}</div>
-            <div className="small muted mb-2">{gio(last.thoi_diem)}{last.cong_nhan ? ` · ${last.cong_nhan.ma}` : ''}</div>
+            <div className="small muted num mono-meta mb-2">{gio(last.thoi_diem)}{last.cong_nhan ? ` · ${last.cong_nhan.ma}` : ''}</div>
             <StatusBadge map={KET_QUA} value={last.ket_qua} />
           </div>
         </div>
       ) : <div className="small muted">Chưa có lượt nào.</div>}
-      <Link to="/man-hinh-cong" className="btn btn-primary w-100 mt-4"><MonitorPlay size={18} />Mở màn hình cổng</Link>
+      <Link to="/man-hinh-cong" className="btn btn-primary w-100 mt-3"><MonitorPlay size={16} strokeWidth={1.5} />Mở màn hình cổng</Link>
     </Card>
   )
 }
@@ -108,7 +108,7 @@ export default function DashboardPage() {
     <div className="page">
       <PageHead title="Tổng quan hôm nay" sub={data ? thuNgay(data.ngay) : ' '} />
 
-      <div className="grid grid-4 mb-4">
+      <div className="grid grid-4 mb-3">
         <StatCard icon={Users} tone="neutral" label="Công nhân đang làm" value={d.so_cong_nhan} loading={isLoading}
           sub="trong danh sách đang làm việc" />
         <StatCard icon={LogIn} tone="ok" label="Đã vào hôm nay" value={d.da_vao} loading={isLoading}
@@ -119,7 +119,7 @@ export default function DashboardPage() {
           sub={data ? `trong ${d.so_luot} lượt kiểm tra` : ''} />
       </div>
 
-      <div className="grid grid-2-1 mb-4">
+      <div className="grid grid-2-1 mb-3">
         <Card title="Lượt kiểm tra theo giờ hôm nay"
           end={<div className="legend"><span><i style={{ background: C_DAT }} />Đạt</span><span><i style={{ background: C_KHONG }} />Không đạt</span></div>}>
           {isLoading ? <Skeleton height={220} /> : <HourChart rows={d.luot_theo_gio ?? []} nowHour={nowHour} />}
@@ -138,11 +138,11 @@ export default function DashboardPage() {
                     {luot.map((c) => (
                       <tr key={c.id} className={`clickable${newIds.includes(c.id) ? ' flash' : ''}`} onClick={() => setCheckId(c.id)}>
                         <td className="shrink">
-                          {c.anh ? <img className="thumb" src={c.anh} alt="" loading="lazy" /> : <span className="thumb thumb--empty"><ImageOff size={18} /></span>}
+                          {c.anh ? <img className="thumb" src={c.anh} alt="" loading="lazy" /> : <span className="thumb thumb--empty"><ImageOff size={17} strokeWidth={1.5} /></span>}
                         </td>
                         <td>
                           {c.cong_nhan
-                            ? <div className="person__text"><span className="person__name">{c.cong_nhan.ten}</span><span className="person__sub">{c.cong_nhan.ma}</span></div>
+                            ? <div className="person__text"><span className="person__name">{c.cong_nhan.ten}</span><span className="person__sub num">{c.cong_nhan.ma}</span></div>
                             : <span className="text-warn" style={{ fontWeight: 600 }}>{(MAT[c.trang_thai_mat] ?? ['Không nhận ra'])[0]}</span>}
                         </td>
                         <td>
@@ -150,7 +150,7 @@ export default function DashboardPage() {
                           {c.thieu.length > 0 && <div className="small text-bad mt-1">{thieuText(c.thieu)}</div>}
                         </td>
                         <td className="muted nowrap">{(HANH_DONG[c.hanh_dong] ?? [''])[0]}</td>
-                        <td className="right num" style={{ fontWeight: 600 }}>{gio(c.thoi_diem, true)}</td>
+                        <td className="right num mono-meta" style={{ fontWeight: 600 }}>{gio(c.thoi_diem, true)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -166,7 +166,7 @@ export default function DashboardPage() {
                     {d.dang_co_mat_ds.map((p) => (
                       <tr key={p.worker_id}>
                         <td><Person name={p.ho_ten} code={p.ma} sub={p.to_doi} workerId={p.worker_id} to={`/cong-nhan/${p.worker_id}`} /></td>
-                        <td className="right"><Pill tone="ok">vào {p.gio_vao}</Pill></td>
+                        <td className="right num"><Pill tone="ok">vào {p.gio_vao}</Pill></td>
                       </tr>
                     ))}
                   </tbody>

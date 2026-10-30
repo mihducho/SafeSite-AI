@@ -3,8 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { selectIsAuthenticated, setUser } from '../store/authSlice.js'
 import { dangNhap } from '../api/endpoints.js'
-import { CircleAlert, LoaderCircle, LockKeyhole, LogIn, UserRound } from 'lucide-react'
-import { Logo } from '../components/common/Logo.jsx'
+import { Check, CircleAlert, HardHat, LoaderCircle, LockKeyhole, LogIn, UserRound } from 'lucide-react'
 
 // Trang do backend phục vụ (không thuộc giao diện React): sau khi đăng nhập phải tải lại cả trang
 const TRANG_BACKEND = ['/docs', '/openapi.json', '/cu', '/api']
@@ -59,82 +58,95 @@ export default function LoginPage() {
 
   return (
     <div className="login">
-      <aside className="login__art">
-        <Logo size={44} sub="Chấm công · Kiểm tra bảo hộ" />
-        <div>
-          <SiteIllustration />
-          <h1 className="login__tagline">Chấm công bằng khuôn mặt, kiểm tra bảo hộ tự động tại cổng</h1>
-          <p className="login__lead">Công nhân chỉ cần đứng trước camera ở cổng: hệ thống nhận ra người, kiểm tra mũ bảo hộ và áo phản quang,
-            đủ bảo hộ thì tự ghi giờ vào, giờ ra.</p>
+      <aside className="login__art" aria-label="Giám sát an toàn công trường">
+        <div className="login__bg" aria-hidden="true" />
+        <span className="login__corner login__corner--tl" aria-hidden="true" />
+        <span className="login__corner login__corner--tr" aria-hidden="true" />
+        <span className="login__corner login__corner--bl" aria-hidden="true" />
+        <span className="login__corner login__corner--br" aria-hidden="true" />
+
+        <div className="login__top-tag">
+          <i className="login__tag-dot" aria-hidden="true" />
+          <span>CAM-GATE-01 // AI PPE &amp; ATTENDANCE ACTIVE</span>
         </div>
-        <span className="login__foot">SafeGate · Đồ án tốt nghiệp</span>
+
+        <div className="login__caption">
+          <div className="login__hud">
+            <span className="login__hud-item">
+              [<Check size={11} strokeWidth={2.5} aria-hidden="true" /> HARDHAT: VERIFIED]
+            </span>
+            <span className="login__hud-item">
+              [<Check size={11} strokeWidth={2.5} aria-hidden="true" /> SAFETY VEST: VERIFIED]
+            </span>
+          </div>
+          <h1 className="login__tagline">Hệ thống Chấm công &amp; Kiểm soát Bảo hộ Lao động</h1>
+          <p className="login__lead">Giám sát an toàn công trường và xác thực nhân sự thời gian thực.</p>
+        </div>
       </aside>
 
       <main className="login__panel">
         <form className="login__form" onSubmit={handleSubmit} noValidate>
-          <h2>Đăng nhập</h2>
-          <p className="muted mb-4">Dành cho cán bộ quản lý công trường.</p>
-          {error && <div className="note bad mb-3" role="alert"><CircleAlert size={18} />{error}</div>}
-          <div className="mb-3">
+          <div className="login__header">
+            <div className="login__badge" aria-hidden="true">
+              <HardHat size={18} strokeWidth={1.75} />
+            </div>
+            <div className="login__eyebrow">CỔNG THÔNG TIN VẬN HÀNH</div>
+            <h2 className="login__title">Đăng nhập hệ thống</h2>
+            <p className="login__subtitle">Dành cho cán bộ quản lý công trường.</p>
+          </div>
+
+          {error && (
+            <div className="login__error" role="alert">
+              <CircleAlert size={16} strokeWidth={1.75} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="login__field">
             <label className="form-label" htmlFor="username">Tên đăng nhập</label>
             <div className="input-icon">
-              <UserRound size={18} />
-              <input id="username" name="username" type="text" autoComplete="username" autoFocus className="form-control form-control-lg"
-                value={form.username} onChange={handleChange} disabled={isLoading} />
+              <UserRound size={16} strokeWidth={1.5} />
+              <input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                autoFocus
+                className="form-control login__input"
+                value={form.username}
+                onChange={handleChange}
+                disabled={isLoading}
+              />
             </div>
           </div>
-          <div className="mb-4">
+
+          <div className="login__field login__field--last">
             <label className="form-label" htmlFor="password">Mật khẩu</label>
             <div className="input-icon">
-              <LockKeyhole size={18} />
-              <input id="password" name="password" type="password" autoComplete="current-password" className="form-control form-control-lg"
-                value={form.password} onChange={handleChange} disabled={isLoading} />
+              <LockKeyhole size={16} strokeWidth={1.5} />
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                className="form-control login__input"
+                value={form.password}
+                onChange={handleChange}
+                disabled={isLoading}
+              />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary btn-lg w-100" disabled={isLoading}>
-            {isLoading ? <LoaderCircle size={18} className="spin" /> : <LogIn size={18} />}
+
+          <button type="submit" className="btn login__submit w-100" disabled={isLoading}>
+            {isLoading ? <LoaderCircle size={16} strokeWidth={1.75} className="spin" /> : <LogIn size={16} strokeWidth={1.75} />}
             {isLoading ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </button>
-          <p className="small muted mt-4 mb-0">Giao diện gặp sự cố? Dùng <a href="/cu/login" className="text-decoration-underline">giao diện dự phòng</a>.</p>
+
+          <p className="login__fallback">
+            Giao diện gặp sự cố? Dùng <a href="/cu/login">giao diện dự phòng</a>.
+          </p>
         </form>
       </main>
     </div>
-  )
-}
-
-/** Minh hoạ công trường đơn giản: cần cẩu, toà nhà đang xây, cổng có camera, công nhân đội mũ */
-function SiteIllustration() {
-  return (
-    <svg className="login__svg" viewBox="0 0 420 240" fill="none" aria-hidden="true">
-      <rect x="0" y="214" width="420" height="4" rx="2" fill="#334155" />
-      {/* cần cẩu */}
-      <rect x="62" y="40" width="10" height="174" fill="#F59E0B" />
-      <path d="M62 40h180v8H62z" fill="#F59E0B" />
-      <path d="M72 48l20 -8M92 48l20 -8M112 48l20 -8M132 48l20 -8M152 48l20 -8M172 48l20 -8" stroke="#B45309" strokeWidth="2" />
-      <rect x="40" y="40" width="22" height="14" fill="#B45309" />
-      <path d="M210 48v52" stroke="#94A3B8" strokeWidth="2" />
-      <rect x="200" y="100" width="20" height="12" rx="2" fill="#64748B" />
-      {/* toà nhà đang xây */}
-      <rect x="110" y="110" width="100" height="104" fill="#1E293B" stroke="#475569" strokeWidth="2" />
-      {[0, 1, 2, 3].map((r) => [0, 1, 2].map((c) => (
-        <rect key={`${r}${c}`} x={122 + c * 30} y={122 + r * 22} width="18" height="12" rx="2" fill={r === 0 && c === 2 ? '#F59E0B' : '#334155'} />
-      )))}
-      <path d="M110 110h100M110 132h100M110 154h100M110 176h100" stroke="#475569" strokeWidth="1" />
-      {/* cổng + camera */}
-      <rect x="268" y="120" width="8" height="94" fill="#475569" />
-      <rect x="370" y="120" width="8" height="94" fill="#475569" />
-      <rect x="268" y="114" width="110" height="10" rx="3" fill="#64748B" />
-      <rect x="282" y="128" width="14" height="22" rx="3" fill="#0F172A" stroke="#F59E0B" strokeWidth="2" />
-      <circle cx="289" cy="135" r="3" fill="#F59E0B" />
-      {/* công nhân */}
-      <path d="M314 150a12 12 0 0 1 24 0z" fill="#F59E0B" />
-      <rect x="310" y="149" width="32" height="4" rx="2" fill="#FCD34D" />
-      <circle cx="326" cy="162" r="9" fill="#CBD5E1" />
-      <path d="M310 192c0-10 7-17 16-17s16 7 16 17v8h-32z" fill="#F59E0B" />
-      <path d="M314 184h24" stroke="#E2E8F0" strokeWidth="3" strokeLinecap="round" />
-      <rect x="315" y="200" width="8" height="14" rx="3" fill="#64748B" />
-      <rect x="329" y="200" width="8" height="14" rx="3" fill="#64748B" />
-      <path d="M296 140l14 14" stroke="#22C55E" strokeWidth="2" strokeDasharray="3 3" />
-    </svg>
   )
 }

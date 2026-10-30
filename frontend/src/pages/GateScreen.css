@@ -1,82 +1,562 @@
-/* ═══ Màn hình cổng (/man-hinh-cong): nền tối, toàn màn hình, công nhân nhìn từ khoảng 3 m ═══ */
+/* ═══ Màn hình cổng (/man-hinh-cong): Industrial Security & AI Access Control Terminal (#09090B) ═══ */
 .gs {
-  position: fixed; inset: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; padding: 20px;
-  background: #0B1220; color: #F8FAFC; overflow: hidden; font-family: var(--font);
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 16px;
+  background: #09090B;
+  color: #FAFAFA;
+  overflow: hidden;
+  font-family: var(--font);
 }
 
-/* Trái: hình camera khung dọc, cao hết màn hình */
+/* ─── Cột trái (50%): Recessed Camera Viewport 9:16 ───────────────────────── */
+.gs-viewport {
+  position: relative;
+  height: calc(100vh - 32px);
+  background: #09090B;
+  border: 1px solid #27272A;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* 4 góc ngắm camera kỹ thuật (Viewfinder Corner Brackets) */
+.gs-vp-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-style: solid;
+  border-width: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.gs-vp-corner--tl { top: 20px; left: 20px; border-top-width: 1px; border-left-width: 1px; }
+.gs-vp-corner--tr { top: 20px; right: 20px; border-top-width: 1px; border-right-width: 1px; }
+.gs-vp-corner--bl { bottom: 20px; left: 20px; border-bottom-width: 1px; border-left-width: 1px; }
+.gs-vp-corner--br { bottom: 20px; right: 20px; border-bottom-width: 1px; border-right-width: 1px; }
+
+/* Nhãn HUD góc trên trái: LIVE // 720×1280 · 30 FPS */
+.gs-cam__tag {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  background: rgba(9, 9, 11, 0.85);
+  border: 1px solid #27272A;
+  color: #E4E4E7;
+  font-variant-numeric: tabular-nums;
+}
+.gs-cam__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10B981;
+  flex-shrink: 0;
+  animation: sgPulse 1.8s ease-in-out infinite;
+}
+.gs-cam__dot.off {
+  background: #DC2626;
+  animation: none;
+}
+
+/* Khung hình 9:16 căn giữa trong viewport, cắt nhẹ rìa để ẩn watermark dọc của DroidCam */
 .gs-cam {
-  position: relative; height: calc(100vh - 40px); max-width: 58vw; min-width: 240px;
-  background: #020617; border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.14);
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+  background: #000000;
+  border-radius: 4px;
+  border: 1px solid #27272A;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.gs-cam img { width: 100%; height: 100%; object-fit: contain; display: block; }
-.gs-cam__wait { position: absolute; color: #94A3B8; font-size: 18px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.gs-cam__tag { position: absolute; left: 12px; bottom: 12px; padding: 4px 10px; border-radius: 999px; font-size: 13px;
-  background: rgba(2, 6, 23, 0.7); color: #CBD5E1; font-variant-numeric: tabular-nums; }
+.gs-cam img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.035);
+  display: block;
+}
+.gs-cam__wait {
+  position: absolute;
+  color: #71717A;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
 
-/* Phải */
-.gs-side { position: relative; display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
-.gs-top { display: flex; align-items: center; gap: 10px; }
-.gs-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; margin-right: auto; }
-.gs-status { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 14px; font-weight: 600;
-  background: rgba(148, 163, 184, 0.12); color: #E2E8F0; }
-.gs-status i { width: 9px; height: 9px; border-radius: 50%; background: #94A3B8; }
-.gs-status.ok i { background: #22C55E; box-shadow: 0 0 8px #22C55E; }
-.gs-status.warn i { background: #F59E0B; }
-.gs-status.bad i { background: #EF4444; box-shadow: 0 0 8px #EF4444; }
-.gs-btn { height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 8px; font-size: 14px; font-weight: 600;
-  border: 1px solid rgba(148, 163, 184, 0.3); background: rgba(148, 163, 184, 0.08); color: #E2E8F0; cursor: pointer; text-decoration: none; }
-.gs-btn:hover { background: rgba(148, 163, 184, 0.18); color: #fff; }
-.gs-btn.icon { width: 34px; padding: 0; justify-content: center; }
-.gs-btn.attention { background: #F59E0B; border-color: #F59E0B; color: #1F2937; }
-.gs-btn.attention:hover { background: #D97706; border-color: #D97706; color: #1F2937; }
-.gs-btn.on { background: rgba(34, 197, 94, 0.16); border-color: rgba(34, 197, 94, 0.5); color: #BBF7D0; }
-.gs-voice { font-size: 13px; color: #94A3B8; margin-top: -4px; }
+/* ─── Cột phải (50%): Thanh điều khiển + 3 Thẻ Kỹ thuật ───────────────────── */
+.gs-side {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  height: calc(100vh - 32px);
+}
+.gs-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.gs-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-right: auto;
+  letter-spacing: -0.02em;
+  color: #FAFAFA;
+}
+.gs-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #18181B;
+  border: 1px solid #27272A;
+  color: #D4D4D8;
+}
+.gs-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #71717A;
+  flex-shrink: 0;
+}
+.gs-status.ok { border-color: rgba(5, 150, 105, 0.45); background: rgba(5, 150, 105, 0.12); color: #A7F3D0; }
+.gs-status.ok i { background: #10B981; }
+.gs-status.warn { border-color: rgba(217, 119, 6, 0.45); background: rgba(217, 119, 6, 0.12); color: #FDE68A; }
+.gs-status.warn i { background: #D97706; }
+.gs-status.bad { border-color: rgba(220, 38, 38, 0.45); background: rgba(220, 38, 38, 0.12); color: #FECACA; }
+.gs-status.bad i { background: #DC2626; }
 
-/* Ô kết quả lớn */
+.gs-btn {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid #27272A;
+  background: #18181B;
+  color: #E4E4E7;
+  cursor: pointer;
+  text-decoration: none;
+}
+.gs-btn:hover { background: #27272A; color: #FFFFFF; }
+.gs-btn.icon { width: 30px; padding: 0; justify-content: center; }
+.gs-btn.attention { background: #D97706; border-color: #D97706; color: #FFFFFF; }
+.gs-btn.attention:hover { background: #B45309; border-color: #B45309; color: #FFFFFF; }
+.gs-btn.on { background: rgba(5, 150, 105, 0.14); border-color: rgba(5, 150, 105, 0.4); color: #A7F3D0; cursor: default; }
+
+.gs-sound-alert {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #D97706;
+  border: 1px solid #F59E0B;
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Khung thẻ kỹ thuật dùng chung (bg-zinc-900/60 border border-zinc-800 rounded-md p-5) */
+.gs-card {
+  background: rgba(24, 24, 27, 0.6);
+  border: 1px solid #27272A;
+  border-radius: 6px;
+  padding: 20px;
+}
+
+/* ─── Thẻ A: Đồng hồ số Terminal (Digital Terminal Clock) ─────────────────── */
+.gs-clock-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.gs-clock-card__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gs-clock {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: #FFFFFF;
+}
+.gs-date {
+  font-size: 14px;
+  font-weight: 500;
+  color: #A1A1AA;
+  font-variant-numeric: tabular-nums;
+}
+.gs-clock-card__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.gs-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #71717A;
+}
+.gs-ready-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  border: 1px solid #27272A;
+  background: #09090B;
+  color: #A1A1AA;
+}
+.gs-ready-tag i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #71717A;
+}
+.gs-ready-tag.ok { border-color: rgba(16, 185, 129, 0.35); color: #A7F3D0; }
+.gs-ready-tag.ok i { background: #10B981; }
+.gs-ready-tag.warn { border-color: rgba(217, 119, 6, 0.35); color: #FDE68A; }
+.gs-ready-tag.warn i { background: #D97706; }
+.gs-ready-tag.bad { border-color: rgba(220, 38, 38, 0.35); color: #FECACA; }
+.gs-ready-tag.bad i { background: #DC2626; }
+
+/* ─── Thẻ B: Khung Trạng thái Xác thực (Active Verification Status Box) ──── */
 .gs-box {
-  flex: 1; min-height: 0; border-radius: 20px; background: #111A2E; box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
-  display: flex; align-items: center; justify-content: safe center; flex-direction: column; text-align: center;
-  padding: 32px; overflow-y: auto; transition: background-color 0.2s ease;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  flex-direction: column;
+  text-align: center;
+  overflow-y: auto;
+  transition: background-color 0.18s ease, border-color 0.18s ease;
 }
-.gs-box.xanh { background: #16A34A; box-shadow: none; }
-.gs-box.do { background: #DC2626; box-shadow: none; }
-.gs-box.vang { background: #D97706; box-shadow: none; }
-.gs-box.kiem-tra { background: #13213D; }
-.gs-in { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 100%; animation: gsIn 0.2s ease-out; }
-@keyframes gsIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.gs-box.xanh { background: #059669; border-color: #10B981; }
+.gs-box.do { background: #DC2626; border-color: #EF4444; }
+.gs-box.vang { background: #D97706; border-color: #F59E0B; }
+.gs-box.kiem-tra { background: rgba(24, 24, 27, 0.9); border-color: #52525B; }
 
-.gs-icon { width: clamp(104px, 15vh, 156px); height: clamp(104px, 15vh, 156px); border-radius: 50%; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.2); border: 4px solid rgba(255, 255, 255, 0.85); color: #fff; }
-.gs-icon svg { width: 62%; height: 62%; }
-.gs-name { font-size: clamp(56px, 3.9vw, 76px); font-weight: 700; line-height: 1.08; letter-spacing: -0.02em; color: #fff; word-break: break-word; }
-.gs-code { font-size: 24px; font-weight: 600; color: #fff; font-variant-numeric: tabular-nums; }
-.gs-msg { font-size: clamp(30px, 2.1vw, 40px); font-weight: 600; line-height: 1.3; color: #fff; max-width: 26ch; }
-.gs-missing { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-.gs-missing span { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 12px; font-size: 22px; font-weight: 600;
-  background: rgba(0, 0, 0, 0.18); border: 2px solid rgba(255, 255, 255, 0.7); color: #fff; }
-.gs-meta { display: flex; align-items: center; gap: 16px; color: #fff; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.gs-photo { height: clamp(90px, 15vh, 150px); max-width: 40%; border-radius: 12px; object-fit: cover; object-position: 50% 15%;
-  border: 3px solid rgba(255, 255, 255, 0.75); background: rgba(0, 0, 0, 0.2); }
+.gs-in {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  animation: gsIn 0.18s ease-out;
+}
+.gs-in--idle {
+  align-items: stretch;
+  text-align: left;
+  gap: 16px;
+  max-width: 100%;
+}
+@keyframes gsIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: none; } }
 
-/* Chờ: đồng hồ + hướng dẫn + hình minh hoạ */
-.gs-illus { width: clamp(120px, 22vh, 210px); height: auto; color: #334155; }
-.gs-clock { font-size: 72px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: #F8FAFC; }
-.gs-date { font-size: 20px; color: #94A3B8; }
-.gs-guide { font-size: 28px; font-weight: 600; color: #F8FAFC; }
-.gs-steps { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-.gs-steps span { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 10px; font-size: 18px;
-  background: rgba(148, 163, 184, 0.1); color: #CBD5E1; }
-.gs-spinner { width: 132px; height: 132px; border-radius: 50%; border: 10px solid rgba(148, 163, 184, 0.25); border-top-color: #F59E0B;
-  animation: gsSpin 0.9s linear infinite; }
+/* Thanh chỉ báo quét kỹ thuật (Technical Scanner Indicator) */
+.gs-scanner-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: #09090B;
+  border: 1px solid #27272A;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #A1A1AA;
+}
+.gs-scanner-bar__icon {
+  color: #10B981;
+  flex-shrink: 0;
+}
+.gs-scanner-bar__pulse {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10B981;
+  animation: sgPulse 1.6s ease-in-out infinite;
+}
+
+.gs-guide {
+  font-size: 22px;
+  font-weight: 600;
+  color: #FAFAFA;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+/* 3 yêu cầu bảo hộ & tư thế dạng dòng checklist kỹ thuật */
+.gs-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.gs-step-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 4px;
+  background: rgba(9, 9, 11, 0.65);
+  border: 1px solid #27272A;
+}
+.gs-step-row__idx {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #71717A;
+  font-variant-numeric: tabular-nums;
+}
+.gs-step-row__icon {
+  color: #D4D4D8;
+  flex-shrink: 0;
+}
+.gs-step-row__label {
+  font-size: 15px;
+  font-weight: 500;
+  color: #FAFAFA;
+  flex: 1;
+}
+.gs-step-row__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  background: rgba(24, 24, 27, 0.9);
+  border: 1px solid #27272A;
+  color: #A1A1AA;
+}
+.gs-step-row__badge i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10B981;
+}
+
+/* Trạng thái kết quả lượt kiểm tra (Đạt / Không đạt / Cảnh báo / Đang kiểm tra) */
+.gs-icon {
+  width: clamp(80px, 12vh, 120px);
+  height: clamp(80px, 12vh, 120px);
+  border-radius: 6px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  color: #FFFFFF;
+}
+.gs-icon svg { width: 56%; height: 56%; }
+.gs-name { font-size: clamp(36px, 3vw, 56px); font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: #FFFFFF; word-break: break-word; }
+.gs-code { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.92); font-variant-numeric: tabular-nums; }
+.gs-msg { font-size: clamp(22px, 1.8vw, 30px); font-weight: 600; line-height: 1.3; color: #FFFFFF; max-width: 28ch; }
+.gs-missing { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.gs-missing span {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 4px; font-size: 17px; font-weight: 600;
+  background: rgba(9, 9, 11, 0.28); border: 1px solid rgba(255, 255, 255, 0.75); color: #FFFFFF;
+}
+.gs-meta {
+  display: flex; align-items: center; gap: 12px; color: #FFFFFF; font-family: var(--font-mono);
+  font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.gs-photo {
+  height: clamp(72px, 12vh, 116px); max-width: 40%; border-radius: 4px; object-fit: cover; object-position: 50% 15%;
+  border: 2px solid rgba(255, 255, 255, 0.8); background: rgba(0, 0, 0, 0.25);
+}
+.gs-spinner {
+  width: 84px; height: 84px; border-radius: 50%; border: 4px solid #27272A; border-top-color: #10B981;
+  animation: gsSpin 0.9s linear infinite;
+}
 @keyframes gsSpin { to { transform: rotate(360deg); } }
-.gs-title { font-size: 48px; font-weight: 700; line-height: 1.15; color: #fff; }
-.gs-sub { font-size: 26px; font-weight: 500; color: rgba(255, 255, 255, 0.92); max-width: 30ch; line-height: 1.35; }
-.gs-detail { font-size: 16px; color: rgba(255, 255, 255, 0.8); max-width: 60ch; }
+.gs-title { font-size: 32px; font-weight: 700; line-height: 1.2; color: #FFFFFF; }
+.gs-sub { font-size: 18px; font-weight: 500; color: rgba(255, 255, 255, 0.9); max-width: 32ch; line-height: 1.4; }
+.gs-detail { font-size: 14px; color: rgba(255, 255, 255, 0.78); max-width: 56ch; }
+
+/* ─── Thẻ C: Hoạt động cổng gần nhất (Recent Gate Activity) ───────────────── */
+.gs-recent-card {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+}
+.gs-recent-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #71717A;
+}
+.gs-recent-card__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #A1A1AA;
+}
+.gs-recent-card__count {
+  font-variant-numeric: tabular-nums;
+}
+.gs-recent-card__count b {
+  color: #E4E4E7;
+}
+.gs-recent-card__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.gs-recent-card__thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  object-position: 50% 15%;
+  border: 1px solid #27272A;
+  background: #09090B;
+  flex-shrink: 0;
+}
+.gs-recent-card__info {
+  flex: 1;
+  min-width: 0;
+}
+.gs-recent-card__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #FAFAFA;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gs-recent-card__code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #A1A1AA;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #09090B;
+  border: 1px solid #27272A;
+}
+.gs-recent-card__sub {
+  font-size: 12.5px;
+  color: #A1A1AA;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gs-recent-card__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  border: 1px solid #27272A;
+  background: #09090B;
+  color: #D4D4D8;
+  white-space: nowrap;
+}
+.gs-recent-card__pill i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #71717A;
+}
+.gs-recent-card__pill.xanh { border-color: rgba(16, 185, 129, 0.4); background: rgba(5, 150, 105, 0.12); color: #A7F3D0; }
+.gs-recent-card__pill.xanh i { background: #10B981; }
+.gs-recent-card__pill.do { border-color: rgba(220, 38, 38, 0.4); background: rgba(220, 38, 38, 0.12); color: #FECACA; }
+.gs-recent-card__pill.do i { background: #DC2626; }
+.gs-recent-card__pill.vang { border-color: rgba(217, 119, 6, 0.4); background: rgba(217, 119, 6, 0.12); color: #FDE68A; }
+.gs-recent-card__pill.vang i { background: #D97706; }
+
+.gs-recent-card__empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #A1A1AA;
+  padding: 4px 0;
+}
+.gs-recent-card__empty svg {
+  color: #10B981;
+  flex-shrink: 0;
+}
 
 @media (max-width: 900px) {
-  .gs { grid-template-columns: 1fr; grid-template-rows: 42vh 1fr; overflow-y: auto; }
-  .gs-cam { height: 100%; max-width: none; }
-  .gs-clock { font-size: 56px; }
+  .gs { grid-template-columns: 1fr; grid-template-rows: 44vh auto; overflow-y: auto; }
+  .gs-viewport { height: 100%; }
+  .gs-side { height: auto; }
+  .gs-clock { font-size: 36px; }
 }

@@ -33,8 +33,8 @@ export default function CheckDetailModal({ id, onHide }) {
     ['Thiếu', c.thieu?.length ? <span className="text-bad" style={{ fontWeight: 600 }}>{thieuText(c.thieu)}</span> : ''],
     ['Nhận diện', <>
       <StatusBadge map={MAT} value={c.trang_thai_mat} />
-      {c.diem != null && <span className="ms-2">điểm {soVN(c.diem)}</span>}
-      {d.rong_mat_px ? <span className="muted"> · mặt rộng {d.rong_mat_px} px</span> : null}
+      {c.diem != null && <span className="ms-2 num mono-meta">điểm {soVN(c.diem)}</span>}
+      {d.rong_mat_px ? <span className="muted num mono-meta"> · mặt rộng {d.rong_mat_px} px</span> : null}
     </>],
     ['Người giống nhất', !c.cong_nhan && nd.gan_nhat_ma ? `${nd.gan_nhat_ma} (điểm ${soVN(nd.diem)})` : ''],
     ['Chấm công', <ChamCongCell value={c.hanh_dong} />],
@@ -62,8 +62,8 @@ export default function CheckDetailModal({ id, onHide }) {
               </div>
               <div style={{ flex: "1 1 280px", minWidth: 280 }}>
                 <div className="mb-3">
-                  <div style={{ fontSize: 20, fontWeight: 700 }}>{c.cong_nhan ? c.cong_nhan.ten : (MAT[c.trang_thai_mat] ?? ['Không nhận ra'])[0]}</div>
-                  <div className="muted">{[c.cong_nhan?.ma, thuNgay(c.thoi_diem)].filter(Boolean).join(' · ')}</div>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>{c.cong_nhan ? c.cong_nhan.ten : (MAT[c.trang_thai_mat] ?? ['Không nhận ra'])[0]}</div>
+                  <div className="muted num mono-meta">{[c.cong_nhan?.ma, thuNgay(c.thoi_diem)].filter(Boolean).join(' · ')}</div>
                 </div>
                 <table className="kv mb-4"><tbody>{rows.map(([k, v]) => <tr key={k}><th>{k}</th><td>{v}</td></tr>)}</tbody></table>
                 <div className="small muted mb-2">Kết quả này đúng không?</div>

@@ -31,11 +31,11 @@ export default function ConfirmModal({
   const Icon = danger ? TriangleAlert : CircleAlert
   return (
     <Modal show={show} onHide={onCancel} centered backdrop="static">
-      <Modal.Body className="d-flex gap-3" style={{ paddingTop: 24 }}>
-        <span className={`stat__icon ${danger ? 'tone-bad' : 'tone-primary'}`}><Icon size={20} /></span>
+      <Modal.Body className="d-flex gap-3" style={{ paddingTop: 18 }}>
+        <span className={`stat__icon ${danger ? 'tone-bad' : 'tone-primary'}`}><Icon size={18} strokeWidth={1.5} /></span>
         <div>
-          <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 6 }}>{title}</div>
-          <div className="muted" style={{ fontSize: 14, lineHeight: 1.6 }}>{message}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{title}</div>
+          <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>{message}</div>
         </div>
       </Modal.Body>
       <Modal.Footer>

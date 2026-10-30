@@ -11,7 +11,7 @@ export function ChamCongCell({ value }) {
   const Icon = ACTION_ICON[value] ?? CircleMinus
   return (
     <span className={`d-inline-flex align-items-center gap-2 nowrap ${tone === 'ok' ? 'text-ok' : 'muted'}`} style={{ fontWeight: tone === 'ok' ? 600 : 400 }}>
-      <Icon size={17} />{text}
+      <Icon size={16} strokeWidth={1.5} />{text}
     </span>
   )
 }

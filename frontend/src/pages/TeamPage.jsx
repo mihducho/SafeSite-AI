@@ -49,7 +49,7 @@ function ToDoiModal({ initial, onClose }) {
             <Form.Label htmlFor="t-leader">Tổ trưởng</Form.Label>
             <Form.Control id="t-leader" maxLength={100} value={leader} onChange={(e) => setLeader(e.target.value)} />
           </Form.Group>
-          {error && <div className="note bad mt-3"><CircleAlert size={18} />{error}</div>}
+          {error && <div className="note bad mt-3"><CircleAlert size={17} strokeWidth={1.5} />{error}</div>}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={onClose} disabled={mutation.isPending}>Huỷ</Button>
@@ -63,19 +63,19 @@ function ToDoiModal({ initial, onClose }) {
 function TeamCard({ team, onEdit }) {
   return (
     <section className="sg-card d-flex flex-column">
-      <div className="d-flex align-items-start gap-3 p-4 pb-3">
-        <Avatar name={team.name} size={44} face={false} />
+      <div className="d-flex align-items-start gap-3 p-3 pb-2">
+        <Avatar name={team.name} size={38} face={false} />
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>{team.name}</div>
+          <div style={{ fontSize: 14.5, fontWeight: 600 }}>{team.name}</div>
           <div className="team-kv mt-2">
-            <span><Building2 size={15} />Nhà thầu phụ</span><b>{team.contractor}</b>
-            <span><UserRound size={15} />Tổ trưởng</span><b>{team.leader_name}</b>
+            <span><Building2 size={14} strokeWidth={1.5} />Nhà thầu phụ</span><b>{team.contractor}</b>
+            <span><UserRound size={14} strokeWidth={1.5} />Tổ trưởng</span><b>{team.leader_name}</b>
           </div>
         </div>
-        <Button variant="text" className="btn-text btn-icon" onClick={() => onEdit(team)} aria-label={`Sửa ${team.name}`} title="Sửa"><Pencil size={17} /></Button>
+        <Button variant="text" className="btn-text btn-icon" onClick={() => onEdit(team)} aria-label={`Sửa ${team.name}`} title="Sửa"><Pencil size={16} strokeWidth={1.5} /></Button>
       </div>
       <Link to={`/cong-nhan?to_doi=${team.id}`} className="team-foot">
-        <span><b className="num">{team.so_cong_nhan ?? 0}</b> công nhân đang làm</span><ChevronRight size={17} />
+        <span><b className="num">{team.so_cong_nhan ?? 0}</b> công nhân đang làm</span><ChevronRight size={16} strokeWidth={1.5} />
       </Link>
     </section>
   )
@@ -90,12 +90,12 @@ export default function TeamPage() {
     <div className="page">
       {modalData !== null && <ToDoiModal initial={modalData} onClose={() => setModalData(null)} />}
       <PageHead title="Tổ đội" sub={data ? `${ds.length} tổ · ${ds.reduce((s, t) => s + (t.so_cong_nhan ?? 0), 0)} công nhân đang làm` : ' '}>
-        <Button onClick={() => setModalData({})}><Plus size={18} />Thêm tổ đội</Button>
+        <Button onClick={() => setModalData({})}><Plus size={16} strokeWidth={1.5} />Thêm tổ đội</Button>
       </PageHead>
       {isLoading ? <div className="grid team-grid">{[1, 2, 3].map((k) => <Card key={k}><Skeleton height={90} /></Card>)}</div>
         : !ds.length ? (
           <Card><EmptyState icon={UsersRound} title="Chưa có tổ đội nào" text="Tạo tổ đội để xếp công nhân và lọc bảng công theo tổ."
-            action={<Button onClick={() => setModalData({})}><Plus size={18} />Thêm tổ đội đầu tiên</Button>} /></Card>
+            action={<Button onClick={() => setModalData({})}><Plus size={16} strokeWidth={1.5} />Thêm tổ đội đầu tiên</Button>} /></Card>
         ) : <div className="grid team-grid">{ds.map((t) => <TeamCard key={t.id} team={t} onEdit={setModalData} />)}</div>}
     </div>
   )

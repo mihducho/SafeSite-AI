@@ -96,9 +96,9 @@ function ProfileCard({ worker, onEdit, onQuit, onRejoin }) {
   return (
     <Card>
       <div className="d-flex flex-column align-items-center text-center pb-3 mb-2" style={{ borderBottom: '1px solid var(--line)' }}>
-        <Avatar name={worker.full_name} workerId={worker.id} size={96} />
-        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 12 }}>{worker.full_name}</div>
-        <div className="muted mb-2">{worker.code}</div>
+        <Avatar name={worker.full_name} workerId={worker.id} size={84} />
+        <div style={{ fontSize: 18, fontWeight: 700, marginTop: 10 }}>{worker.full_name}</div>
+        <div className="muted num mono-meta mb-2">{worker.code}</div>
         <StatusBadge map={CONG_NHAN} value={worker.status} />
       </div>
       <table className="kv"><tbody>
@@ -320,11 +320,11 @@ function SheetTab({ workerId }) {
                 const [text, tone] = trangThaiNgay(r)
                 return (
                   <tr key={r.ngay}>
-                    <td className="nowrap" style={{ fontWeight: 600 }}>{thuNgay(r.ngay)}</td>
-                    <td className="num">{r.gio_vao}</td>
-                    <td className="num">{r.gio_ra}</td>
+                    <td className="nowrap num" style={{ fontWeight: 600 }}>{thuNgay(r.ngay)}</td>
+                    <td className="num mono-meta">{r.gio_vao}</td>
+                    <td className="num mono-meta">{r.gio_ra}</td>
                     <td>{r.di_muon_phut > 0 && <Pill tone="warn">+{r.di_muon_phut} phút</Pill>}</td>
-                    <td className="nowrap">{r.gio_ra ? gioPhutChu(r.so_phut_lam) : ''}</td>
+                    <td className="nowrap num">{r.gio_ra ? gioPhutChu(r.so_phut_lam) : ''}</td>
                     <td><Pill tone={tone}>{text}</Pill></td>
                   </tr>
                 )

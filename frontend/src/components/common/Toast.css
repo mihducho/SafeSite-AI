@@ -1,11 +1,13 @@
-/* Thông báo nhỏ (toast) góc trên bên phải: viền trái theo loại, icon Lucide */
-.toast-stack { position: fixed; top: 16px; right: 16px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; width: min(400px, calc(100vw - 32px)); }
-.toast-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 14px 14px 16px; background: #fff; border: 1px solid var(--border);
-  border-left: 4px solid var(--neutral); border-radius: 10px; box-shadow: var(--shadow-lg); font-size: 14px; color: var(--text); animation: sgToastIn 0.2s ease; }
-.toast-item.success { border-left-color: #16A34A; } .toast-item.success > svg { color: #16A34A; }
+/* Thông báo nhỏ (toast) góc trên bên phải: phẳng, viền 1px solid #E4E4E7, bo góc kỹ thuật 6px */
+.toast-stack { position: fixed; top: 14px; right: 14px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; width: min(380px, calc(100vw - 28px)); }
+.toast-item {
+  display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px 11px 14px; background: #FFFFFF;
+  border: 1px solid var(--border); border-left: 3px solid var(--neutral-dot); border-radius: var(--radius);
+  box-shadow: none; font-size: 13px; color: var(--text); animation: sgToastIn 0.18s ease;
+}
+.toast-item.success { border-left-color: #059669; } .toast-item.success > svg { color: #059669; }
 .toast-item.error { border-left-color: #DC2626; } .toast-item.error > svg { color: #DC2626; }
-.toast-item.warning { border-left-color: var(--primary); } .toast-item.warning > svg { color: var(--primary-hover); }
+.toast-item.warning { border-left-color: #D97706; } .toast-item.warning > svg { color: #D97706; }
 .toast-item.info { border-left-color: #2563EB; } .toast-item.info > svg { color: #2563EB; }
 .toast-item p { margin: 0; flex: 1; line-height: 1.45; }
 .toast-item button { border: none; background: none; color: var(--text-2); padding: 0; line-height: 0; }
-

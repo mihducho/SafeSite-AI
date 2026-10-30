@@ -34,7 +34,7 @@ export function StatusBadge({ map, value, className = '' }) {
 export function Pill({ tone = 'neutral', icon: Icon, children, className = '' }) {
   return (
     <span className={`pill ${tone} ${Icon ? 'no-dot' : ''} ${className}`}>
-      {Icon && <Icon strokeWidth={2.2} />}{children}
+      {Icon && <Icon size={13} strokeWidth={1.5} />}{children}
     </span>
   )
 }
@@ -67,18 +67,11 @@ export function Pager({ page, pages, onChange }) {
   )
 }
 
-/** Màu nền pastel tính theo tên (cùng tên luôn cùng màu) */
-function pastel(name) {
-  let h = 0
-  for (const ch of String(name ?? '')) h = (h * 31 + ch.codePointAt(0)) % 360
-  return { background: `hsl(${h} 70% 90%)`, color: `hsl(${h} 45% 28%)` }
-}
-
 /**
  * Ảnh đại diện: ảnh mẫu khuôn mặt đầu tiên nếu có (đọc /api/cong-nhan/{id}/mau-mat, có bộ nhớ đệm), không thì chữ cái
- * đầu của tên trên nền pastel.
+ * đầu của tên trên nền trung tính.
  */
-export function Avatar({ name, workerId, size = 36, face = true }) {
+export function Avatar({ name, workerId, size = 34, face = true }) {
   const { data } = useQuery({
     queryKey: ['mau-mat', workerId],
     queryFn: () => layDanhSachMauMat(workerId),
@@ -87,20 +80,20 @@ export function Avatar({ name, workerId, size = 36, face = true }) {
     meta: { silent: true },
   })
   const src = face ? data?.ds?.[0]?.anh : null
-  const style = { width: size, height: size, fontSize: Math.round(size * 0.38) }
+  const style = { width: size, height: size, fontSize: Math.round(size * 0.36) }
   return src
     ? <img className="avatar" src={src} alt={name} style={style} />
-    : <span className="avatar" style={{ ...style, ...pastel(name) }} title={name}>{chuCaiDau(name)}</span>
+    : <span className="avatar" style={style} title={name}>{chuCaiDau(name)}</span>
 }
 
 /** Tên người: avatar + tên đậm màu chữ chính + mã nhỏ màu phụ bên dưới (to: mở trang chi tiết) */
-export function Person({ name, code, workerId, sub, to, size = 36, face = true }) {
+export function Person({ name, code, workerId, sub, to, size = 34, face = true }) {
   const inner = (
     <>
       <Avatar name={name} workerId={workerId} size={size} face={face} />
       <span className="person__text">
         <span className="person__name">{name}</span>
-        {(code || sub) && <span className="person__sub">{[code, sub].filter(Boolean).join(' · ')}</span>}
+        {(code || sub) && <span className="person__sub num">{[code, sub].filter(Boolean).join(' · ')}</span>}
       </span>
     </>
   )
@@ -113,7 +106,7 @@ const MenuToggle = forwardRef(function MenuToggle({ onClick }, ref) {
   return (
     <button ref={ref} type="button" className="row-menu-btn" aria-label="Thao tác"
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClick(e) }}>
-      <MoreHorizontal size={18} />
+      <MoreHorizontal size={16} strokeWidth={1.5} />
     </button>
   )
 })
@@ -126,7 +119,7 @@ export function RowMenu({ items }) {
       <Dropdown.Menu popperConfig={{ strategy: 'fixed' }} renderOnMount>
         {items.filter(Boolean).map(({ label, icon: Icon, onClick, danger }) => (
           <Dropdown.Item key={label} as="button" className={danger ? 'danger' : ''} onClick={onClick}>
-            {Icon && <Icon size={16} />}{label}
+            {Icon && <Icon size={15} strokeWidth={1.5} />}{label}
           </Dropdown.Item>
         ))}
       </Dropdown.Menu>
@@ -153,7 +146,7 @@ export function SkeletonRows({ rows = 6, cols = 5 }) {
 export function EmptyState({ icon: Icon = Inbox, title, text, action }) {
   return (
     <div className="empty">
-      <span className="empty__icon"><Icon size={24} /></span>
+      <span className="empty__icon"><Icon size={18} strokeWidth={1.5} /></span>
       {title && <b>{title}</b>}
       {text && <span className="small">{text}</span>}
       {action}
@@ -195,15 +188,15 @@ export function Card({ title, sub, end, children, flush = false, className = '',
   )
 }
 
-/** Thẻ số liệu: icon trong ô tròn màu nhạt, số lớn, dòng phụ */
+/** Thẻ số liệu: icon 17px mảnh không nền tròn, số lớn tabular-nums, dòng phụ */
 export function StatCard({ icon: Icon, tone = 'neutral', label, value, sub, loading }) {
   return (
     <section className="sg-card stat">
-      <span className={`stat__icon tone-${tone}`}><Icon size={20} /></span>
+      <span className={`stat__icon tone-${tone}`}><Icon size={17} strokeWidth={1.5} /></span>
       <div style={{ minWidth: 0 }}>
         <div className="stat__label">{label}</div>
-        {loading ? <Skeleton width={70} height={34} style={{ margin: '4px 0' }} /> : <div className="stat__value">{value}</div>}
-        {sub && <div className="stat__sub">{sub}</div>}
+        {loading ? <Skeleton width={70} height={30} style={{ margin: '4px 0' }} /> : <div className="stat__value num">{value}</div>}
+        {sub && <div className="stat__sub num">{sub}</div>}
       </div>
     </section>
   )
@@ -216,7 +209,7 @@ export function Tabs({ tabs, active, onChange }) {
       {tabs.map(({ key, label, count, icon: Icon }) => (
         <button key={key} type="button" role="tab" aria-selected={active === key} className={active === key ? 'active' : ''}
           onClick={() => onChange(key)}>
-          {Icon && <Icon size={16} />}{label}{count != null && <span className="count">{count}</span>}
+          {Icon && <Icon size={16} strokeWidth={1.5} />}{label}{count != null && <span className="count num">{count}</span>}
         </button>
       ))}
     </div>

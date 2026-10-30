@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  ArrowLeft, Camera, CameraOff, Check, Expand, HardHat, Minimize, PersonStanding, ServerCrash, Shirt, TriangleAlert,
-  Volume2, VolumeX, X,
+  Activity, ArrowLeft, Camera, CameraOff, Check, Expand, HardHat, Minimize, PersonStanding, ScanLine, ServerCrash,
+  ShieldCheck, Shirt, TriangleAlert, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { STREAM_URL } from '../api/endpoints.js'
 import { LogoMark } from '../components/common/Logo.jsx'
@@ -14,15 +14,10 @@ import { THIEU_NGAN, trangThaiCong } from '../lib/labels.js'
 import './GateScreen.css'
 
 /**
- * Màn hình cổng (DE_TAI.md mục 5 bước 6). Mở toàn màn hình trên màn hình đặt ở cổng, nền tối.
- *  - Trái: hình trực tiếp /stream/gate (qua backend; KHÔNG mở thẳng URL DroidCam vì DroidCam chỉ nhận 1 kết nối),
- *    giữ đúng tỉ lệ hình (điện thoại kẹp dọc 720x1280 -> cột hẹp, cao hết màn hình). Lỗi luồng hình -> tự thử lại.
- *  - Phải: ô kết quả lớn. Chờ (đồng hồ + hướng dẫn) -> đang kiểm tra (pha KIEM_TRA) -> kết quả xanh/đỏ/vàng theo `mau`
- *    của sự kiện lượt, trong giay_hien_ket_qua giây -> về chờ.
+ * Màn hình cổng (DE_TAI.md mục 5 bước 6). Mở toàn màn hình trên màn hình đặt ở cổng, nền tối (#09090B).
+ *  - Trái (50%): khung ngắm kỹ thuật (recessed viewport) chứa luồng trực tiếp /stream/gate tỉ lệ 9:16.
+ *  - Phải (50%): 3 thẻ kỹ thuật (Đồng hồ số Terminal · Khung trạng thái kiểm tra & danh sách 3 điều kiện bảo hộ · Hoạt động cổng gần nhất).
  *  - Loa luôn bật (useSound): tự bật khi trình duyệt cho phép (mở bằng cong.bat); bị chặn thì chạm màn hình một lần.
- *    Đọc `thong_bao` bằng giọng tiếng Việt (ưu tiên giọng cài sẵn trong máy, không cần mạng); không có giọng -> tiếng
- *    bíp (1 tiếng = xanh, 2 tiếng = đỏ/vàng).
- *  - Mất camera / cổng lỗi / mất kết nối máy chủ -> ô đỏ "tạm gián đoạn"; WebSocket tự kết nối lại (lib/events.js).
  */
 
 const RESULT_ICON = { xanh: Check, do: X, vang: TriangleAlert }
@@ -41,11 +36,6 @@ function displayMessage(ev) {
 const STREAM_RETRY_MS = 2000
 
 // ─── âm thanh: loa LUÔN BẬT ────────────────────────────────────────────────────
-// Trình duyệt chỉ cho phát tiếng (giọng đọc, tiếng bíp) khi người dùng đã bấm vào trang, TRỪ KHI được phép tự phát:
-//  - mở bằng cong.bat (Edge kiosk, tham số --autoplay-policy=no-user-gesture-required), hoặc
-//  - trong Edge đặt "Tự động phát nội dung đa phương tiện: Cho phép" cho địa chỉ ứng dụng.
-// Khi đó trang tự bật loa ngay lúc mở. Nếu vẫn bị chặn: chạm / bấm phím BẤT KỲ đâu trên màn hình một lần là bật.
-// Không có nút tắt loa.
 function useSound() {
   const [state, setState] = useState('dang_bat')   // dang_bat | bat | bi_chan
   const [voice, setVoice] = useState(null)
@@ -144,7 +134,7 @@ function useSound() {
   return { state, announce, info }
 }
 
-// ─── hình camera ───────────────────────────────────────────────────────────────
+// ─── hình camera (Cột trái 50%: khung ngắm kỹ thuật + viền góc + HUD LIVE) ────
 function GateStream({ status }) {
   const imgRef = useRef(null)
   const [src, setSrc] = useState(STREAM_URL)
@@ -167,13 +157,25 @@ function GateStream({ status }) {
     retryRef.current = setTimeout(() => setSrc(`${STREAM_URL}?t=${Date.now()}`), STREAM_RETRY_MS)
   }
 
+  const resText = status?.do_phan_giai ? status.do_phan_giai.replace('x', '×') : '720×1280'
+  const fpsText = status?.khung_giay != null ? `${status.khung_giay} FPS` : '30 FPS'
+
   return (
-    <div className="gs-cam" style={ratio ? { aspectRatio: String(ratio) } : { width: '34vw' }}>
-      <LiveStream ref={imgRef} src={src} alt="Hình trực tiếp camera cổng" onError={onError} />
-      {!ratio && <div className="gs-cam__wait"><Camera size={36} />Đang chờ hình từ camera…</div>}
-      {status?.do_phan_giai && (
-        <div className="gs-cam__tag">{status.do_phan_giai.replace('x', '×')}{status.khung_giay != null ? ` · ${status.khung_giay} khung/giây` : ''}</div>
-      )}
+    <div className="gs-viewport">
+      <span className="gs-vp-corner gs-vp-corner--tl" aria-hidden="true" />
+      <span className="gs-vp-corner gs-vp-corner--tr" aria-hidden="true" />
+      <span className="gs-vp-corner gs-vp-corner--bl" aria-hidden="true" />
+      <span className="gs-vp-corner gs-vp-corner--br" aria-hidden="true" />
+
+      <div className="gs-cam__tag">
+        <i className={`gs-cam__dot${status?.mat_camera ? ' off' : ''}`} aria-hidden="true" />
+        <span>LIVE // {resText} · {fpsText}</span>
+      </div>
+
+      <div className="gs-cam" style={{ aspectRatio: ratio ? String(ratio) : '9 / 16' }}>
+        <LiveStream ref={imgRef} src={src} alt="Hình trực tiếp camera cổng" onError={onError} />
+        {!ratio && <div className="gs-cam__wait"><Camera size={28} strokeWidth={1.5} />Đang chờ hình từ camera…</div>}
+      </div>
     </div>
   )
 }
@@ -188,29 +190,13 @@ function useClock(tz) {
   return now
 }
 
-/** Hình minh hoạ: người đứng trong khung, đội mũ bảo hộ */
-function StandIllustration() {
-  return (
-    <svg className="gs-illus" viewBox="0 0 200 220" fill="none" aria-hidden="true">
-      <rect x="40" y="8" width="120" height="196" rx="16" stroke="#334155" strokeWidth="4" strokeDasharray="10 8" />
-      <ellipse cx="100" cy="196" rx="44" ry="8" fill="#1E293B" />
-      <path d="M78 52a22 22 0 0 1 44 0z" fill="#F59E0B" />
-      <rect x="72" y="50" width="56" height="7" rx="3.5" fill="#FCD34D" />
-      <circle cx="100" cy="72" r="16" fill="#CBD5E1" />
-      <path d="M70 120c0-17 13-28 30-28s30 11 30 28v26H70z" fill="#F59E0B" />
-      <path d="M80 104h40M78 120h44" stroke="#E2E8F0" strokeWidth="5" strokeLinecap="round" />
-      <rect x="78" y="146" width="16" height="44" rx="6" fill="#64748B" />
-      <rect x="106" y="146" width="16" height="44" rx="6" fill="#64748B" />
-    </svg>
-  )
-}
-
 // ─── trang ─────────────────────────────────────────────────────────────────────
 export default function GateScreen() {
   const cfg = useWebConfig()
   const wsState = useWsState()
   const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
+  const [lastEvent, setLastEvent] = useState(null)
   const [full, setFull] = useState(!!document.fullscreenElement)
   const timerRef = useRef(null)
   const sound = useSound()
@@ -220,6 +206,7 @@ export default function GateScreen() {
     if (ev.loai === 'trang_thai') setStatus(ev)
     if (ev.loai === 'luot') {
       setResult(ev)
+      setLastEvent(ev)
       sound.announce(ev)
       clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => setResult(null), cfg.resultSeconds * 1000)
@@ -253,9 +240,10 @@ export default function GateScreen() {
   const checking = !result && status?.trang_thai === 'dang_chay' && status.pha === 'KIEM_TRA'
   const starting = !result && status?.trang_thai === 'dang_khoi_dong'
   const boxClass = down ? 'do' : result ? result.mau : checking ? 'kiem-tra' : ''
-  const [statusText, , statusTone] = trangThaiCong(status, wsState)
+  const [statusText, statusLong, statusTone] = trangThaiCong(status, wsState)
   const ResultIcon = result ? RESULT_ICON[result.mau] ?? TriangleAlert : null
   const DownIcon = down?.icon
+  const recent = result ?? lastEvent
 
   return (
     <div className="gs">
@@ -263,38 +251,50 @@ export default function GateScreen() {
 
       <div className="gs-side">
         <div className="gs-top">
-          <span className="gs-brand"><LogoMark size={34} />SafeGate</span>
-          <span className={`gs-status ${statusTone}`}><i />{statusText}</span>
+          <span className="gs-brand"><LogoMark size={30} />SafeGate</span>
+          <span className={`gs-status ${statusTone}`} title={statusLong}><i />{statusText}</span>
           {sound.state === 'bi_chan'
-            ? <button className="gs-btn attention"><VolumeX size={17} />Chạm để bật loa</button>
-            : <span className="gs-btn on" title="Loa luôn bật"><Volume2 size={17} />Loa đang bật</span>}
+            ? <button className="gs-btn attention" title={sound.info}><VolumeX size={16} strokeWidth={1.5} />Chạm để bật loa</button>
+            : <span className="gs-btn on" title={sound.info}><Volume2 size={16} strokeWidth={1.5} />Loa đang bật</span>}
           <button className="gs-btn icon" onClick={toggleFullscreen} title={full ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
             aria-label="Toàn màn hình">
-            {full ? <Minimize size={17} /> : <Expand size={17} />}
+            {full ? <Minimize size={16} strokeWidth={1.5} /> : <Expand size={16} strokeWidth={1.5} />}
           </button>
-          <Link className="gs-btn icon" to="/" title="Về trang quản lý" aria-label="Về trang quản lý"><ArrowLeft size={17} /></Link>
+          <Link className="gs-btn icon" to="/" title="Về trang quản lý" aria-label="Về trang quản lý"><ArrowLeft size={16} strokeWidth={1.5} /></Link>
         </div>
-        <div className="gs-voice">{sound.info}</div>
 
         {sound.state === 'bi_chan' && (
-          <div role="alert" style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '14px 18px', borderRadius: 6,
-            background: '#D97706', color: '#FFFFFF', fontSize: 24, fontWeight: 700, cursor: 'pointer',
-          }}>
-            <VolumeX size={28} />Chạm vào màn hình một lần để bật loa
+          <div role="alert" className="gs-sound-alert">
+            <VolumeX size={22} strokeWidth={1.75} />Chạm vào màn hình một lần để bật loa
           </div>
         )}
-        <div className={`gs-box ${boxClass}`}>
+
+        {/* Thẻ A: Đồng hồ số Terminal */}
+        <section className="gs-card gs-clock-card" aria-label="Thời gian hệ thống">
+          <div className="gs-clock-card__main">
+            <div className="gs-clock">{clock.gio}</div>
+            <div className="gs-date">{clock.ngay}</div>
+          </div>
+          <div className="gs-clock-card__meta">
+            <span className="gs-kicker">TERMINAL // GATE-01</span>
+            <span className={`gs-ready-tag ${statusTone}`}>
+              <i />{statusText}
+            </span>
+          </div>
+        </section>
+
+        {/* Thẻ B: Khung trạng thái xác thực & Danh sách kiểm tra bảo hộ */}
+        <section className={`gs-card gs-box ${boxClass}`} aria-live="polite">
           {down ? (
             <div className="gs-in" key={`down-${down.title}`}>
-              <div className="gs-icon"><DownIcon /></div>
+              <div className="gs-icon"><DownIcon strokeWidth={1.75} /></div>
               <div className="gs-title">{down.title}</div>
               <div className="gs-sub">{down.sub}</div>
               {down.detail && <div className="gs-detail">{down.detail}</div>}
             </div>
           ) : result ? (
             <div className="gs-in" key={result.id}>
-              <div className="gs-icon"><ResultIcon strokeWidth={3} /></div>
+              <div className="gs-icon"><ResultIcon strokeWidth={2.5} /></div>
               <div className="gs-name">{result.cong_nhan?.ten ?? result.thong_bao}</div>
               {result.cong_nhan?.ma && <div className="gs-code">Mã {result.cong_nhan.ma}</div>}
               {result.cong_nhan && <div className="gs-msg">{displayMessage(result)}</div>}
@@ -302,7 +302,7 @@ export default function GateScreen() {
                 <div className="gs-missing">
                   {result.thieu.map((t) => {
                     const Icon = MISSING_ICON[t] ?? TriangleAlert
-                    return <span key={t}><Icon size={22} />{THIEU_NGAN[t] ?? t}</span>
+                    return <span key={t}><Icon size={20} strokeWidth={1.75} />{THIEU_NGAN[t] ?? t}</span>
                   })}
                 </div>
               )}
@@ -318,19 +318,73 @@ export default function GateScreen() {
               <div className="gs-sub">Mời đứng yên, nhìn thẳng camera</div>
             </div>
           ) : (
-            <div className="gs-in" key="cho">
-              <StandIllustration />
-              <div className="gs-clock">{clock.gio}</div>
-              <div className="gs-date">{clock.ngay}</div>
+            <div className="gs-in gs-in--idle" key="cho">
+              <div className="gs-scanner-bar">
+                <ScanLine size={18} strokeWidth={1.75} className="gs-scanner-bar__icon" />
+                <span>{starting ? 'HỆ THỐNG ĐANG KHỞI ĐỘNG CAMERA' : 'TRẠNG THÁI QUÉT // SẴN SÀNG NHẬN DIỆN'}</span>
+                <i className="gs-scanner-bar__pulse" />
+              </div>
+
               <div className="gs-guide">{starting ? 'Đang khởi động camera…' : 'Mời đứng vào vị trí, nhìn vào camera'}</div>
-              <div className="gs-steps">
-                <span><HardHat size={20} />Đội mũ bảo hộ</span>
-                <span><Shirt size={20} />Mặc áo phản quang</span>
-                <span><PersonStanding size={20} />Đứng yên 2 giây</span>
+
+              <div className="gs-steps" role="list" aria-label="Yêu cầu kiểm tra tại cổng">
+                <div className="gs-step-row" role="listitem">
+                  <span className="gs-step-row__idx">01</span>
+                  <HardHat size={18} strokeWidth={1.5} className="gs-step-row__icon" />
+                  <span className="gs-step-row__label">Đội mũ bảo hộ</span>
+                  <span className="gs-step-row__badge"><i />BẮT BUỘC</span>
+                </div>
+                <div className="gs-step-row" role="listitem">
+                  <span className="gs-step-row__idx">02</span>
+                  <Shirt size={18} strokeWidth={1.5} className="gs-step-row__icon" />
+                  <span className="gs-step-row__label">Mặc áo phản quang</span>
+                  <span className="gs-step-row__badge"><i />BẮT BUỘC</span>
+                </div>
+                <div className="gs-step-row" role="listitem">
+                  <span className="gs-step-row__idx">03</span>
+                  <PersonStanding size={18} strokeWidth={1.5} className="gs-step-row__icon" />
+                  <span className="gs-step-row__label">Đứng yên 2 giây</span>
+                  <span className="gs-step-row__badge"><i />XÁC THỰC</span>
+                </div>
               </div>
             </div>
           )}
-        </div>
+        </section>
+
+        {/* Thẻ C: Hoạt động cổng gần nhất / Trạng thái sẵn sàng */}
+        <section className="gs-card gs-recent-card" aria-label="Hoạt động cổng gần nhất">
+          <div className="gs-recent-card__head">
+            <span className="gs-recent-card__title">
+              <Activity size={15} strokeWidth={1.5} />
+              HOẠT ĐỘNG CỔNG GẦN NHẤT
+            </span>
+            <span className="gs-recent-card__count">
+              Đã xử lý: <b>{status?.so_luot ?? 0}</b> lượt
+            </span>
+          </div>
+          {recent ? (
+            <div className="gs-recent-card__body">
+              {recent.anh && <img className="gs-recent-card__thumb" src={recent.anh} alt="" />}
+              <div className="gs-recent-card__info">
+                <div className="gs-recent-card__name">
+                  {recent.cong_nhan?.ten ?? recent.thong_bao}
+                  {recent.cong_nhan?.ma && <span className="gs-recent-card__code">{recent.cong_nhan.ma}</span>}
+                </div>
+                <div className="gs-recent-card__sub">
+                  {displayMessage(recent)}
+                </div>
+              </div>
+              <div className={`gs-recent-card__pill ${recent.mau ?? 'neutral'}`}>
+                <i />{recent.gio}{recent.huong ? ` · ${recent.huong === 'vao' ? 'Vào' : 'Ra'}` : ''}
+              </div>
+            </div>
+          ) : (
+            <div className="gs-recent-card__empty">
+              <ShieldCheck size={16} strokeWidth={1.5} />
+              <span>{statusLong || 'Cổng kiểm soát sẵn sàng · Chờ công nhân bước vào vùng nhận diện.'}</span>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

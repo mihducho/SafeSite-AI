@@ -31,11 +31,11 @@ function ShiftTimeline({ form }) {
   const brk = Number(form.break_minutes) || 0
   return (
     <div>
-      <div className="d-flex gap-4 flex-wrap mb-3" style={{ fontSize: 14 }}>
-        <span>Giờ làm <b className="num">{fmt(s)} – {fmt(e)}</b></span>
-        {b != null && brk > 0 && <span>Nghỉ giữa ca <b className="num">{fmt(b)} – {fmt(b + brk)}</b></span>}
-        {early > 0 && <span>Cho vào từ <b className="num">{fmt(Math.max(0, s - early))}</b></span>}
-        {grace > 0 && <span>Tính đi muộn sau <b className="num">{fmt(s + grace)}</b></span>}
+      <div className="d-flex gap-4 flex-wrap mb-3" style={{ fontSize: 13 }}>
+        <span>Giờ làm <b className="num mono-meta">{fmt(s)} – {fmt(e)}</b></span>
+        {b != null && brk > 0 && <span>Nghỉ giữa ca <b className="num mono-meta">{fmt(b)} – {fmt(b + brk)}</b></span>}
+        {early > 0 && <span>Cho vào từ <b className="num mono-meta">{fmt(Math.max(0, s - early))}</b></span>}
+        {grace > 0 && <span>Tính đi muộn sau <b className="num mono-meta">{fmt(s + grace)}</b></span>}
       </div>
       <div className="timeline" role="img" aria-label={`Ca ${fmt(s)} đến ${fmt(e)}`}>
         {early > 0 && <span className="timeline__seg early" style={{ left: pct(s - early), width: width(s - early, s) }} title={`Cho vào sớm từ ${fmt(s - early)}`} />}
@@ -45,10 +45,10 @@ function ShiftTimeline({ form }) {
       </div>
       <div className="timeline__ticks">{[0, 3, 6, 9, 12, 15, 18, 21, 24].map((h) => <span key={h} style={{ left: `${(h / 24) * 100}%` }}>{h}h</span>)}</div>
       <div className="legend mt-3">
-        <span><i style={{ background: '#FDE68A' }} />Giờ làm</span>
-        <span><i style={{ background: '#FCD34D' }} />Ân hạn đi muộn ({grace} phút)</span>
-        <span><i style={{ background: '#CBD5E1' }} />Nghỉ giữa ca ({brk} phút)</span>
-        <span><i style={{ background: '#FEF3C7' }} />Cho vào sớm ({early} phút)</span>
+        <span><i style={{ background: '#D4D4D8' }} />Giờ làm</span>
+        <span><i style={{ background: '#FDE68A' }} />Ân hạn đi muộn ({grace} phút)</span>
+        <span><i style={{ background: '#FFFFFF', border: '1px solid #D4D4D8' }} />Nghỉ giữa ca ({brk} phút)</span>
+        <span><i style={{ background: '#F4F4F5', border: '1px dashed #A1A1AA' }} />Cho vào sớm ({early} phút)</span>
       </div>
     </div>
   )
@@ -105,29 +105,29 @@ export default function ShiftConfigPage() {
           </Card>
           <Card>
             <Form id="shift-form" onSubmit={submit} noValidate>
-              <Form.Group className="mb-4" style={{ maxWidth: 420 }}>
+              <Form.Group className="mb-3" style={{ maxWidth: 420 }}>
                 <Form.Label htmlFor="s-name">Tên ca</Form.Label>
                 <Form.Control id="s-name" maxLength={50} value={form.name} onChange={set('name')} />
               </Form.Group>
-              <div className="row g-4">
+              <div className="row g-3">
                 <div className="col-lg-4">
-                  <div className="form-group-title"><Clock size={17} />Giờ làm</div>
-                  <div className="row g-3">
+                  <div className="form-group-title"><Clock size={16} strokeWidth={1.5} />Giờ làm</div>
+                  <div className="row g-2">
                     <div className="col-6"><Form.Label htmlFor="s-start">Giờ bắt đầu</Form.Label><TimeInput id="s-start" value={form.start_time} onChange={set('start_time')} /></div>
                     <div className="col-6"><Form.Label htmlFor="s-end">Giờ kết thúc</Form.Label><TimeInput id="s-end" value={form.end_time} onChange={set('end_time')} /></div>
                   </div>
                 </div>
                 <div className="col-lg-4">
-                  <div className="form-group-title"><Coffee size={17} />Nghỉ giữa ca</div>
-                  <div className="row g-3">
+                  <div className="form-group-title"><Coffee size={16} strokeWidth={1.5} />Nghỉ giữa ca</div>
+                  <div className="row g-2">
                     <div className="col-6"><Form.Label htmlFor="s-break-start">Giờ bắt đầu nghỉ</Form.Label><TimeInput id="s-break-start" value={form.break_start} onChange={set('break_start')} /></div>
                     <div className="col-6"><Form.Label htmlFor="s-break">Số phút nghỉ</Form.Label>
                       <Form.Control id="s-break" type="number" min={0} max={240} value={form.break_minutes} onChange={set('break_minutes')} /></div>
                   </div>
                 </div>
                 <div className="col-lg-4">
-                  <div className="form-group-title"><ShieldCheck size={17} />Quy định</div>
-                  <div className="row g-3">
+                  <div className="form-group-title"><ShieldCheck size={16} strokeWidth={1.5} />Quy định</div>
+                  <div className="row g-2">
                     <div className="col-6"><Form.Label htmlFor="s-grace">Ân hạn đi muộn (phút)</Form.Label>
                       <Form.Control id="s-grace" type="number" min={0} max={120} value={form.grace_minutes} onChange={set('grace_minutes')} /></div>
                     <div className="col-6"><Form.Label htmlFor="s-early">Cho vào sớm (phút)</Form.Label>
@@ -135,9 +135,9 @@ export default function ShiftConfigPage() {
                   </div>
                 </div>
               </div>
-              {error && <div className="note bad mt-4"><CircleAlert size={18} />{error}</div>}
-              <div className="note info mt-4">
-                <Info size={18} />
+              {error && <div className="note bad mt-3"><CircleAlert size={17} strokeWidth={1.5} />{error}</div>}
+              <div className="note info mt-3">
+                <Info size={17} strokeWidth={1.5} />
                 <div>
                   Giờ nhập dạng 24 giờ HH:MM, ví dụ 07:00. Đi muộn quá số phút ân hạn thì tính toàn bộ số phút từ giờ bắt đầu ca.
                   Số giờ làm chỉ trừ phần nghỉ giữa ca nằm trong khoảng từ giờ vào đến giờ ra. Vào trước giờ bắt đầu quá số phút cho vào

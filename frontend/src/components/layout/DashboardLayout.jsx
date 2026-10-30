@@ -66,11 +66,11 @@ const UserToggle = forwardRef(function UserToggle({ onClick, user }, ref) {
   const name = user?.full_name || user?.username || 'Người dùng'
   return (
     <button ref={ref} type="button" className="user-btn" onClick={(e) => { e.preventDefault(); onClick(e) }}>
-      <span className="avatar" style={{ width: 32, height: 32, fontSize: 13, background: '#FEF3C7', color: '#92400E' }}>
+      <span className="avatar" style={{ width: 26, height: 26, fontSize: 11.5 }}>
         {name.charAt(0).toUpperCase()}
       </span>
       <span className="d-none d-lg-inline">{name}</span>
-      <ChevronDown size={16} className="muted" />
+      <ChevronDown size={15} strokeWidth={1.5} className="muted" />
     </button>
   )
 })
@@ -108,7 +108,7 @@ export default function DashboardLayout() {
       <div className="side-backdrop" onClick={() => setMobileOpen(false)} />
       <aside className="sidebar">
         <NavLink to="/" className="sidebar__brand" title="SafeGate">
-          {collapsed ? <LogoMark size={34} /> : <Logo size={34} />}
+          {collapsed ? <LogoMark size={30} /> : <Logo size={30} />}
         </NavLink>
         <nav className="sidebar__nav">
           {NAV.map(({ group, items }) => (
@@ -116,7 +116,7 @@ export default function DashboardLayout() {
               <div className="sidebar__group">{group}</div>
               {items.map(({ to, icon: Icon, label, end }) => (
                 <NavLink key={to} to={to} end={end} className="sidebar__link" title={collapsed ? label : undefined}>
-                  <Icon size={19} strokeWidth={1.9} />
+                  <Icon size={16} strokeWidth={1.5} />
                   <span className="sidebar__label">{label}</span>
                 </NavLink>
               ))}
@@ -124,15 +124,15 @@ export default function DashboardLayout() {
           ))}
         </nav>
         <div className="sidebar__foot">
-          <a href="/cu/" title="Giao diện Jinja2 cũ, dùng khi giao diện này gặp sự cố"><LifeBuoy size={16} /><span>Giao diện dự phòng</span></a>
-          <a href="/docs" target="_blank" rel="noreferrer" title="Thử API"><Code2 size={16} /><span>API</span></a>
+          <a href="/cu/" title="Giao diện Jinja2 cũ, dùng khi giao diện này gặp sự cố"><LifeBuoy size={15} strokeWidth={1.5} /><span>Giao diện dự phòng</span></a>
+          <a href="/docs" target="_blank" rel="noreferrer" title="Thử API"><Code2 size={15} strokeWidth={1.5} /><span>API</span></a>
         </div>
       </aside>
 
       <div className="main">
         <header className="topbar">
           <button className="btn btn-text btn-icon" onClick={toggle} aria-label="Thu gọn / mở rộng menu">
-            {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+            {collapsed ? <PanelLeftOpen size={17} strokeWidth={1.5} /> : <PanelLeftClose size={17} strokeWidth={1.5} />}
           </button>
           <div className="topbar__title">
             <b>{title}</b>
@@ -148,7 +148,7 @@ export default function DashboardLayout() {
                   <div style={{ fontWeight: 600 }}>{user?.full_name || user?.username}</div>
                   <div className="small muted">{user?.role === 'admin' ? 'Quản trị viên' : 'Tài khoản'} · {user?.username}</div>
                 </div>
-                <Dropdown.Item as="button" onClick={handleLogout}><LogOut size={16} />Đăng xuất</Dropdown.Item>
+                <Dropdown.Item as="button" onClick={handleLogout}><LogOut size={15} strokeWidth={1.5} />Đăng xuất</Dropdown.Item>
               </Dropdown.Menu>
             </Dropdown>
           </div>

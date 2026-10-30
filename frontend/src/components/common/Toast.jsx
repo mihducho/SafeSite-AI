@@ -17,9 +17,9 @@ export default function ToastHost() {
         const Icon = ICON[t.type] ?? Info
         return (
           <div key={t.id} className={`toast-item ${t.type}`} role="alert">
-            <Icon size={20} />
+            <Icon size={17} strokeWidth={1.5} />
             <p>{t.message}</p>
-            <button onClick={() => removeToast(t.id)} aria-label="Đóng"><X size={16} /></button>
+            <button onClick={() => removeToast(t.id)} aria-label="Đóng"><X size={15} strokeWidth={1.5} /></button>
           </div>
         )
       })}
