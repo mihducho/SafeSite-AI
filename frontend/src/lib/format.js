@@ -54,6 +54,28 @@ export function hhmm(value, label) {
   return `${m[1].padStart(2, '0')}:${m[2]}`
 }
 
+/** Số thập phân kiểu Việt Nam: 0.534 -> "0,53" */
+export const soVN = (x, digits = 2) => (x == null ? '' : Number(x).toFixed(digits).replace('.', ','))
+
+/** số phút -> "7 giờ 45 phút" / "45 phút" / "8 giờ" */
+export function gioPhutChu(m) {
+  if (m == null) return ''
+  const h = Math.floor(m / 60)
+  const p = m % 60
+  if (!h) return `${p} phút`
+  return p ? `${h} giờ ${p} phút` : `${h} giờ`
+}
+
+const THU = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+const THU_NGAN = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
+const thuSo = (iso) => new Date(`${iso.slice(0, 10)}T00:00:00Z`).getUTCDay()
+
+/** "2026-10-30" -> "Thứ Sáu, 30/10/2026" */
+export const thuNgay = (iso) => (iso ? `${THU[thuSo(iso)]}, ${ngay(iso)}` : '')
+/** "2026-10-30" -> "T6" (Chủ nhật -> "CN") */
+export const thuNgan = (iso) => THU_NGAN[thuSo(iso)]
+export const laChuNhat = (iso) => thuSo(iso) === 0
+
 /** Chữ cái đầu cho ảnh đại diện: "Nguyễn Văn An" -> "NA" */
 export function chuCaiDau(name) {
   const words = String(name ?? '').trim().split(/\s+/).filter(Boolean)

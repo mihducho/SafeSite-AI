@@ -1,7 +1,8 @@
-import { Modal, Button } from 'react-bootstrap'
+import { Modal, Button, Spinner } from 'react-bootstrap'
+import { CircleAlert, TriangleAlert } from 'lucide-react'
 
 /**
- * Modal xác nhận dùng chung (thay cho window.confirm của trình duyệt).
+ * Hộp xác nhận dùng chung (thay cho window.confirm của trình duyệt).
  *
  * @param {{
  *   show: boolean,
@@ -9,7 +10,7 @@ import { Modal, Button } from 'react-bootstrap'
  *   message: import('react').ReactNode,
  *   onConfirm: () => void,
  *   onCancel: () => void,
- *   variant?: 'danger' | 'warning' | 'primary' | 'success',
+ *   variant?: 'danger' | 'primary' | 'success',
  *   confirmLabel?: string,
  *   cancelLabel?: string,
  *   loading?: boolean,
@@ -26,20 +27,21 @@ export default function ConfirmModal({
   cancelLabel = 'Huỷ',
   loading = false,
 }) {
+  const danger = variant === 'danger'
+  const Icon = danger ? TriangleAlert : CircleAlert
   return (
     <Modal show={show} onHide={onCancel} centered backdrop="static">
-      <Modal.Header closeButton>
-        <Modal.Title>{title}</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <div className="mb-0">{message}</div>
+      <Modal.Body className="d-flex gap-3" style={{ paddingTop: 18 }}>
+        <span className={`stat__icon ${danger ? 'tone-bad' : 'tone-primary'}`}><Icon size={18} strokeWidth={1.5} /></span>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>{title}</div>
+          <div className="muted" style={{ fontSize: 13.5, lineHeight: 1.55 }}>{message}</div>
+        </div>
       </Modal.Body>
       <Modal.Footer>
-        <Button variant="secondary" onClick={onCancel} disabled={loading}>
-          {cancelLabel}
-        </Button>
+        <Button variant="secondary" onClick={onCancel} disabled={loading}>{cancelLabel}</Button>
         <Button variant={variant} onClick={onConfirm} disabled={loading}>
-          {loading ? 'Đang xử lý…' : confirmLabel}
+          {loading && <Spinner size="sm" />}{confirmLabel}
         </Button>
       </Modal.Footer>
     </Modal>

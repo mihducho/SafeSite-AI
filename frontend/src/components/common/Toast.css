@@ -1,66 +1,13 @@
-/* ─── Toast container ─────────────────────────────────────── */
-.sg-toast-container {
-  position: fixed;
-  bottom: 1.25rem;
-  right: 1.25rem;
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-width: 340px;
-  width: 100%;
+/* Thông báo nhỏ (toast) góc trên bên phải: phẳng, viền 1px solid #E4E4E7, bo góc kỹ thuật 6px */
+.toast-stack { position: fixed; top: 14px; right: 14px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; width: min(380px, calc(100vw - 28px)); }
+.toast-item {
+  display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px 11px 14px; background: #FFFFFF;
+  border: 1px solid var(--border); border-left: 3px solid var(--neutral-dot); border-radius: var(--radius);
+  box-shadow: none; font-size: 13px; color: var(--text); animation: sgToastIn 0.18s ease;
 }
-
-/* ─── Individual toast ────────────────────────────────────── */
-.sg-toast {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  font-size: 0.9rem;
-  line-height: 1.4;
-}
-
-.sg-toast__icon {
-  flex-shrink: 0;
-  font-size: 1rem;
-  margin-top: 1px;
-}
-
-.sg-toast__msg {
-  flex: 1;
-  word-break: break-word;
-}
-
-.sg-toast__close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.25rem;
-  line-height: 1;
-  padding: 0;
-  opacity: 0.75;
-  flex-shrink: 0;
-  margin-top: -2px;
-}
-.sg-toast__close:hover {
-  opacity: 1;
-}
-
-/* ─── Slide-in animation ──────────────────────────────────── */
-@keyframes sgToastSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(60px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.sg-toast--enter {
-  animation: sgToastSlideIn 0.25s ease forwards;
-}
+.toast-item.success { border-left-color: #059669; } .toast-item.success > svg { color: #059669; }
+.toast-item.error { border-left-color: #DC2626; } .toast-item.error > svg { color: #DC2626; }
+.toast-item.warning { border-left-color: #D97706; } .toast-item.warning > svg { color: #D97706; }
+.toast-item.info { border-left-color: #2563EB; } .toast-item.info > svg { color: #2563EB; }
+.toast-item p { margin: 0; flex: 1; line-height: 1.45; }
+.toast-item button { border: none; background: none; color: var(--text-2); padding: 0; line-height: 0; }
