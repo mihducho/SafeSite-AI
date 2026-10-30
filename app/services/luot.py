@@ -1,23 +1,28 @@
-"""Xu ly 1 luot kiem tra tai cong (DE_TAI.md muc 5 buoc 5-6, muc 7, 8).
+"""Xu ly 1 luot kiem tra tai cong (DE_TAI.md muc 5 buoc 5-6, muc 7, 8; docs/LOGIC_CHAM_CONG.md).
 
-GateWorker (thread nen) xong 1 luot -> LuotKiemTra.tu_ket_qua_cong(ket_qua) -> xu_ly_luot(db, luot):
+GateWorker (thread nen) xong 1 luot -> LuotKiemTra.tu_ket_qua_cong(ket_qua, luc bat dau luot) -> xu_ly_luot(db, luot):
   1. nhan dien: vector khuon mat -> cong nhan (nhan_dien.py) hoac KHONG_NHAN_RA / KHONG_THAY_MAT;
-  2. luu anh minh chung vao paths.check_images/<ngay>/<gio>_<ma>.jpg;
-  3. ghi ppe_checks (ket qua bao ho, diem nhan dien, ...; KHONG ghi vector);
-  4. da nhan ra -> cham_cong.py quyet dinh vao/ra va ghi hoac khong ghi attendance;
-  5. tra ve SU KIEN cho man hinh cong: mau (xanh/do/vang), cau thong bao, cong nhan, hanh dong, gio, anh.
+  2. DUOI khoa theo cong nhan (cham_cong.khoa_cong_nhan): ghi ppe_checks (KHONG ghi vector), cham_cong.py quyet dinh
+     vao / ra va ghi phien; commit. Loi IntegrityError (ghi dong thoi tu tien trinh khac): rollback, thu lai 1 lan;
+  3. SAU khi commit thanh cong moi ghi anh minh chung paths.check_images/<ngay>/<gio>_<ma>.jpg (file tam roi doi ten):
+     loi CSDL thi khong de lai file mo coi;
+  4. tra ve SU KIEN cho man hinh cong: mau (xanh/do/vang, phan_loai_luot: dung chung voi trang Tong quan), cau thong
+     bao (+ dong phu), cong nhan, hanh dong, gio, anh.
 """
+import os
 import uuid
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from app.models import PpeCheck, Worker
-from app.services.cham_cong import (BO_QUA_TRUNG, GHI_RA, GHI_VAO, KHONG_GHI, KetQuaChamCong, cham_cong_tu_dong,
-                                    gio_phut, mui_gio)
+from app.services.cham_cong import (BO_QUA_TRUNG, GHI_RA, GHI_VAO, KHONG_GHI, NGOAI_GIO_VAO, VAO, KetQuaChamCong,
+                                    cham_cong_tu_dong, gio_phut, khoa_cong_nhan, mui_gio)
 from app.services.nhan_dien import NhanDien
 from src.checkpoint.evaluate import KHONG_CO_NGUOI, KHONG_DAT, NHIEU_NGUOI
 
@@ -67,36 +72,61 @@ class LuotKiemTra:
                    thoi_gian_ms=r.get("thoi_gian_ms"), chi_tiet=json_safe(chi_tiet))
 
 
-def luu_anh(jpeg: bytes | None, image_dir: Path, t: datetime, tz) -> str | None:
-    """Ghi anh luot ra file, tra ve duong dan tuong doi (luu vao ppe_checks.image_path)."""
-    if not jpeg:
-        return None
+def duong_dan_anh(t: datetime, tz) -> str:
+    """Duong dan tuong doi cua anh luot (luu vao ppe_checks.image_path), vd 2026-11-02/070000_ab12cd34.jpg."""
     local = t.astimezone(tz)
-    rel = f"{local:%Y-%m-%d}/{local:%H%M%S}_{uuid.uuid4().hex[:8]}.jpg"
+    return f"{local:%Y-%m-%d}/{local:%H%M%S}_{uuid.uuid4().hex[:8]}.jpg"
+
+
+def ghi_anh(jpeg: bytes, image_dir: Path, rel: str) -> None:
+    """Ghi file tam roi doi ten: khong bao gio co file anh ghi do dang."""
     path = Path(image_dir) / rel
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(jpeg)
-    return rel
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_bytes(jpeg)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
-def thong_bao_cong(luot: LuotKiemTra, worker: Worker | None, kq: KetQuaChamCong, tz) -> tuple[str, str]:
-    """(mau, cau thong bao) cho man hinh cong (DE_TAI muc 5 buoc 6)."""
-    if luot.ket_qua == NHIEU_NGUOI:
-        return VANG, "Mời từng người một"
-    if luot.ket_qua == KHONG_CO_NGUOI:
-        return VANG, "Mời đứng vào vị trí, nhìn vào camera"
-    if worker is None:
-        return VANG, "Chưa nhận diện được, mời nhìn thẳng camera"
+def phan_loai_luot(ket_qua: str, nhan_ra: bool, hanh_dong: str, ly_do: str | None = None) -> str:
+    """Mau cua 1 luot tren man hinh cong (xanh / do / vang). Dung chung voi trang Tong quan (Q14): "luot khong dat"
+    = luot mau DO = luot VAO cua nguoi DA NHAN RA bi KHONG_DAT (trong gio vao ca)."""
+    if hanh_dong in (GHI_VAO, GHI_RA, BO_QUA_TRUNG):
+        return XANH
+    if nhan_ra and ket_qua == KHONG_DAT and not ly_do:
+        return DO
+    return VANG
+
+
+def thong_bao_cong(luot: LuotKiemTra, worker: Worker | None, kq: KetQuaChamCong, tz) -> tuple[str, str, str | None]:
+    """(mau, cau thong bao, dong phu) cho man hinh cong (DE_TAI muc 5 buoc 6)."""
+    mau = phan_loai_luot(luot.ket_qua, worker is not None, kq.hanh_dong, kq.ly_do)
+    if worker is None or (kq.hanh_dong == KHONG_GHI and luot.ket_qua in (NHIEU_NGUOI, KHONG_CO_NGUOI)):
+        if luot.ket_qua == NHIEU_NGUOI:
+            return mau, "Mời từng người một", None
+        if luot.ket_qua == KHONG_CO_NGUOI:
+            return mau, "Mời đứng vào vị trí, nhìn vào camera", None
+        return mau, "Chưa nhận diện được, mời nhìn thẳng camera", None
     ten, gio = worker.full_name, gio_phut(luot.thoi_diem, tz)
     if kq.hanh_dong == GHI_VAO:
-        return XANH, f"Xin chào {ten}. Đã ghi vào lại {gio}" if kq.vao_lai else f"Xin chào {ten}. Đã ghi giờ vào {gio}"
+        return mau, (f"Chào mừng trở lại {ten}. Đã ghi giờ vào {gio}" if kq.vao_lai
+                     else f"Xin chào {ten}. Đã ghi giờ vào {gio}"), None
     if kq.hanh_dong == GHI_RA:
-        return XANH, f"Tạm biệt {ten}. Đã ghi giờ ra {gio}"
+        if kq.tong_hop is not None and kq.tong_hop.som_co_phep:
+            return mau, f"Tạm biệt {ten}. Đã ghi giờ ra {gio} (về sớm có phép)", None
+        return mau, f"Tạm biệt {ten}. Đã ghi giờ ra {gio}", \
+            "Về sớm chưa có phép, vui lòng báo tổ trưởng" if kq.nhac_ve_som else None
     if kq.hanh_dong == BO_QUA_TRUNG:
-        return XANH, f"{ten}: đã ghi giờ vào {gio_phut(kq.gio_vao_truoc, tz)}, không ghi lặp"
+        loai = "vào" if kq.moc_huong == VAO else "ra"
+        return mau, f"{ten}: đã ghi giờ {loai} {gio_phut(kq.moc, tz)}, không ghi lặp", None
+    if kq.ly_do == NGOAI_GIO_VAO:
+        return mau, (f"Chưa đến giờ vào ca (từ {gio_phut(kq.moc, tz)})" if kq.som_qua
+                     else "Đã hết giờ vào ca hôm nay"), None
     if luot.ket_qua == KHONG_DAT:  # luot vao khong dat
-        return DO, f"{ten}: {', '.join(TEN_THIEU.get(t, t) for t in luot.thieu)}. Chưa ghi công"
-    return VANG, f"{ten}: mời đứng yên để kiểm tra lại"  # KHONG_XAC_DINH
+        return mau, f"{ten}: {', '.join(TEN_THIEU.get(t, t) for t in luot.thieu)}. Chưa ghi công", None
+    return mau, f"{ten}: mời đứng yên để kiểm tra lại", None  # KHONG_XAC_DINH
 
 
 def xu_ly_luot(db: Session, luot: LuotKiemTra, *, settings: dict, nhan_dien: NhanDien, image_dir: str | Path,
@@ -117,30 +147,44 @@ def xu_ly_luot(db: Session, luot: LuotKiemTra, *, settings: dict, nhan_dien: Nha
                   "gan_nhat_id": m.ma_gan_nhat, "gan_nhat_ma": nearest.code if nearest else None,
                   "diem": None if m.diem is None else round(m.diem, 4),
                   "diem_thu_hai": None if m.diem_thu_hai is None else round(m.diem_thu_hai, 4)}}
-    check = PpeCheck(
-        gate_id=gate_id, worker_id=worker.id if worker else None, checked_at=luot.thoi_diem, face_status=face_status,
-        face_score=None if m is None or m.diem is None else round(m.diem, 4), result=luot.ket_qua,
-        missing=list(luot.thieu), presence_ratio=json_safe(luot.ty_le_co_mat), reason=luot.ly_do,
-        duration_ms=luot.thoi_gian_ms, action=KHONG_GHI,
-        image_path=luu_anh(luot.anh_jpeg, Path(image_dir), luot.thoi_diem, tz), detail=json_safe(detail))
-    db.add(check)
-    db.flush()  # lay check.id cho attendance.ppe_check_id
+    worker_id = worker.id if worker is not None else None
+    rel = duong_dan_anh(luot.thoi_diem, tz) if luot.anh_jpeg else None
 
-    kq = KetQuaChamCong(None, KHONG_GHI)
-    if worker is not None:
-        kq = cham_cong_tu_dong(db, worker, luot.ket_qua, luot.thoi_diem, check, settings["attendance"])
-    check.direction, check.action = kq.huong, kq.hanh_dong
-    db.commit()
+    for lan in (1, 2):  # ghi dong thoi tu tien trinh khac -> IntegrityError: rollback, doc lai, thu lai 1 lan
+        try:
+            with khoa_cong_nhan(db, worker_id) if worker_id is not None else nullcontext():
+                worker = db.get(Worker, worker_id) if worker_id is not None else None
+                check = PpeCheck(
+                    gate_id=gate_id, worker_id=worker_id, checked_at=luot.thoi_diem, face_status=face_status,
+                    face_score=None if m is None or m.diem is None else round(m.diem, 4), result=luot.ket_qua,
+                    missing=list(luot.thieu), presence_ratio=json_safe(luot.ty_le_co_mat), reason=luot.ly_do,
+                    duration_ms=luot.thoi_gian_ms, action=KHONG_GHI, image_path=rel, detail=json_safe(detail))
+                db.add(check)
+                db.flush()  # lay check.id cho phien (vao_check_id / ra_check_id)
+                kq = KetQuaChamCong(None, KHONG_GHI)
+                if worker is not None:
+                    kq = cham_cong_tu_dong(db, worker, luot.ket_qua, luot.thoi_diem, check, settings["attendance"])
+                check.direction, check.action, check.action_reason = kq.huong, kq.hanh_dong, kq.ly_do
+                db.commit()
+            break
+        except (IntegrityError, OperationalError):
+            db.rollback()
+            if lan == 2:
+                raise
+    if rel:
+        ghi_anh(luot.anh_jpeg, Path(image_dir), rel)  # sau khi commit: loi CSDL thi khong co file mo coi
 
-    mau, text = thong_bao_cong(luot, worker, kq, tz)
+    mau, text, phu = thong_bao_cong(luot, worker, kq, tz)
     return {
         "loai": "luot",
         "id": check.id,
         "mau": mau,
         "thong_bao": text,
+        "thong_bao_phu": phu,  # vd "Về sớm chưa có phép, vui lòng báo tổ trưởng"
         "cong_nhan": None if worker is None else {"id": worker.id, "ma": worker.code, "ten": worker.full_name},
         "hanh_dong": kq.hanh_dong,
         "huong": kq.huong,
+        "ly_do_ghi": kq.ly_do,
         "gio": gio_phut(luot.thoi_diem, tz),
         "thoi_diem": luot.thoi_diem.astimezone(tz).isoformat(timespec="seconds"),
         "ket_qua": luot.ket_qua,

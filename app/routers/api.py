@@ -17,8 +17,10 @@ from sqlalchemy.orm import Session
 from app.auth import authenticate, current_user, login_session
 from app.db import get_db, utcnow
 from app.config import mask_source
-from app.models import DANG_LAM, Attendance, FaceSample, Gate, PpeCheck, Shift, Team, User, Worker
-from app.services import bao_cao, cham_cong, cong_nhan
+from app.models import DANG_LAM, Attendance, AttendanceSegment, FaceSample, Gate, NhatKyChamCong, Phep, PpeCheck, Shift, \
+    Team, User, Worker
+from app.services import bao_cao, cham_cong, cong_nhan, phep
+from app.services.tinh_cong import LOAI_PHEP
 from app.services.dang_ky_mat import CAMERA, NOI_DUNG_DONG_Y, UPLOAD, DangKyMatError
 from src.zone.zone import zone_to_pixels
 
@@ -50,11 +52,14 @@ def _get(db: Session, model, obj_id: int, name: str):
 
 
 def worker_json(w: Worker, tz, so_mau: int | None = None) -> dict:
+    vao_lam = cham_cong.khoang_lam_viec(w, tz)[0]
     return {"id": w.id, "code": w.code, "full_name": w.full_name, "phone": w.phone, "trade": w.trade,
             "team_id": w.team_id, "team_name": w.team.name if w.team else None, "status": w.status,
             "consent_at": _iso(w.consent_at, tz), "consent_by": w.consent_by,
             "consent_by_name": (w.consent_user.full_name or w.consent_user.username) if w.consent_user else None,
-            "created_at": _iso(w.created_at, tz), "so_mau": so_mau}
+            "created_at": _iso(w.created_at, tz), "so_mau": so_mau,
+            "ngay_vao_lam": vao_lam.isoformat() if vao_lam else None,
+            "ngay_nghi_viec": w.ngay_nghi_viec.isoformat() if w.ngay_nghi_viec else None}
 
 
 def team_json(t: Team, so_cong_nhan: int | None = None) -> dict:
@@ -73,7 +78,7 @@ def check_json(c: PpeCheck, tz) -> dict:
             "cong_nhan": None if c.worker is None else {"id": c.worker.id, "ma": c.worker.code, "ten": c.worker.full_name},
             "trang_thai_mat": c.face_status, "diem": c.face_score, "ket_qua": c.result, "thieu": c.missing,
             "ty_le_co_mat": c.presence_ratio, "ly_do": c.reason, "thoi_gian_ms": c.duration_ms, "huong": c.direction,
-            "hanh_dong": c.action, "anh": f"/api/luot/{c.id}/anh" if c.image_path else None,
+            "hanh_dong": c.action, "ly_do_ghi": c.action_reason, "anh": f"/api/luot/{c.id}/anh" if c.image_path else None,
             "danh_gia": c.review_status, "chi_tiet": c.detail}
 
 
@@ -81,7 +86,16 @@ def attendance_json(a: Attendance, tz) -> dict:
     return {"id": a.id, "worker_id": a.worker_id, "ngay": a.work_date.isoformat(), "shift_id": a.shift_id,
             "gio_vao": _iso(a.check_in, tz), "gio_ra": _iso(a.check_out, tz), "ppe_check_id": a.ppe_check_id,
             "di_muon_phut": a.late_minutes, "ve_som_phut": a.early_leave_minutes, "so_phut_lam": a.worked_minutes,
-            "trang_thai": a.status, "ghi_chu": a.note, "updated_by": a.updated_by, "updated_at": _iso(a.updated_at, tz)}
+            "trang_thai": a.status, "ghi_chu": a.note, "updated_by": a.updated_by, "updated_at": _iso(a.updated_at, tz),
+            "so_lan_ra_ngoai": a.so_lan_ra_ngoai, "phut_ra_ngoai": a.phut_ra_ngoai, "phut_cong_tac": a.phut_cong_tac,
+            "phien": [bao_cao.phien_json(s, tz) for s in sorted(a.segments, key=lambda s: s.vao_at)]}
+
+
+def nhat_ky_json(n: NhatKyChamCong, tz) -> dict:
+    return {"id": n.id, "worker_id": n.worker_id, "ngay": n.ngay.isoformat(), "attendance_id": n.attendance_id,
+            "segment_id": n.segment_id, "phep_id": n.phep_id, "hanh_dong": n.hanh_dong, "gia_tri_cu": n.gia_tri_cu,
+            "gia_tri_moi": n.gia_tri_moi, "ly_do": n.ly_do, "user_id": n.user_id,
+            "nguoi_sua": (n.user.full_name or n.user.username) if n.user else None, "thoi_diem": _iso(n.thoi_diem, tz)}
 
 
 def _sample_count(db: Session, worker_id: int) -> int:
@@ -134,6 +148,7 @@ class WorkerIn(BaseModel):
     phone: str | None = Field(None, max_length=20)
     trade: str | None = Field(None, max_length=50, examples=["Thợ xây"])
     team_id: int | None = None
+    ngay_vao_lam: date | None = Field(None, description="YYYY-MM-DD; bỏ trống = hôm nay")
 
 
 class WorkerPatch(BaseModel):
@@ -142,6 +157,7 @@ class WorkerPatch(BaseModel):
     phone: str | None = Field(None, max_length=20)
     trade: str | None = Field(None, max_length=50)
     team_id: int | None = None
+    ngay_vao_lam: date | None = None
 
 
 class ConsentIn(BaseModel):
@@ -169,7 +185,9 @@ def list_workers(request: Request, q: str | None = Query(None, description="Tìm
 
 @router.post("/cong-nhan", status_code=201, tags=["cong nhan"])
 def create_worker(body: WorkerIn, request: Request, db: Session = Depends(get_db)):
-    w = cong_nhan.tao_cong_nhan(db, body.model_dump())
+    data = body.model_dump()
+    data["ngay_vao_lam"] = data["ngay_vao_lam"] or cham_cong.ngay_cong(utcnow(), _tz(request))
+    w = cong_nhan.tao_cong_nhan(db, data)
     return worker_json(w, _tz(request), 0)
 
 
@@ -186,10 +204,11 @@ def update_worker(worker_id: int, body: WorkerPatch, request: Request, db: Sessi
 
 
 @router.post("/cong-nhan/{worker_id}/nghi-viec", tags=["cong nhan"])
-def worker_quit(worker_id: int, request: Request, db: Session = Depends(get_db)):
-    """Cho nghỉ việc: không còn được nhận diện, XOÁ toàn bộ mẫu khuôn mặt (vector + ảnh)."""
+def worker_quit(worker_id: int, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Cho nghỉ việc: lưu ngày nghỉ việc, đóng phiên đang mở (nếu có) tại lúc này, không còn được nhận diện,
+    XOÁ toàn bộ mẫu khuôn mặt (vector + ảnh)."""
     w = _get(db, Worker, worker_id, "công nhân")
-    n = cong_nhan.cho_nghi_viec(db, w, _state(request).dang_ky)
+    n = cong_nhan.cho_nghi_viec(db, w, _state(request).dang_ky, user)
     return {"cong_nhan": worker_json(w, _tz(request), 0), "so_mau_da_xoa": n}
 
 
@@ -426,11 +445,138 @@ def monthly_excel(request: Request, thang: str | None = Query(None, description=
 @router.post("/cham-cong-thu-cong", tags=["cham cong"])
 def manual_attendance(body: ManualIn, request: Request, db: Session = Depends(get_db),
                       user: User = Depends(current_user)):
-    """Thêm hoặc sửa giờ vào/ra. Bắt buộc có lý do; trạng thái chuyển thành cham_thu_cong, lưu người sửa."""
+    """Thêm hoặc sửa giờ vào/ra CỦA NGÀY (giữ cho giao diện cũ). Ngày chưa có phiên: thêm 1 phiên; đã có: giờ vào sửa
+    phiên đầu, giờ ra sửa (hoặc đóng) phiên cuối. Bắt buộc có lý do; mỗi thay đổi 1 dòng nhật ký."""
     w = _get(db, Worker, body.worker_id, "công nhân")
     a = cham_cong.cham_thu_cong(db, w, body.ngay, body.gio_vao, body.gio_ra, body.ly_do, user,
                                 _state(request).settings["attendance"])
     return attendance_json(a, _tz(request))
+
+
+@router.get("/bang-cong/cong-nhan/{worker_id}/{ngay}", tags=["cham cong"])
+def day_detail(worker_id: int, ngay: date, request: Request, db: Session = Depends(get_db)):
+    """Bảng công 1 ngày của 1 công nhân: trạng thái, các phiên, các phép, nhật ký sửa."""
+    st, tz = _state(request), _tz(request)
+    w = _get(db, Worker, worker_id, "công nhân")
+    row = bao_cao.chi_tiet_ngay(db, w, ngay, st.settings["attendance"], utcnow())
+    logs = db.scalars(select(NhatKyChamCong).where(NhatKyChamCong.worker_id == w.id, NhatKyChamCong.ngay == ngay)
+                      .order_by(NhatKyChamCong.thoi_diem, NhatKyChamCong.id)).all()
+    return {**row, "nhat_ky": [nhat_ky_json(n, tz) for n in logs]}
+
+
+@router.get("/bang-cong/{attendance_id}/nhat-ky", tags=["cham cong"])
+def attendance_log(attendance_id: int, request: Request, db: Session = Depends(get_db)):
+    """Nhật ký mọi thao tác tay của 1 ngày công (giá trị cũ, mới, người sửa, lý do), cũ trước."""
+    a = _get(db, Attendance, attendance_id, "dòng bảng công")
+    logs = db.scalars(select(NhatKyChamCong).where(or_(NhatKyChamCong.attendance_id == a.id, (
+        NhatKyChamCong.worker_id == a.worker_id) & (NhatKyChamCong.ngay == a.work_date)))
+                      .order_by(NhatKyChamCong.thoi_diem, NhatKyChamCong.id)).all()
+    return {"attendance_id": a.id, "ds": [nhat_ky_json(n, _tz(request)) for n in logs]}
+
+
+class SegmentIn(BaseModel):
+    worker_id: int
+    ngay: date = Field(description="YYYY-MM-DD (ngày công)")
+    gio_vao: time = Field(description="HH:MM[:SS] giờ Việt Nam", examples=["07:00"])
+    gio_ra: time | None = Field(None, description="bỏ trống = phiên đang mở", examples=["17:00"])
+    ly_do: str = Field(description="Bắt buộc")
+
+
+class SegmentPatch(BaseModel):
+    gio_vao: time | None = None
+    gio_ra: time | None = Field(None, description="nhập giờ ra cho phiên đang mở / thiếu giờ ra = đóng phiên")
+    ly_do: str = Field(description="Bắt buộc")
+
+
+class ReasonIn(BaseModel):
+    ly_do: str = Field(description="Bắt buộc")
+
+
+def _day_json(db: Session, a: Attendance, request: Request) -> dict:
+    return bao_cao.chi_tiet_ngay(db, a.worker, a.work_date, _state(request).settings["attendance"], utcnow())
+
+
+@router.post("/phien", status_code=201, tags=["cham cong"])
+def add_segment(body: SegmentIn, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Chấm tay: thêm 1 phiên. Từ chối: thời điểm chưa tới, giờ ra ≤ giờ vào, chồng lấn phiên khác, ngoài thời gian
+    làm việc của công nhân, đã có phiên mở mà thêm phiên mở nữa."""
+    w = _get(db, Worker, body.worker_id, "công nhân")
+    s = cham_cong.them_phien(db, w, body.ngay, body.gio_vao, body.gio_ra, body.ly_do, user,
+                             _state(request).settings["attendance"])
+    return {"phien": bao_cao.phien_json(s, _tz(request)), "ngay": _day_json(db, s.attendance, request)}
+
+
+@router.patch("/phien/{segment_id}", tags=["cham cong"])
+def edit_segment(segment_id: int, body: SegmentPatch, request: Request, db: Session = Depends(get_db),
+                 user: User = Depends(current_user)):
+    """Chấm tay: sửa giờ vào / giờ ra của 1 phiên (kể cả đóng phiên thiếu giờ ra). Mỗi thay đổi 1 dòng nhật ký."""
+    s = cham_cong.sua_phien(db, _get(db, AttendanceSegment, segment_id, "phiên"), body.gio_vao, body.gio_ra,
+                            body.ly_do, user, _state(request).settings["attendance"])
+    return {"phien": bao_cao.phien_json(s, _tz(request)), "ngay": _day_json(db, s.attendance, request)}
+
+
+@router.post("/phien/{segment_id}/huy", tags=["cham cong"])
+def cancel_segment(segment_id: int, body: ReasonIn, request: Request, db: Session = Depends(get_db),
+                   user: User = Depends(current_user)):
+    s = cham_cong.huy_phien(db, _get(db, AttendanceSegment, segment_id, "phiên"), body.ly_do, user,
+                            _state(request).settings["attendance"])
+    return {"phien": bao_cao.phien_json(s, _tz(request)), "ngay": _day_json(db, s.attendance, request)}
+
+
+# ---------- phep / giai trinh ----------
+class PhepIn(BaseModel):
+    worker_id: int
+    ngay: date = Field(description="YYYY-MM-DD (ngày công)")
+    loai: Literal[LOAI_PHEP] = Field(description="ve_som | di_muon | ra_ngoai_cong_viec | nghi_ca_ngay")
+    tu_gio: time | None = Field(None, description="về sớm: giờ được về; ra ngoài: từ giờ")
+    den_gio: time | None = Field(None, description="đi muộn: giờ dự kiến đến; ra ngoài: đến giờ")
+    tinh_cong: bool | None = Field(None, description="mặc định: có cho ra_ngoai_cong_viec, không cho loại khác")
+    ly_do: str = Field(description="Bắt buộc")
+
+
+@router.get("/phep", tags=["phep"])
+def list_leaves(request: Request, worker_id: int | None = None, ngay: date | None = None, tu: date | None = None,
+                den: date | None = None, ca_huy: bool = False, db: Session = Depends(get_db)):
+    """Liệt kê phép theo công nhân và / hoặc theo ngày (mới nhất trước)."""
+    tz = _tz(request)
+    return {"ds": [bao_cao.phep_json(p, tz) for p in phep.liet_ke(db, worker_id, ngay, tu, den, ca_huy)]}
+
+
+@router.post("/phep", status_code=201, tags=["phep"])
+def add_leave(body: PhepIn, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    w = _get(db, Worker, body.worker_id, "công nhân")
+    p = phep.them_phep(db, w, body.ngay, body.loai, body.ly_do, user, _state(request).settings["attendance"],
+                       tu_gio=body.tu_gio, den_gio=body.den_gio, tinh_cong=body.tinh_cong)
+    return bao_cao.phep_json(p, _tz(request))
+
+
+@router.post("/phep/{phep_id}/huy", tags=["phep"])
+def cancel_leave(phep_id: int, body: ReasonIn, request: Request, db: Session = Depends(get_db),
+                 user: User = Depends(current_user)):
+    p = phep.huy_phep(db, _get(db, Phep, phep_id, "phép"), body.ly_do, user, _state(request).settings["attendance"])
+    return bao_cao.phep_json(p, _tz(request))
+
+
+# ---------- viec can xu ly ----------
+@router.get("/viec-can-xu-ly", tags=["cham cong"])
+def todo_list(request: Request, db: Session = Depends(get_db)):
+    """Ngày thiếu giờ ra; ngày đi muộn / về sớm KHÔNG phép quá ngưỡng (attendance.nguong_can_giai_trinh_phut)."""
+    ds = bao_cao.viec_can_xu_ly(db, _state(request).settings["attendance"], utcnow())
+    return {"tong": len(ds), "ds": ds}
+
+
+class ConfirmIn(BaseModel):
+    attendance_id: int
+    ly_do: str | None = None
+
+
+@router.post("/viec-can-xu-ly/xac-nhan-khong-phep", tags=["cham cong"])
+def confirm_no_leave(body: ConfirmIn, request: Request, db: Session = Depends(get_db),
+                     user: User = Depends(current_user)):
+    """Xác nhận ngày đi muộn / về sớm là KHÔNG có phép: ghi nhật ký, rời khỏi danh sách Việc cần xử lý."""
+    a = cham_cong.xac_nhan_khong_phep(db, _get(db, Attendance, body.attendance_id, "dòng bảng công"), body.ly_do, user,
+                                      _state(request).settings["attendance"])
+    return _day_json(db, a, request)
 
 
 @router.get("/tong-quan", tags=["cham cong"])
@@ -451,12 +597,14 @@ class ShiftPatch(BaseModel):
     break_minutes: int | None = Field(None, ge=0, le=240)
     grace_minutes: int | None = Field(None, ge=0, le=120)
     early_checkin_minutes: int | None = Field(None, ge=0, le=240)
+    phut_chong_trung: int | None = Field(None, ge=1, le=120, description="2 lần ghi công cách nhau dưới chừng này phút "
+                                                                       "-> bỏ qua trùng")
 
 
 def shift_json(s: Shift) -> dict:
     return {"id": s.id, "name": s.name, "start_time": f"{s.start_time:%H:%M}", "end_time": f"{s.end_time:%H:%M}",
             "break_start": f"{s.break_start:%H:%M}", "break_minutes": s.break_minutes, "grace_minutes": s.grace_minutes,
-            "early_checkin_minutes": s.early_checkin_minutes}
+            "early_checkin_minutes": s.early_checkin_minutes, "phut_chong_trung": s.phut_chong_trung}
 
 
 @router.get("/ca-lam", tags=["ca lam"])

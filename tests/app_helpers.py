@@ -10,7 +10,7 @@ import copy
 import os
 import sys
 import tempfile
-from datetime import datetime, time
+from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -20,6 +20,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from sqlalchemy import select
 from sqlalchemy.engine import make_url
 
 from app.auth import hash_password
@@ -42,7 +43,9 @@ FAST_HASH = hash_password(PASSWORD, iterations=1000)  # test khong can 600 000 v
 SETTINGS = copy.deepcopy(BASE_SETTINGS)
 SETTINGS["face"].update(min_samples=3, max_samples=10, match_threshold=0.40, match_margin=0.05, enroll_min_score=0.85,
                         min_face_px=50, enroll_long_side=1280)
-SETTINGS["attendance"].update(duplicate_minutes=2, missing_checkout_hours=4, timezone="Asia/Ho_Chi_Minh")
+SETTINGS["attendance"].update(missing_checkout_hours=4, quet_thieu_gio_ra_phut=5, timezone="Asia/Ho_Chi_Minh",
+                              ngay_nghi_tuan=["chu_nhat"], dung_sai_phep_phut=15, nguong_can_giai_trinh_phut=15,
+                              phep_toi_da_truoc_ngay=30)
 SETTINGS["web"].update(page_size=20, max_page_size=200, max_upload_mb=10)
 
 
@@ -94,17 +97,29 @@ def add_admin(s, username: str = "admin") -> User:
 
 
 def add_shift(s) -> Shift:
+    """Ca mau cua cac test: 07:00-17:00, nghi 11:30-12:30, an han 5, cho vao som 60, chong quet trung 10 phut."""
     shift = Shift(name="Ca hành chính", start_time=time(7, 0), end_time=time(17, 0), break_start=time(11, 30),
-                  break_minutes=60, grace_minutes=5, early_checkin_minutes=60)
+                  break_minutes=60, grace_minutes=5, early_checkin_minutes=60, phut_chong_trung=10)
     s.add(shift)
     s.commit()
     return shift
 
 
+def ca_ca_ngay(s) -> Shift:
+    """Doi ca dau tien thanh 00:00-23:59 (vao som 0): cho test dung GIO THAT (utcnow) - luot luc nao cung trong cua so
+    vao ca, ket qua khong phu thuoc gio chay test."""
+    shift = s.scalar(select(Shift).order_by(Shift.id).limit(1))
+    shift.start_time, shift.end_time, shift.early_checkin_minutes = time(0, 0), time(23, 59, 59), 0
+    s.commit()
+    return shift
+
+
 def add_worker(s, code: str, name: str, face_index: int | None = None, n_samples: int = 3, consent: bool = True,
-               team_id: int | None = None) -> Worker:
-    """Cong nhan co n_samples mau gia quanh unit(face_index) (ghi thang vao CSDL, bo qua buoc anh)."""
-    w = Worker(code=code, full_name=name, team_id=team_id, consent_at=utcnow() if consent else None)
+               team_id: int | None = None, ngay_vao_lam: date = date(2026, 1, 1)) -> Worker:
+    """Cong nhan co n_samples mau gia quanh unit(face_index) (ghi thang vao CSDL, bo qua buoc anh). Ngay vao lam co
+    dinh (01/01/2026) de cac ngay test co dinh (thang 10/2026) luon nam trong thoi gian lam viec."""
+    w = Worker(code=code, full_name=name, team_id=team_id, consent_at=utcnow() if consent else None,
+               ngay_vao_lam=ngay_vao_lam)
     s.add(w)
     s.flush()
     if face_index is not None:

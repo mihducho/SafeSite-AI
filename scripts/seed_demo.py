@@ -3,7 +3,7 @@
   1. Tai khoan quan tri: ADMIN_USERNAME / ADMIN_PASSWORD trong .env (mat khau doi trong .env thi chay lai de cap nhat).
   2. 1 cong: nguon hinh + vung kiem tra. Vung lay tu configs/gates.yaml (--zone ten_cong, vd cong_dt) hoac ca khung hinh.
   3. Ca mac dinh (attendance.default_shift trong settings.yaml): 07:00-17:00, nghi trua 11:30 (60 phut), an han 5,
-     vao som 60 phut. --ca 08:00-16:00: doi gio bat dau/ket thuc ca (vd cho hop gio thi).
+     vao som 60 phut, chong quet trung 10 phut. --ca 08:00-16:00: doi gio bat dau/ket thuc ca (vd cho hop gio thi).
   4. 2 to doi mau (chi tao khi chua co to doi nao).
   5. (tuy chon) --faces <thu_muc>: nhap mau khuon mat tu <thu_muc>/<ma_cong_nhan>/*.jpg cho cong nhan DA CO trong CSDL
      (dung lai src/face/enroll.py). Cong nhan chua ghi nhan dong y thi bo qua, tru khi them --dong-y (xac nhan da co
@@ -135,7 +135,7 @@ def seed_shift(db, settings, hours: tuple[time, time] | None = None) -> Shift:
         shift = Shift(name=d["name"], start_time=parse_hhmm(d["start"]), end_time=parse_hhmm(d["end"]),
                       break_start=parse_hhmm(d["break_start"]), break_minutes=d["break_minutes"],
                       grace_minutes=d["grace_minutes"], early_checkin_minutes=d["early_checkin_minutes"],
-                      is_overnight=False, is_overtime=False)
+                      phut_chong_trung=d["phut_chong_trung"], is_overnight=False, is_overtime=False)
         db.add(shift)
         action = "Tao"
     else:
@@ -145,7 +145,8 @@ def seed_shift(db, settings, hours: tuple[time, time] | None = None) -> Shift:
         action = "Doi gio" if action != "Tao" else action
     db.commit()
     print(f"{action} ca '{shift.name}' {shift.start_time:%H:%M}-{shift.end_time:%H:%M}, nghi trua {shift.break_start:%H:%M} "
-          f"({shift.break_minutes} phut), an han {shift.grace_minutes}, vao som {shift.early_checkin_minutes} phut")
+          f"({shift.break_minutes} phut), an han {shift.grace_minutes}, vao som {shift.early_checkin_minutes} phut, "
+          f"chong quet trung {shift.phut_chong_trung} phut")
     return shift
 
 

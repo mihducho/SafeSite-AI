@@ -93,6 +93,18 @@ class Database:
         from app import models  # noqa: F401  (dang ky cac bang voi Base.metadata)
         Base.metadata.create_all(self.engine)
 
+    def cot_con_thieu(self) -> list[str]:
+        """Cot co trong models nhung chua co trong CSDL (CSDL tao tu phien ban cu; create_all khong them cot)."""
+        from sqlalchemy import inspect
+
+        insp = inspect(self.engine)
+        missing = []
+        for table in Base.metadata.sorted_tables:
+            if insp.has_table(table.name):
+                have = {c["name"] for c in insp.get_columns(table.name)}
+                missing += [f"{table.name}.{c.name}" for c in table.columns if c.name not in have]
+        return missing
+
     def session(self) -> Session:
         return self.Session()
 

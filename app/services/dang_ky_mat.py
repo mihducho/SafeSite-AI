@@ -55,6 +55,7 @@ class DangKyMat:
     Dung bo YuNet/SFace RIENG voi vong lap cong (2 thread dung chung 1 bo OpenCV khong an toan) + khoa."""
 
     def __init__(self, settings: dict, sample_dir: str | Path, nhan_dien: NhanDien, face_models=None):
+        self.settings = settings  # cong_nhan.cho_nghi_viec can muc attendance (mui gio, tinh lai cong)
         self.face_cfg = settings["face"]
         self.sample_dir = Path(sample_dir)
         self.nhan_dien = nhan_dien
@@ -68,6 +69,7 @@ class DangKyMat:
             raise DangKyMatError("Công nhân đã nghỉ việc")
         worker.consent_at, worker.consent_by = utcnow(), user.id
         db.commit()
+        self.nhan_dien.xoa_bo_nho_dem()  # chi cong nhan da dong y moi duoc so khop (Q13)
         return worker
 
     # --- them mau ---

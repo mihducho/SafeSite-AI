@@ -94,18 +94,23 @@ gate:
   stream_jpeg_quality: 70
 
 attendance:
-  # Cham cong (DE_TAI.md muc 7)
-  duplicate_minutes: 2        # luot ra cach luot vao gan nhat duoi 2 phut -> bo qua (bo_qua_trung)
-  missing_checkout_hours: 4   # chua co gio ra sau gio ket thuc ca 4 gio -> hien "thieu gio ra"
+  # Cham cong v2 (DE_TAI.md muc 7, docs/LOGIC_CHAM_CONG.md): moi lan vao mo 1 phien, moi lan ra dong phien
+  missing_checkout_hours: 4   # phien con mo sau gio ket thuc ca hon 4 gio -> LUU thanh thieu_gio_ra (tac vu nen)
+  quet_thieu_gio_ra_phut: 5   # tac vu nen danh dau thieu gio ra: chay luc khoi dong roi moi 5 phut
   timezone: Asia/Ho_Chi_Minh  # CSDL luu gio UTC; ngay cong (work_date) va hien thi tinh theo mui gio nay
-  default_shift:              # ca mac dinh tao boi seed_demo.py (bang shifts)
+  ngay_nghi_tuan: [chu_nhat]  # ngay nghi hang tuan (thu_hai ... thu_bay, chu_nhat): khong tinh vang
+  dung_sai_phep_phut: 15      # phep ve som / di muon: ra truoc gio duoc phep (vao sau gio du kien) toi da 15 phut van la co phep
+  nguong_can_giai_trinh_phut: 15  # di muon / ve som KHONG phep hon 15 phut -> vao danh sach "Viec can xu ly"
+  phep_toi_da_truoc_ngay: 30  # tao phep cho ngay trong tuong lai toi da 30 ngay
+  default_shift:              # ca mac dinh tao boi seed_demo.py (bang shifts); sua o trang Cau hinh ca
     name: Ca hành chính
     start: "07:00"
     end: "17:00"
-    break_start: "11:30"      # nghi trua 11:30-12:30: chi tru phan nghi nam trong [gio vao, gio ra]
+    break_start: "11:30"      # nghi trua 11:30-12:30: tru phan giao voi cac phien lam viec
     break_minutes: 60
-    grace_minutes: 5          # di muon <= 5 phut: khong tinh; > 5 phut: tinh tu gio bat dau ca
-    early_checkin_minutes: 60 # cho vao som toi da 60 phut; vao ngoai [bat dau - 60 phut, ket thuc] -> ngoai_ca
+    grace_minutes: 5          # vao sau 07:05:00 (tinh ca giay) -> muon, so phut muon tinh tu 07:00, lam tron len
+    early_checkin_minutes: 60 # chi ghi VAO trong [bat dau - 60 phut, ket thuc]; ngoai khung -> khong ghi
+    phut_chong_trung: 10      # 2 lan ghi cong (vao / ra) cua 1 nguoi cach nhau duoi 10 phut -> bo_qua_trung
 
 web:
   session_hours: 12           # dang nhap het han sau bay nhieu gio

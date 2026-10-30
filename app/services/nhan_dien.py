@@ -1,6 +1,6 @@
 """Nhan dien cong nhan tu vector khuon mat cua 1 luot (DE_TAI.md muc 6.2 "So khop").
 
-Doc mau khuon mat cua cong nhan DANG LAM tu CSDL vao bo nho dem {worker_id: (m, 128)}, roi goi
+Doc mau khuon mat cua cong nhan DANG LAM va DA GHI NHAN DONG Y tu CSDL vao bo nho dem {worker_id: (m, 128)}, roi goi
 src/face/match.py (ham thuan, da test o F1). Chi cong nhan co >= face.min_samples mau moi duoc so khop.
 Bo nho dem bi xoa (doc lai o lan sau) khi them/xoa mau hoac doi trang thai cong nhan (dang_ky_mat.py, cong_nhan.py).
 Vong lap cong (thread nen) va API (thread khac) cung dung -> co khoa (Lock).
@@ -27,8 +27,8 @@ def vector_to_embedding(vector: np.ndarray) -> bytes:
 
 
 def load_gallery(db: Session, min_samples: int) -> dict[int, np.ndarray]:
-    """{worker_id: (m, 128)} cua cong nhan dang lam co it nhat min_samples mau."""
-    enough = (select(FaceSample.worker_id).join(Worker).where(Worker.status == DANG_LAM)
+    """{worker_id: (m, 128)} cua cong nhan dang lam, da dong y, co it nhat min_samples mau."""
+    enough = (select(FaceSample.worker_id).join(Worker).where(Worker.status == DANG_LAM, Worker.consent_at.is_not(None))
               .group_by(FaceSample.worker_id).having(func.count(FaceSample.id) >= min_samples))
     rows = db.execute(select(FaceSample.worker_id, FaceSample.embedding)
                       .where(FaceSample.worker_id.in_(enough)).order_by(FaceSample.id)).all()

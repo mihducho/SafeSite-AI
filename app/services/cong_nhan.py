@@ -1,15 +1,21 @@
 """Quan ly cong nhan va to doi (DE_TAI.md muc 9.1): them, sua, cho nghi viec.
 
-Cho nghi viec (DE_TAI muc 7): trang thai nghi_viec -> khong con duoc nhan dien (nhan_dien chi doc cong nhan dang_lam)
-va XOA TOAN BO mau khuon mat (vector + anh mau). Doi trang thai thi xoa bo nho dem nhan dien.
+Cho nghi viec (DE_TAI muc 7, Q12): luu ngay_nghi_viec; dang co phien mo thi DONG phien tai thoi diem thao tac (nguon tay,
+nhat ky dong_khi_nghi_viec); trang thai nghi_viec -> khong con duoc nhan dien (nhan_dien chi doc cong nhan dang_lam)
+va XOA TOAN BO mau khuon mat (vector + anh mau). Di lam lai: xoa ngay_nghi_viec, ngay_vao_lam = hom nay, phai ghi nhan
+dong y lai. Doi trang thai thi xoa bo nho dem nhan dien.
 """
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import DANG_LAM, NGHI_VIEC, Team, Worker
+from app.db import utcnow
+from app.models import DANG_LAM, NGHI_VIEC, Team, User, Worker
+from app.services.cham_cong import dong_phien_khi_nghi_viec, khoa_cong_nhan, mui_gio, ngay_cong
 from app.services.dang_ky_mat import DangKyMat
 
-WORKER_FIELDS = ("code", "full_name", "phone", "trade", "team_id")
+WORKER_FIELDS = ("code", "full_name", "phone", "trade", "team_id", "ngay_vao_lam")
 TEAM_FIELDS = ("name", "contractor", "leader_name")
 
 
@@ -59,18 +65,24 @@ def sua_cong_nhan(db: Session, worker: Worker, data: dict) -> Worker:
     return worker
 
 
-def cho_nghi_viec(db: Session, worker: Worker, dang_ky: DangKyMat) -> int:
+def cho_nghi_viec(db: Session, worker: Worker, dang_ky: DangKyMat, user: User | None = None,
+                  now: datetime | None = None) -> int:
     """Tra ve so mau khuon mat da xoa."""
-    worker.status = NGHI_VIEC
-    n = dang_ky.xoa_tat_ca(db, worker, commit=False)
-    db.commit()
+    att_cfg, now = dang_ky.settings["attendance"], now or utcnow()
+    with khoa_cong_nhan(db, worker.id):
+        worker.status, worker.ngay_nghi_viec = NGHI_VIEC, ngay_cong(now, mui_gio(att_cfg))
+        dong_phien_khi_nghi_viec(db, worker, user, att_cfg, now)
+        n = dang_ky.xoa_tat_ca(db, worker, commit=False)
+        db.commit()
     dang_ky.nhan_dien.xoa_bo_nho_dem()
     return n
 
 
-def di_lam_lai(db: Session, worker: Worker, dang_ky: DangKyMat) -> Worker:
-    """Nhan lai cong nhan da nghi: phai ghi nhan dong y va dang ky khuon mat lai tu dau."""
+def di_lam_lai(db: Session, worker: Worker, dang_ky: DangKyMat, now: datetime | None = None) -> Worker:
+    """Nhan lai cong nhan da nghi: ngay vao lam moi = hom nay; phai ghi nhan dong y va dang ky khuon mat lai tu dau."""
+    tz = mui_gio(dang_ky.settings["attendance"])
     worker.status, worker.consent_at, worker.consent_by = DANG_LAM, None, None
+    worker.ngay_nghi_viec, worker.ngay_vao_lam = None, ngay_cong(now or utcnow(), tz)
     db.commit()
     dang_ky.nhan_dien.xoa_bo_nho_dem()
     return worker
