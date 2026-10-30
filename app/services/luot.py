@@ -193,4 +193,6 @@ def xu_ly_luot(db: Session, luot: LuotKiemTra, *, settings: dict, nhan_dien: Nha
         "diem": check.face_score,
         "anh": f"/api/luot/{check.id}/anh" if check.image_path else None,
         "ghi_cong": kq.hanh_dong in (GHI_VAO, GHI_RA),
+        "vao_lai": kq.vao_lai,                                                   # ghi_vao phien thu 2 tro di
+        "som_co_phep": bool(kq.tong_hop is not None and kq.tong_hop.som_co_phep),  # ghi_ra ve som co phep
     }

@@ -125,6 +125,13 @@ def trong_khung_vao(shift: Shift, t: datetime, ngay: date, tz: ZoneInfo) -> bool
     return ca.mo_cua_vao <= t <= ca.ket_thuc
 
 
+def ngay_nghi_tuan(shift: Shift, att_cfg: dict) -> list[str]:
+    """Ten cac ngay nghi hang tuan (vd ["chu_nhat"]): dat o trang Cau hinh ca, chua dat thi attendance.ngay_nghi_tuan."""
+    if shift is not None and shift.ngay_nghi_tuan is not None:
+        return [x for x in shift.ngay_nghi_tuan.split(",") if x]
+    return list(att_cfg.get("ngay_nghi_tuan") or [])
+
+
 def khoang_lam_viec(worker: Worker, tz: ZoneInfo) -> tuple[date | None, date | None]:
     """[ngay vao lam, ngay nghi viec]; chua dat ngay vao lam -> ngay tao cong nhan (gio Viet Nam)."""
     start = worker.ngay_vao_lam or (worker.created_at.astimezone(tz).date() if worker.created_at else None)
@@ -192,7 +199,8 @@ def tinh_tu_du_lieu(worker: Worker, ngay: date, att: Attendance | None, segs: li
         ngay, gio_ca_ngay(att, shift, ngay, tz),
         [Phien(s.vao_at, s.ra_at, s.trang_thai, s.nguon_vao, s.nguon_ra) for s in segs],
         [phep_ngay(p, tz) for p in pheps], now=now, ngay_vao_lam=vao_lam, ngay_nghi_viec=nghi,
-        nghi_tuan=tc.nghi_tuan_tu_cau_hinh(att_cfg), dung_sai_phut=att_cfg["dung_sai_phep_phut"],
+        nghi_tuan=tc.nghi_tuan_tu_cau_hinh({"ngay_nghi_tuan": ngay_nghi_tuan(shift, att_cfg)}),
+        dung_sai_phut=att_cfg["dung_sai_phep_phut"],
         nguong_phut=att_cfg["nguong_can_giai_trinh_phut"], da_xac_nhan_khong_phep=bool(att and att.da_xac_nhan_khong_phep))
 
 
@@ -522,6 +530,9 @@ def sua_ca(db: Session, shift: Shift, data: dict, att_cfg: dict, now: datetime |
     gio ca vao cac dong hom nay); ngay cu giu gio ca da chep nen so lieu khong doi. Tra ve so dong da tinh lai."""
     values = {k: data[k] for k in SHIFT_FIELDS if k in data and data[k] is not None}
     new = {k: values.get(k, getattr(shift, k)) for k in SHIFT_FIELDS}
+    nghi_tuan = data.get("ngay_nghi_tuan")  # danh sach ten ngay; [] = khong co ngay nghi hang tuan
+    if nghi_tuan is not None and any(x not in tc.THU for x in nghi_tuan):
+        raise ChamCongError(f"Ngày nghỉ hằng tuần không hợp lệ: {', '.join(x for x in nghi_tuan if x not in tc.THU)}")
     if not str(new["name"]).strip():
         raise ChamCongError("Tên ca không được để trống")
     if new["end_time"] <= new["start_time"]:
@@ -539,6 +550,8 @@ def sua_ca(db: Session, shift: Shift, data: dict, att_cfg: dict, now: datetime |
             raise ChamCongError("Giờ nghỉ phải nằm trong giờ ca")
     for k, v in values.items():
         setattr(shift, k, v.strip() if isinstance(v, str) else v)
+    if nghi_tuan is not None:
+        shift.ngay_nghi_tuan = ",".join(sorted(set(nghi_tuan), key=list(tc.THU).index))
     tz, now = mui_gio(att_cfg), now or utcnow()
     today = ngay_cong(now, tz)
     rows = db.scalars(select(Attendance).where(Attendance.shift_id == shift.id, Attendance.work_date == today)).all()

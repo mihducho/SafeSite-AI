@@ -118,6 +118,8 @@ class Shift(Base):
     grace_minutes: Mapped[int] = mapped_column(Integer, default=5)
     early_checkin_minutes: Mapped[int] = mapped_column(Integer, default=60)
     phut_chong_trung: Mapped[int] = mapped_column(Integer, default=10)  # sua o trang Cau hinh ca
+    # ngay nghi hang tuan, vd "chu_nhat" / "thu_bay,chu_nhat" / "" (khong nghi); rong (NULL) = attendance.ngay_nghi_tuan
+    ngay_nghi_tuan: Mapped[str | None] = mapped_column(String(60))
     is_overnight: Mapped[bool] = mapped_column(Boolean, default=False)  # chua dung
     is_overtime: Mapped[bool] = mapped_column(Boolean, default=False)   # chua dung
 

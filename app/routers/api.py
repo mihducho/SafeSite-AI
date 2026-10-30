@@ -20,7 +20,7 @@ from app.config import mask_source
 from app.models import DANG_LAM, Attendance, AttendanceSegment, FaceSample, Gate, NhatKyChamCong, Phep, PpeCheck, Shift, \
     Team, User, Worker
 from app.services import bao_cao, cham_cong, cong_nhan, phep
-from app.services.tinh_cong import LOAI_PHEP
+from app.services.tinh_cong import LOAI_PHEP, THU
 from app.services.dang_ky_mat import CAMERA, NOI_DUNG_DONG_Y, UPLOAD, DangKyMatError
 from src.zone.zone import zone_to_pixels
 
@@ -599,25 +599,29 @@ class ShiftPatch(BaseModel):
     early_checkin_minutes: int | None = Field(None, ge=0, le=240)
     phut_chong_trung: int | None = Field(None, ge=1, le=120, description="2 lần ghi công cách nhau dưới chừng này phút "
                                                                        "-> bỏ qua trùng")
+    ngay_nghi_tuan: list[Literal[tuple(THU)]] | None = Field(None, examples=[["chu_nhat"]],
+                                                             description="ngày nghỉ hằng tuần; [] = không nghỉ ngày nào")
 
 
-def shift_json(s: Shift) -> dict:
+def shift_json(s: Shift, att_cfg: dict) -> dict:
     return {"id": s.id, "name": s.name, "start_time": f"{s.start_time:%H:%M}", "end_time": f"{s.end_time:%H:%M}",
             "break_start": f"{s.break_start:%H:%M}", "break_minutes": s.break_minutes, "grace_minutes": s.grace_minutes,
-            "early_checkin_minutes": s.early_checkin_minutes, "phut_chong_trung": s.phut_chong_trung}
+            "early_checkin_minutes": s.early_checkin_minutes, "phut_chong_trung": s.phut_chong_trung,
+            "ngay_nghi_tuan": cham_cong.ngay_nghi_tuan(s, att_cfg)}
 
 
 @router.get("/ca-lam", tags=["ca lam"])
-def get_shift(db: Session = Depends(get_db)):
-    return shift_json(cham_cong.ca_mac_dinh(db))
+def get_shift(request: Request, db: Session = Depends(get_db)):
+    return shift_json(cham_cong.ca_mac_dinh(db), _state(request).settings["attendance"])
 
 
 @router.patch("/ca-lam", tags=["ca lam"])
 def update_shift(body: ShiftPatch, request: Request, db: Session = Depends(get_db)):
     """Sửa ca mặc định. Bảng công HÔM NAY được tính lại theo ca mới; các ngày trước giữ nguyên."""
+    att_cfg = _state(request).settings["attendance"]
     shift = cham_cong.ca_mac_dinh(db)
-    n = cham_cong.sua_ca(db, shift, body.model_dump(exclude_unset=True), _state(request).settings["attendance"])
-    return {**shift_json(shift), "so_dong_tinh_lai": n}
+    n = cham_cong.sua_ca(db, shift, body.model_dump(exclude_unset=True), att_cfg)
+    return {**shift_json(shift, att_cfg), "so_dong_tinh_lai": n}
 
 
 # ---------- cong ----------

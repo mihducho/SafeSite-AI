@@ -113,8 +113,8 @@ class VaoRaV2Test(V2Case):
         self.assertEqual(self.ngay()["so_phut_lam"], 540)
 
     def test_t9_ra_an_trua_dung_gio_nghi(self):
-        for t in (vn(29, 7, 0), vn(29, 11, 30), vn(29, 12, 30), vn(29, 17, 0)):
-            self.run_luot(t)
+        evs = [self.run_luot(t) for t in (vn(29, 7, 0), vn(29, 11, 30), vn(29, 12, 30), vn(29, 17, 0))]
+        self.assertEqual([e["vao_lai"] for e in evs], [False, False, True, False])
         r = self.ngay()
         self.assertEqual((len(r["phien"]), r["so_phut_lam"], r["phut_ra_ngoai"], r["co_ra_ngoai"]), (2, 540, 0, False))
 
@@ -160,8 +160,8 @@ class ThieuGioRaV2Test(V2Case):
         r = self.ngay()
         self.assertEqual((r["trang_thai_ngay"], r["so_phut_lam"], r["ngay_cong"], r["thieu_gio_ra"]),
                          (tc.TT_THIEU_GIO_RA, 0, 0, True))
-        self.assertEqual([(v["loai"], v["ma"], v["ngay"]) for v in self.viec()],
-                         [("thieu_gio_ra", "CN001", "2026-10-29")])
+        self.assertEqual([(v["loai"], v["ma"], v["ngay"], v["segment_id"], v["phien_vao"]) for v in self.viec()],
+                         [("thieu_gio_ra", "CN001", "2026-10-29", self.phien()[0].id, "07:00")])
         self.assertEqual(self.run_luot(vn(30, 7, 0))["hanh_dong"], GHI_VAO)  # hom sau: dong moi binh thuong
         self.assertEqual(self.att(self.an, 30).check_in, vn(30, 7, 0))
         self.assertEqual(self.phien()[0].trang_thai, tc.THIEU_GIO_RA)  # ngay cu khong bi dung
@@ -455,6 +455,7 @@ class PhepTest(V2Case):
         self.run_luot(vn(29, 7, 2))
         ev = self.run_luot(vn(29, 15, 2))
         self.assertEqual(ev["thong_bao"], "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 15:02 (về sớm có phép)")
+        self.assertTrue(ev["som_co_phep"])
         r = self.ngay()
         self.assertEqual((r["trang_thai_ngay"], r["ve_som_phut"], r["so_phut_lam"]), (tc.TT_VE_SOM_CO_PHEP, 118, 420))
         self.assertEqual(self.viec(), [])
@@ -587,6 +588,19 @@ class ApiV2Test(AppCase):
         self.assertEqual(self.client.patch("/api/ca-lam", json={"phut_chong_trung": 0}).status_code, 422)
         w = self.client.get(f"/api/cong-nhan/{self.an_id}").json()
         self.assertEqual((w["ngay_vao_lam"], w["ngay_nghi_viec"]), ("2026-01-01", None))
+
+    def test_ngay_nghi_tuan_sua_tren_trang_ca(self):
+        self.assertEqual(self.client.get("/api/ca-lam").json()["ngay_nghi_tuan"], ["chu_nhat"])  # theo settings.yaml
+        thu_bay = "2026-10-24"
+        trang_thai = lambda: self.client.get(f"/api/bang-cong/cong-nhan/{self.an_id}/{thu_bay}").json()["trang_thai_ngay"]  # noqa: E731
+        self.assertEqual(trang_thai(), tc.TT_VANG)
+        r = self.client.patch("/api/ca-lam", json={"ngay_nghi_tuan": ["chu_nhat", "thu_bay"]})
+        self.assertEqual(r.json()["ngay_nghi_tuan"], ["thu_bay", "chu_nhat"])
+        self.assertEqual(trang_thai(), tc.TT_NGHI_TUAN)
+        self.assertEqual(self.client.patch("/api/ca-lam", json={"ngay_nghi_tuan": ["thu_tam"]}).status_code, 422)
+        self.assertEqual(self.client.patch("/api/ca-lam", json={"ngay_nghi_tuan": []}).json()["ngay_nghi_tuan"], [])
+        self.assertEqual(self.client.get(f"/api/bang-cong/cong-nhan/{self.an_id}/2026-10-25").json()["trang_thai_ngay"],
+                         tc.TT_VANG)  # Chu nhat cung la ngay lam khi khong dat ngay nghi
 
     def test_csdl_cu_thieu_cot_bao_loi_ro_rang(self):
         self.assertEqual(self.app.state.db.cot_con_thieu(), [])

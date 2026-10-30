@@ -239,9 +239,13 @@ def viec_can_xu_ly(db: Session, att_cfg: dict, now: datetime) -> list[dict]:
     out = []
 
     def item(a: Attendance, loai: str, mo_ta_viec: str, phut: int | None = None) -> dict:
+        thieu = next((s for s in sorted(a.segments, key=lambda s: s.vao_at) if s.trang_thai == tc.THIEU_GIO_RA), None)
         return {"loai": loai, "ten_loai": TEN_VIEC[loai], "attendance_id": a.id, "worker_id": a.worker_id,
                 "ma": a.worker.code, "ho_ten": a.worker.full_name, "ngay": a.work_date.isoformat(), "mo_ta": mo_ta_viec,
-                "phut": phut}
+                "phut": phut, "gio_vao": gio_phut(a.check_in, tz), "gio_ra": gio_phut(a.check_out, tz),
+                # thieu_gio_ra: phien can nhap gio ra (nut "Nhap gio ra")
+                "segment_id": thieu.id if loai == "thieu_gio_ra" and thieu else None,
+                "phien_vao": gio_phut(thieu.vao_at, tz) if loai == "thieu_gio_ra" and thieu else None}
 
     thieu = db.scalars(select(Attendance).options(selectinload(Attendance.segments)).where(
         Attendance.id.in_(select(AttendanceSegment.attendance_id).where(AttendanceSegment.trang_thai == tc.THIEU_GIO_RA))
