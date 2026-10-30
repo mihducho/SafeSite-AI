@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { ClipboardX, DoorOpen, ImageOff, LogIn, MonitorPlay, ScanFace, UserCheck, Users } from 'lucide-react'
+import { ClipboardX, DoorOpen, ImageOff, ListTodo, LogIn, MonitorPlay, ScanFace, UserCheck, Users } from 'lucide-react'
 import { layTongQuan } from '../api/endpoints.js'
 import CheckDetailModal from '../components/common/CheckDetailModal.jsx'
 import { Card, EmptyState, PageHead, Person, Pill, Skeleton, StatCard, StatusBadge } from '../components/common/ui.jsx'
@@ -10,16 +10,18 @@ import { useGateEvents, useGateStatus, useWsState } from '../lib/events.js'
 import { gio, thuNgay } from '../lib/format.js'
 import { HANH_DONG, KET_QUA, MAT, thieuText, trangThaiCong } from '../lib/labels.js'
 
-// ─── biểu đồ cột: số lượt Đạt / Không đạt theo giờ hôm nay (không cần thư viện biểu đồ) ──
-const C_DAT = '#059669'
-const C_KHONG = '#DC2626'
+// ─── biểu đồ cột: số lượt theo giờ hôm nay, tô theo MÀU MÀN HÌNH CỔNG (backend phân loại, giống "lượt không đạt") ──
+const C_DAT = '#059669'    // xanh: đã ghi công (vào / ra / bỏ qua trùng)
+const C_KHONG = '#DC2626'  // đỏ: vào thiếu bảo hộ
+const C_VANG = '#D97706'   // vàng: chưa nhận ra, nhiều người, ngoài giờ vào ca...
+const tong = (r) => r.xanh + r.do + r.vang
 
 function HourChart({ rows, nowHour }) {
-  const used = rows.filter((r) => r.dat + r.khong_dat > 0).map((r) => r.gio)
+  const used = rows.filter((r) => tong(r) > 0).map((r) => r.gio)
   const from = Math.min(6, ...used)
   const to = Math.max(18, nowHour, ...used)
   const shown = rows.filter((r) => r.gio >= from && r.gio <= to)
-  const peak = Math.max(1, ...shown.map((r) => r.dat + r.khong_dat))
+  const peak = Math.max(1, ...shown.map(tong))
   const top = peak <= 4 ? 4 : Math.ceil(peak / 4) * 4          // trục dọc chia 4 vạch số nguyên
   const ticks = [top, (top * 3) / 4, top / 2, top / 4, 0]
   return (
@@ -31,12 +33,14 @@ function HourChart({ rows, nowHour }) {
         </div>
         <div className="chart__bars">
           {shown.map((r) => {
-            const total = r.dat + r.khong_dat
+            const total = tong(r)
             return (
-              <div key={r.gio} className="chart__col" title={`${r.gio} giờ: ${r.dat} đạt, ${r.khong_dat} không đạt`}>
+              <div key={r.gio} className="chart__col"
+                title={`${r.gio} giờ: ${r.xanh} đã ghi công, ${r.do} không đạt, ${r.vang} cần làm lại`}>
                 <div className="chart__stack" style={{ height: `${(total / top) * 100}%` }}>
-                  {r.khong_dat > 0 && <span style={{ background: C_KHONG, flexGrow: r.khong_dat }} />}
-                  {r.dat > 0 && <span style={{ background: C_DAT, flexGrow: r.dat }} />}
+                  {r.vang > 0 && <span style={{ background: C_VANG, flexGrow: r.vang }} />}
+                  {r.do > 0 && <span style={{ background: C_KHONG, flexGrow: r.do }} />}
+                  {r.xanh > 0 && <span style={{ background: C_DAT, flexGrow: r.xanh }} />}
                 </div>
                 <span className={`chart__x${r.gio === nowHour ? ' now' : ''}`}>{r.gio}h</span>
               </div>
@@ -108,7 +112,7 @@ export default function DashboardPage() {
     <div className="page">
       <PageHead title="Tổng quan hôm nay" sub={data ? thuNgay(data.ngay) : ' '} />
 
-      <div className="grid grid-4 mb-3">
+      <div className="grid grid-5 mb-3">
         <StatCard icon={Users} tone="neutral" label="Công nhân đang làm" value={d.so_cong_nhan} loading={isLoading}
           sub="trong danh sách đang làm việc" />
         <StatCard icon={LogIn} tone="ok" label="Đã vào hôm nay" value={d.da_vao} loading={isLoading}
@@ -116,12 +120,16 @@ export default function DashboardPage() {
         <StatCard icon={UserCheck} tone="primary" label="Đang có mặt" value={d.dang_co_mat} loading={isLoading}
           sub={data ? (d.da_vao ? `${d.da_vao - d.dang_co_mat} người đã ra về` : 'chưa ai vào') : ''} />
         <StatCard icon={ClipboardX} tone="bad" label="Lượt không đạt hôm nay" value={d.luot_khong_dat} loading={isLoading}
-          sub={data ? `trong ${d.so_luot} lượt kiểm tra` : ''} />
+          sub={data ? `vào thiếu bảo hộ · trong ${d.so_luot} lượt` : ''} />
+        <Link to="/viec-can-xu-ly" className="stat-link" aria-label="Mở danh sách Việc cần xử lý">
+          <StatCard icon={ListTodo} tone={d.viec_can_xu_ly ? 'warn' : 'ok'} label="Việc cần xử lý" value={d.viec_can_xu_ly}
+            loading={isLoading} sub={data ? (d.viec_can_xu_ly ? 'thiếu giờ ra, muộn / sớm chưa có phép' : 'không có việc tồn') : ''} />
+        </Link>
       </div>
 
       <div className="grid grid-2-1 mb-3">
         <Card title="Lượt kiểm tra theo giờ hôm nay"
-          end={<div className="legend"><span><i style={{ background: C_DAT }} />Đạt</span><span><i style={{ background: C_KHONG }} />Không đạt</span></div>}>
+          end={<div className="legend"><span><i style={{ background: C_DAT }} />Đã ghi công</span><span><i style={{ background: C_KHONG }} />Không đạt</span><span><i style={{ background: C_VANG }} />Cần làm lại</span></div>}>
           {isLoading ? <Skeleton height={220} /> : <HourChart rows={d.luot_theo_gio ?? []} nowHour={nowHour} />}
         </Card>
         <GateCard last={luot[0]} />

@@ -18,6 +18,7 @@ import AttendancePage from './pages/AttendancePage.jsx'
 import MonthlyAttendancePage from './pages/MonthlyAttendancePage.jsx'
 import ShiftConfigPage from './pages/ShiftConfigPage.jsx'
 import GateConfigPage from './pages/GateConfigPage.jsx'
+import TodoPage from './pages/TodoPage.jsx'
 
 export default function App() {
   const dispatch = useDispatch()
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="lich-su" element={<HistoryPage />} />
           <Route path="bang-cong" element={<AttendancePage />} />
           <Route path="bang-cong-thang" element={<MonthlyAttendancePage />} />
+          <Route path="viec-can-xu-ly" element={<TodoPage />} />
           <Route path="cau-hinh-ca" element={<ShiftConfigPage />} />
           <Route path="cau-hinh-cong" element={<GateConfigPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

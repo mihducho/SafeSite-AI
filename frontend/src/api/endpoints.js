@@ -60,6 +60,24 @@ export const layBangCongThang = (params = {}) => client.get('/bang-cong/thang', 
 export const taiExcelThang = (params = {}) =>
   client.get('/bang-cong/thang/excel', { params, responseType: 'blob' }).then(data)
 
+// ─── CHẤM CÔNG V2: PHIÊN, PHÉP, NHẬT KÝ, VIỆC CẦN XỬ LÝ ───────────────────────
+/** Bảng công 1 ngày của 1 công nhân: trạng thái, các phiên, các phép, nhật ký sửa */
+export const layNgayCong = (workerId, ngay) => client.get(`/bang-cong/cong-nhan/${workerId}/${ngay}`).then(data)
+/** { worker_id, ngay, gio_vao, gio_ra?, ly_do } -> { phien, ngay } */
+export const themPhien = (body) => client.post('/phien', body).then(data)
+/** { gio_vao?, gio_ra?, ly_do } (giờ ra cho phiên mở / thiếu giờ ra = đóng phiên) */
+export const suaPhien = (id, body) => client.patch(`/phien/${id}`, body).then(data)
+export const huyPhien = (id, lyDo) => client.post(`/phien/${id}/huy`, { ly_do: lyDo }).then(data)
+/** params: { worker_id, ngay, tu, den, ca_huy } -> { ds } */
+export const layDanhSachPhep = (params = {}) => client.get('/phep', { params }).then(data)
+/** { worker_id, ngay, loai, tu_gio?, den_gio?, tinh_cong?, ly_do } */
+export const themPhep = (body) => client.post('/phep', body).then(data)
+export const huyPhep = (id, lyDo) => client.post(`/phep/${id}/huy`, { ly_do: lyDo }).then(data)
+/** -> { tong, ds: [{ loai, ten_loai, attendance_id, worker_id, ma, ho_ten, ngay, mo_ta, phut, segment_id, ... }] } */
+export const layViecCanXuLy = () => client.get('/viec-can-xu-ly').then(data)
+export const xacNhanKhongPhep = (attendanceId, lyDo) =>
+  client.post('/viec-can-xu-ly/xac-nhan-khong-phep', { attendance_id: attendanceId, ly_do: lyDo || null }).then(data)
+
 // ─── CA LÀM ────────────────────────────────────────────────────────────────────
 export const layCaLam = () => client.get('/ca-lam').then(data)
 /** -> { ...ca, so_dong_tinh_lai } (bảng công hôm nay được tính lại) */

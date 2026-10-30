@@ -1,13 +1,14 @@
 import { forwardRef, useCallback, useEffect, useState } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
+import { useQuery } from '@tanstack/react-query'
 import { Dropdown } from 'react-bootstrap'
 import {
-  CalendarDays, CalendarRange, ChevronDown, Clock, Code2, History, LayoutDashboard, LifeBuoy, LogOut, MonitorPlay,
-  PanelLeftClose, PanelLeftOpen, Settings2, Users, UsersRound,
+  CalendarDays, CalendarRange, ChevronDown, Clock, Code2, History, LayoutDashboard, LifeBuoy, ListTodo, LogOut,
+  MonitorPlay, PanelLeftClose, PanelLeftOpen, Settings2, Users, UsersRound,
 } from 'lucide-react'
 import { selectUser, clearUser } from '../../store/authSlice.js'
-import { dangXuat } from '../../api/endpoints.js'
+import { dangXuat, layViecCanXuLy } from '../../api/endpoints.js'
 import { useWebConfig } from '../../hooks/useWebConfig.js'
 import { useGateStatus, useWsState } from '../../lib/events.js'
 import { dongHo } from '../../lib/format.js'
@@ -27,6 +28,7 @@ const NAV = [
   { group: 'Chấm công', items: [
     { to: '/bang-cong', icon: CalendarDays, label: 'Bảng công ngày' },
     { to: '/bang-cong-thang', icon: CalendarRange, label: 'Bảng công tháng' },
+    { to: '/viec-can-xu-ly', icon: ListTodo, label: 'Việc cần xử lý', badge: 'viec' },
     { to: '/cau-hinh-ca', icon: Clock, label: 'Ca làm' },
   ] },
   { group: 'Hệ thống', items: [
@@ -85,6 +87,10 @@ export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [title, crumb] = pageTitle(location.pathname)
+  // badge số việc cần xử lý trên menu (cùng khoá với trang Việc cần xử lý: xử lý xong là số tự giảm)
+  const { data: viec } = useQuery({ queryKey: ['viec-can-xu-ly'], queryFn: layViecCanXuLy, refetchInterval: 60_000,
+    meta: { silent: true } })
+  const badges = { viec: viec?.tong ?? 0 }
 
   useEffect(() => { setMobileOpen(false) }, [location.pathname])   // đổi trang trên màn hình hẹp -> đóng menu
   useEffect(() => { document.title = `${title} · SafeGate` }, [title])
@@ -114,10 +120,11 @@ export default function DashboardLayout() {
           {NAV.map(({ group, items }) => (
             <div key={group}>
               <div className="sidebar__group">{group}</div>
-              {items.map(({ to, icon: Icon, label, end }) => (
+              {items.map(({ to, icon: Icon, label, end, badge }) => (
                 <NavLink key={to} to={to} end={end} className="sidebar__link" title={collapsed ? label : undefined}>
                   <Icon size={16} strokeWidth={1.5} />
                   <span className="sidebar__label">{label}</span>
+                  {badge && badges[badge] > 0 && <span className="sidebar__badge num" title={`${badges[badge]} việc`}>{badges[badge]}</span>}
                 </NavLink>
               ))}
             </div>

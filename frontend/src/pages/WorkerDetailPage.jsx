@@ -3,24 +3,30 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { Button, Form, Modal, Spinner } from 'react-bootstrap'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
-  ArrowLeft, CalendarDays, Camera, CircleAlert, CircleCheck, History, Images, Pencil, ScanFace, ShieldCheck, Trash2,
-  Upload, UserRoundCheck, UserX, X,
+  ArrowLeft, CalendarDays, Camera, CircleAlert, CircleCheck, ClipboardList, FileClock, History, Images, Pencil,
+  PencilLine, Plus, ScanFace, ShieldCheck, Trash2, Upload, UserRoundCheck, UserX, X,
 } from 'lucide-react'
 import {
-  capNhatCongNhan, chupMauMat, diLamLai, ghiNhanDongY, layBangCongCongNhan, layCaLam, layChiTietCongNhan,
-  layDanhSachMauMat, layDanhSachToDoi, layLichSuLuot, layNoiDungDongY, nghiViec, taiLenMauMat, xoaMauMat, xoaTatCaMauMat,
+  capNhatCongNhan, chupMauMat, diLamLai, ghiNhanDongY, huyPhep, layBangCongCongNhan, layCaLam, layChiTietCongNhan,
+  layDanhSachMauMat, layDanhSachPhep, layDanhSachToDoi, layLichSuLuot, layNoiDungDongY, nghiViec, taiLenMauMat, xoaMauMat,
+  xoaTatCaMauMat,
 } from '../api/endpoints.js'
 import CheckDetailModal from '../components/common/CheckDetailModal.jsx'
 import CheckTable from '../components/common/CheckTable.jsx'
 import ConfirmModal from '../components/common/ConfirmModal.jsx'
+import DayStatus from '../components/common/DayStatus.jsx'
+import LeaveModal from '../components/common/LeaveModal.jsx'
 import ManualAttendanceModal from '../components/common/ManualAttendanceModal.jsx'
+import ReasonModal from '../components/common/ReasonModal.jsx'
+import SessionList from '../components/common/SessionList.jsx'
 import {
-  Avatar, Card, EmptyRow, EmptyState, LiveStream, Meter, Pager, Pill, Skeleton, SkeletonRows, StatusBadge, Tabs,
+  Avatar, Card, EmptyRow, EmptyState, LiveStream, Meter, Pager, Pill, RowMenu, Skeleton, SkeletonRows, StatusBadge, Tabs,
 } from '../components/common/ui.jsx'
+import { useLamMoiCong } from '../hooks/useLamMoiCong.js'
 import { useWebConfig } from '../hooks/useWebConfig.js'
 import { useGateEvents } from '../lib/events.js'
 import { gio, gioPhutChu, ngay, soVN, thuNgay } from '../lib/format.js'
-import { CONG_NHAN, trangThaiNgay } from '../lib/labels.js'
+import { CONG_NHAN } from '../lib/labels.js'
 import { toast } from '../lib/toast.js'
 
 // ─── Sửa thông tin (cửa sổ) ───────────────────────────────────────────────────
@@ -91,7 +97,8 @@ function ProfileCard({ worker, onEdit, onQuit, onRejoin }) {
     ['Nghề', worker.trade],
     ['Điện thoại', worker.phone],
     ['Ca làm', shift ? `${shift.name}, ${shift.start_time} – ${shift.end_time}` : ''],
-    ['Ngày thêm', worker.created_at ? ngay(worker.created_at) : ''],
+    ['Ngày vào làm', worker.ngay_vao_lam ? ngay(worker.ngay_vao_lam) : ''],
+    ...(worker.ngay_nghi_viec ? [['Ngày nghỉ việc', ngay(worker.ngay_nghi_viec)]] : []),
   ]
   return (
     <Card>
@@ -306,32 +313,82 @@ function HistoryTab({ workerId, onOpen, onManual }) {
   )
 }
 
-// ─── Tab Bảng công 30 ngày ─────────────────────────────────────────────────────
-function SheetTab({ workerId }) {
+// ─── Tab Bảng công 30 ngày: mỗi ngày các phiên vào – ra ──────────────────────────
+function SheetTab({ workerId, onOpenDay, onOpenCheck }) {
   const { data, isLoading } = useQuery({ queryKey: ['bang-cong-cn', workerId, 30], queryFn: () => layBangCongCongNhan(workerId, 30) })
   return (
     <div className="table-wrap no-max">
       <table className="sg-table">
-        <thead><tr><th>Ngày</th><th>Giờ vào</th><th>Giờ ra</th><th>Đi muộn</th><th>Giờ làm</th><th>Trạng thái</th></tr></thead>
+        <thead><tr><th>Ngày</th><th>Phiên vào – ra</th><th>Giờ làm</th><th>Ra ngoài</th><th className="right">Công</th><th>Trạng thái</th><th className="shrink" /></tr></thead>
         <tbody>
-          {isLoading ? <SkeletonRows cols={6} />
-            : !data?.ds.length ? <EmptyRow colSpan={6} icon={CalendarDays} title="Chưa có ngày công nào trong 30 ngày gần nhất" />
-              : data.ds.map((r) => {
-                const [text, tone] = trangThaiNgay(r)
-                return (
-                  <tr key={r.ngay}>
-                    <td className="nowrap num" style={{ fontWeight: 600 }}>{thuNgay(r.ngay)}</td>
-                    <td className="num mono-meta">{r.gio_vao}</td>
-                    <td className="num mono-meta">{r.gio_ra}</td>
-                    <td>{r.di_muon_phut > 0 && <Pill tone="warn">+{r.di_muon_phut} phút</Pill>}</td>
-                    <td className="nowrap num">{r.gio_ra ? gioPhutChu(r.so_phut_lam) : ''}</td>
-                    <td><Pill tone={tone}>{text}</Pill></td>
-                  </tr>
-                )
-              })}
+          {isLoading ? <SkeletonRows cols={7} />
+            : !data?.ds.length ? <EmptyRow colSpan={7} icon={CalendarDays} title="Chưa có ngày công nào trong 30 ngày gần nhất" />
+              : data.ds.map((r) => (
+                <tr key={r.ngay}>
+                  <td className="nowrap num" style={{ fontWeight: 600 }}>{thuNgay(r.ngay)}</td>
+                  <td><SessionList phien={r.phien} compact onOpenCheck={onOpenCheck} /></td>
+                  <td className="nowrap num">{r.so_phut_lam ? gioPhutChu(r.so_phut_lam) : ''}</td>
+                  <td className="nowrap">{r.so_lan_ra_ngoai > 0 ? `${r.phut_ra_ngoai} phút` : ''}</td>
+                  <td className="right num">{soVN(r.cong_quy_doi)}</td>
+                  <td><DayStatus r={r} /></td>
+                  <td className="shrink">
+                    <RowMenu items={[
+                      { label: 'Chấm công thủ công', icon: PencilLine, onClick: () => onOpenDay(r.ngay, 'phien') },
+                      { label: 'Nhật ký sửa', icon: FileClock, onClick: () => onOpenDay(r.ngay, 'nhat_ky') },
+                    ]} />
+                  </td>
+                </tr>
+              ))}
         </tbody>
       </table>
     </div>
+  )
+}
+
+// ─── Tab Phép: danh sách phép của công nhân, thêm / huỷ (kèm lý do) ───────────────
+function LeaveTab({ worker }) {
+  const lamMoi = useLamMoiCong()
+  const [add, setAdd] = useState(false)
+  const [cancel, setCancel] = useState(null)
+  const { data, isLoading } = useQuery({
+    queryKey: ['phep', { worker_id: worker.id }], queryFn: () => layDanhSachPhep({ worker_id: worker.id, ca_huy: true }),
+  })
+  return (
+    <>
+      <div className="sg-card__body d-flex align-items-center gap-2" style={{ paddingBottom: 0 }}>
+        <span className="small muted">Phép về sớm, đi muộn, ra ngoài vì công việc, nghỉ cả ngày (tạo là duyệt luôn).</span>
+        <Button size="sm" className="ms-auto" onClick={() => setAdd(true)} disabled={worker.status !== 'dang_lam'}><Plus size={16} />Thêm phép</Button>
+      </div>
+      <div className="table-wrap no-max">
+        <table className="sg-table">
+          <thead><tr><th>Ngày</th><th>Phép</th><th>Lý do</th><th>Trạng thái</th><th className="shrink" /></tr></thead>
+          <tbody>
+            {isLoading ? <SkeletonRows cols={5} rows={3} />
+              : !data?.ds.length ? <EmptyRow colSpan={5} icon={ClipboardList} title="Chưa có phép nào" text="Bấm Thêm phép để ghi phép về sớm, đi muộn, công tác hoặc nghỉ." />
+                : data.ds.map((p) => (
+                  <tr key={p.id} className={p.trang_thai === 'huy' ? 'muted-row' : ''}>
+                    <td className="nowrap num" style={{ fontWeight: 600 }}>{thuNgay(p.ngay)}</td>
+                    <td>{p.mo_ta}</td>
+                    <td><span className="note-cell" title={p.ly_do}>{p.ly_do}</span></td>
+                    <td>{p.trang_thai === 'huy' ? <Pill tone="neutral">Đã huỷ</Pill> : <Pill tone="ok">Đã duyệt</Pill>}</td>
+                    <td className="shrink">
+                      {p.trang_thai !== 'huy' && (
+                        <Button size="sm" variant="secondary" onClick={() => setCancel(p)}><Trash2 size={15} />Huỷ</Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+          </tbody>
+        </table>
+      </div>
+      {add && <LeaveModal worker={{ id: worker.id, ma: worker.code, ten: worker.full_name }} defaults={{ ngay: '' }} onClose={() => setAdd(false)} />}
+      {cancel && (
+        <ReasonModal title={`Huỷ phép ${cancel.mo_ta.toLowerCase()} ngày ${ngay(cancel.ngay)}?`} variant="danger" confirmLabel="Huỷ phép"
+          message="Ngày công đó được tính lại như chưa có phép. Thao tác ghi vào nhật ký."
+          onConfirm={async (lyDo) => { await huyPhep(cancel.id, lyDo); toast.success('Đã huỷ phép'); lamMoi() }}
+          onClose={() => setCancel(null)} />
+      )}
+    </>
   )
 }
 
@@ -340,11 +397,13 @@ export default function WorkerDetailPage() {
   const { id } = useParams()
   const workerId = Number(id)
   const qc = useQueryClient()
+  const lamMoi = useLamMoiCong()
   const [params, setParams] = useSearchParams()
   const [tab, setTab] = useState('mat')
   const [confirm, setConfirm] = useState(null)   // 'nghi' | 'lai'
   const [checkId, setCheckId] = useState(null)
   const [manual, setManual] = useState(null)
+  const [dayModal, setDayModal] = useState(null)   // { ngay, tab }
   const editing = params.get('sua') === '1'      // từ danh sách: menu "Sửa thông tin"
 
   const { data: worker, isLoading, isError } = useQuery({
@@ -371,6 +430,7 @@ export default function WorkerDetailPage() {
       qc.invalidateQueries({ queryKey: ['worker', workerId] })
       qc.invalidateQueries({ queryKey: ['mau-mat', workerId] })
       qc.invalidateQueries({ queryKey: ['cong-nhan'] })
+      lamMoi()
     },
     onError: () => setConfirm(null),
   })
@@ -403,11 +463,13 @@ export default function WorkerDetailPage() {
             { key: 'mat', label: 'Khuôn mặt', icon: ScanFace },
             { key: 'luot', label: 'Lịch sử kiểm tra', icon: History, count: checkCount?.tong },
             { key: 'cong', label: 'Bảng công', icon: CalendarDays },
+            { key: 'phep', label: 'Phép', icon: ClipboardList },
           ]} />
           {!worker ? <div className="sg-card__body"><Skeleton height={300} /></div>
             : tab === 'mat' ? <FaceTab worker={worker} />
               : tab === 'luot' ? <HistoryTab workerId={workerId} onOpen={setCheckId} onManual={setManual} />
-                : <SheetTab workerId={workerId} />}
+                : tab === 'phep' ? <LeaveTab worker={worker} />
+                  : <SheetTab workerId={workerId} onOpenCheck={setCheckId} onOpenDay={(d, t2) => setDayModal({ ngay: d, tab: t2 })} />}
         </section>
       </div>
 
@@ -418,13 +480,18 @@ export default function WorkerDetailPage() {
           gioVao={manual.huong !== 'ra' ? gio(manual.thoi_diem) : ''} gioRa={manual.huong === 'ra' ? gio(manual.thoi_diem) : ''}
           note={`từ lượt lúc ${gio(manual.thoi_diem, true)}`} onClose={() => setManual(null)} />
       )}
+      {worker && dayModal && (
+        <ManualAttendanceModal worker={{ id: worker.id, ma: worker.code, ten: worker.full_name }} ngay={dayModal.ngay}
+          tab={dayModal.tab} onClose={() => setDayModal(null)} />
+      )}
       {worker && (
         <ConfirmModal
           show={!!confirm}
           title={confirm === 'nghi' ? `Cho ${worker.full_name} nghỉ việc?` : `Nhận lại ${worker.full_name}?`}
           message={confirm === 'nghi'
             ? <>Hệ thống sẽ <b>xoá toàn bộ dữ liệu khuôn mặt</b> (vector và ảnh mẫu) của người này và không nhận diện ở cổng nữa.
-                Lịch sử kiểm tra và bảng công vẫn được giữ.</>
+                Nếu người này <b>đang có phiên mở</b> (đang ở công trường), phiên đó <b>được đóng tại thời điểm này</b> và ghi vào nhật ký.
+                Ngày nghỉ việc là hôm nay; lịch sử kiểm tra và bảng công vẫn được giữ.</>
             : 'Công nhân sẽ trở lại trạng thái đang làm. Cần ghi nhận đồng ý và đăng ký khuôn mặt lại từ đầu.'}
           variant={confirm === 'nghi' ? 'danger' : 'primary'}
           confirmLabel={confirm === 'nghi' ? 'Cho nghỉ việc' : 'Cho đi làm lại'}

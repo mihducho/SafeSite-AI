@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Activity, ArrowLeft, Camera, CameraOff, Check, Expand, HardHat, Minimize, PersonStanding, ScanLine, ServerCrash,
-  ShieldCheck, Shirt, TriangleAlert, Volume2, VolumeX, X,
+  Activity, ArrowLeft, Camera, CameraOff, Check, CircleCheck, Expand, HardHat, History, Minimize, PersonStanding, ScanLine,
+  ServerCrash, ShieldCheck, Shirt, TriangleAlert, Volume2, VolumeX, X,
 } from 'lucide-react'
 import { STREAM_URL } from '../api/endpoints.js'
 import { LogoMark } from '../components/common/Logo.jsx'
@@ -23,15 +23,34 @@ import './GateScreen.css'
 const RESULT_ICON = { xanh: Check, do: X, vang: TriangleAlert }
 const MISSING_ICON = { thieu_mu: HardHat, thieu_ao: Shirt }
 
-/** Câu thông báo trên màn hình: tên đã hiện chữ lớn ở trên nên bỏ "Tên: " ở đầu (giọng đọc vẫn đọc đủ câu). */
-function displayMessage(ev) {
+const LOI_CHAO = ['Chào mừng trở lại', 'Xin chào', 'Tạm biệt']
+
+/**
+ * Tách câu thông báo của backend để hiện trên màn hình (giọng đọc vẫn đọc nguyên câu):
+ *  - tên đã hiện chữ lớn nên bỏ "Xin chào / Chào mừng trở lại / Tạm biệt {tên}. " hoặc "{tên}: " ở đầu;
+ *    lời chào thành dòng nhỏ phía trên tên;
+ *  - "(về sớm có phép)" và "không ghi lặp" thành nhãn riêng; dòng phụ (vd về sớm chưa có phép) là dòng cảnh báo.
+ */
+function tachThongBao(ev) {
   const name = ev.cong_nhan?.ten
-  const msg = ev.thong_bao ?? ''
-  if (name && msg.startsWith(`${name}: `)) {
-    const rest = msg.slice(name.length + 2)
-    return rest.charAt(0).toUpperCase() + rest.slice(1)
+  let msg = ev.thong_bao ?? ''
+  let chao = null
+  if (name) {
+    chao = LOI_CHAO.find((c) => msg.startsWith(`${c} ${name}. `)) ?? null
+    if (chao) msg = msg.slice(chao.length + name.length + 3)
+    else if (msg.startsWith(`${name}: `)) msg = msg.slice(name.length + 2)
   }
-  return msg
+  const nhan = []
+  if (ev.som_co_phep) {
+    msg = msg.replace(/\s*\(về sớm có phép\)$/, '')
+    nhan.push({ icon: CircleCheck, text: 'Về sớm có phép' })
+  }
+  if (ev.hanh_dong === 'bo_qua_trung') {
+    msg = msg.replace(/, không ghi lặp$/, '')
+    nhan.push({ icon: History, text: 'Đã ghi trước đó, không ghi lặp' })
+  }
+  if (ev.ly_do_ghi === 'ngoai_gio_vao') nhan.push({ icon: X, text: 'Không ghi công' })
+  return { chao, msg: msg.charAt(0).toUpperCase() + msg.slice(1), nhan, phu: ev.thong_bao_phu ?? null }
 }
 const STREAM_RETRY_MS = 2000
 
@@ -117,7 +136,7 @@ function useSound() {
     const synth = window.speechSynthesis
     synth.cancel()
     synth.resume()                                   // Chrome / Edge đôi khi tự tạm dừng hàng đợi đọc sau lâu không dùng
-    const u = new SpeechSynthesisUtterance(ev.thong_bao)
+    const u = new SpeechSynthesisUtterance([ev.thong_bao, ev.thong_bao_phu].filter(Boolean).join('. '))
     u.voice = v
     u.lang = v.lang
     u.onerror = (e) => {
@@ -244,6 +263,8 @@ export default function GateScreen() {
   const ResultIcon = result ? RESULT_ICON[result.mau] ?? TriangleAlert : null
   const DownIcon = down?.icon
   const recent = result ?? lastEvent
+  const tb = result ? tachThongBao(result) : null
+  const tbRecent = recent ? tachThongBao(recent) : null
 
   return (
     <div className="gs">
@@ -293,11 +314,18 @@ export default function GateScreen() {
               {down.detail && <div className="gs-detail">{down.detail}</div>}
             </div>
           ) : result ? (
-            <div className="gs-in" key={result.id}>
+            <div className={`gs-in${tb.phu || tb.nhan.length ? ' dense' : ''}`} key={result.id}>
               <div className="gs-icon"><ResultIcon strokeWidth={2.5} /></div>
+              {tb.chao && <div className="gs-greet">{tb.chao}</div>}
               <div className="gs-name">{result.cong_nhan?.ten ?? result.thong_bao}</div>
               {result.cong_nhan?.ma && <div className="gs-code">Mã {result.cong_nhan.ma}</div>}
-              {result.cong_nhan && <div className="gs-msg">{displayMessage(result)}</div>}
+              {result.cong_nhan && <div className="gs-msg">{tb.msg}</div>}
+              {tb.nhan.length > 0 && (
+                <div className="gs-tags">
+                  {tb.nhan.map(({ icon: Icon, text }) => <span key={text}><Icon size={18} strokeWidth={1.75} />{text}</span>)}
+                </div>
+              )}
+              {tb.phu && <div className="gs-warn" role="alert"><TriangleAlert size={22} strokeWidth={1.75} />{tb.phu}</div>}
               {result.thieu?.length > 0 && (
                 <div className="gs-missing">
                   {result.thieu.map((t) => {
@@ -371,7 +399,7 @@ export default function GateScreen() {
                   {recent.cong_nhan?.ma && <span className="gs-recent-card__code">{recent.cong_nhan.ma}</span>}
                 </div>
                 <div className="gs-recent-card__sub">
-                  {displayMessage(recent)}
+                  {[tbRecent.chao, tbRecent.msg, ...tbRecent.nhan.map((n) => n.text), tbRecent.phu].filter(Boolean).join(' · ')}
                 </div>
               </div>
               <div className={`gs-recent-card__pill ${recent.mau ?? 'neutral'}`}>

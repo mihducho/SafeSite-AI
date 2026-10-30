@@ -412,6 +412,28 @@
 .gs-name { font-size: clamp(36px, 3vw, 56px); font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; color: #FFFFFF; word-break: break-word; }
 .gs-code { font-family: var(--font-mono); font-size: 18px; font-weight: 600; color: rgba(255, 255, 255, 0.92); font-variant-numeric: tabular-nums; }
 .gs-msg { font-size: clamp(22px, 1.8vw, 30px); font-weight: 600; line-height: 1.3; color: #FFFFFF; max-width: 28ch; }
+.gs-greet {
+  font-size: clamp(18px, 1.4vw, 24px); font-weight: 600; letter-spacing: 0.01em; color: rgba(255, 255, 255, 0.92);
+  margin-bottom: -6px;
+}
+/* Nhãn kèm câu thông báo: về sớm có phép, đã ghi trước đó, không ghi công */
+.gs-tags { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.gs-tags span {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 4px; font-size: 17px; font-weight: 600;
+  background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.75); color: #FFFFFF;
+}
+/* Dòng cảnh báo phụ (vd "Về sớm chưa có phép, vui lòng báo tổ trưởng"): nổi trên mọi màu nền của khung */
+.gs-warn {
+  display: inline-flex; align-items: center; gap: 10px; max-width: 34ch; padding: 10px 16px; border-radius: 6px;
+  font-size: clamp(18px, 1.4vw, 22px); font-weight: 700; line-height: 1.35; text-align: left;
+  background: #FEF3C7; color: #78350F; border: 2px solid #F59E0B;
+}
+.gs-warn svg { flex-shrink: 0; color: #B45309; }
+/* Có dòng cảnh báo / nhãn: thu nhỏ biểu tượng, ảnh và khoảng cách để vừa khung trên màn hình 768px */
+.gs-in.dense { gap: 10px; }
+.gs-in.dense .gs-icon { width: clamp(56px, 8vh, 96px); height: clamp(56px, 8vh, 96px); }
+.gs-in.dense .gs-photo { height: clamp(56px, 8vh, 96px); }
+.gs-in.dense .gs-warn { max-width: 48ch; padding: 8px 14px; }
 .gs-missing { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .gs-missing span {
   display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 4px; font-size: 17px; font-weight: 600;

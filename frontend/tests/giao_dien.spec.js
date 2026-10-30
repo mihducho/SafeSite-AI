@@ -14,11 +14,12 @@ const PAGES = [
   ['/lich-su', 'Lịch sử kiểm tra'],
   ['/bang-cong', 'Bảng công ngày'],
   ['/bang-cong-thang', 'Bảng công tháng'],
+  ['/viec-can-xu-ly', 'Việc cần xử lý'],
   ['/cau-hinh-ca', 'Ca làm'],
   ['/cau-hinh-cong', 'Cấu hình cổng'],
 ]
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u
-const MA_KY_THUAT = /\b(KHONG_DAT|KHONG_XAC_DINH|NHIEU_NGUOI|KHONG_CO_NGUOI|DA_NHAN_RA|KHONG_NHAN_RA|KHONG_THAY_MAT|bo_qua_trung|khong_ghi|ghi_vao|ghi_ra|dang_lam|nghi_viec|binh_thuong|ngoai_ca|cham_thu_cong|chua_vao|KIEM_TRA|CHO_ROI_DI)\b/
+const MA_KY_THUAT = /\b(KHONG_DAT|KHONG_XAC_DINH|NHIEU_NGUOI|KHONG_CO_NGUOI|DA_NHAN_RA|KHONG_NHAN_RA|KHONG_THAY_MAT|bo_qua_trung|khong_ghi|ghi_vao|ghi_ra|dang_lam|nghi_viec|binh_thuong|ngoai_ca|cham_thu_cong|chua_vao|KIEM_TRA|CHO_ROI_DI|thieu_gio_ra|du_cong|nghi_tuan|nghi_phep|di_muon|ve_som|ra_ngoai_cong_viec|ngoai_gio_vao|thu_cong|tu_dong)\b/
 
 async function giaoDienSach(page, path) {
   const text = await page.locator('body').innerText()
@@ -64,6 +65,21 @@ test('đăng nhập, mở từng trang, không lỗi', async ({ page }) => {
     await expect(page.getByRole('tab', { name: /Khuôn mặt/ })).toBeVisible()
     await expect(page.getByText('Đồng ý đăng ký khuôn mặt')).toBeVisible()
     await giaoDienSach(page, 'chi tiết công nhân')
+  }
+
+  // bảng công ngày: bấm dòng đầu -> hiện các phiên; "⋯" -> Chấm công thủ công mở modal ngày công (chỉ xem, không lưu)
+  await page.goto('/bang-cong')
+  const row = page.locator('table.day-table tbody tr.clickable').first()
+  if (await row.count()) {
+    await row.click()
+    await expect(page.locator('tr.expand-row').first()).toBeVisible()
+    await row.locator('.row-menu-btn').click()
+    await page.locator('.dropdown-item', { hasText: 'Chấm công thủ công' }).click()
+    await expect(page.locator('.day-modal')).toBeVisible()
+    await page.locator('.day-modal').getByRole('tab', { name: /Nhật ký sửa/ }).click()
+    await giaoDienSach(page, 'modal ngày công')
+    await page.locator('.day-modal .btn-close').click()
+    await expect(page.locator('.day-modal')).toHaveCount(0)
   }
 
   // màn hình cổng: toàn màn hình, có ô kết quả, loa luôn bật (không có nút tắt), WebSocket báo trạng thái cổng

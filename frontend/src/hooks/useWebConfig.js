@@ -18,5 +18,6 @@ export function useWebConfig() {
     resultSeconds: data?.giay_hien_ket_qua ?? 5,
     pageSize: data?.so_dong_trang ?? 20,
     maxUploadMb: data?.tai_len_toi_da_mb ?? 10,
+    nguongGiaiTrinh: data?.nguong_giai_trinh_phut ?? 15,   // đi muộn / về sớm không phép quá số phút này -> Việc cần xử lý
   }
 }

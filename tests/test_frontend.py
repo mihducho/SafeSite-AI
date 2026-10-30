@@ -84,9 +84,11 @@ class WebConfigTest(AppCase):
         s = self.app.state.settings
         tz = mui_gio(s["attendance"])
         self.assertEqual(d["ngay_hom_nay"], utcnow().astimezone(tz).date().isoformat())
-        self.assertEqual((d["mui_gio"], d["mau_toi_thieu"], d["mau_toi_da"], d["giay_hien_ket_qua"], d["so_dong_trang"]),
+        self.assertEqual((d["mui_gio"], d["mau_toi_thieu"], d["mau_toi_da"], d["giay_hien_ket_qua"], d["so_dong_trang"],
+                          d["nguong_giai_trinh_phut"]),
                          (s["attendance"]["timezone"], s["face"]["min_samples"], s["face"]["max_samples"],
-                          s["web"]["gate_result_seconds"], s["web"]["page_size"]))
+                          s["web"]["gate_result_seconds"], s["web"]["page_size"],
+                          s["attendance"]["nguong_can_giai_trinh_phut"]))
 
 
 class LuotTheoGioTest(AppCase):

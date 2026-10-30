@@ -53,17 +53,71 @@ export function thieuText(list) {
 }
 
 /**
- * Trạng thái một dòng bảng công ngày bằng chữ dễ hiểu:
- * Thiếu giờ ra / Chấm thủ công / Ngoài ca / Đã ra / Đang làm / Chưa vào.
+ * Trạng thái ngày công DO BACKEND TÍNH (trường trang_thai_ngay + ten_trang_thai, docs/LOGIC_CHAM_CONG.md mục 10).
+ * Giao diện chỉ chọn tông màu theo mã, không tự suy ra trạng thái. kind = lớp màu ô ở bảng công tháng.
  */
-export function trangThaiNgay(r) {
-  if (r.thieu_gio_ra) return ['Thiếu giờ ra', 'bad']
-  if (r.trang_thai === 'cham_thu_cong') return ['Chấm thủ công', 'info']
-  if (r.trang_thai === 'ngoai_ca') return ['Ngoài ca', 'warn']
-  if (r.gio_ra) return ['Đã ra', 'ok']
-  if (r.gio_vao) return ['Đang làm', 'ok']
-  return ['Chưa vào', 'neutral']
+export const TRANG_THAI_NGAY = {
+  dang_lam: ['Đang làm', 'info', 'dang'],
+  thieu_gio_ra: ['Thiếu giờ ra', 'bad', 'thieu'],
+  du_cong: ['Đủ công', 'ok', 'du'],
+  di_muon: ['Đi muộn', 'warn', 'muon'],
+  ve_som: ['Về sớm', 'warn', 'muon'],
+  di_muon_ve_som: ['Đi muộn, về sớm', 'warn', 'muon'],
+  di_muon_co_phep: ['Đi muộn có phép', 'info', 'phep'],
+  ve_som_co_phep: ['Về sớm có phép', 'info', 'phep'],
+  chua_vao: ['Chưa vào', 'neutral', 'trong'],
+  vang: ['Vắng', 'bad', 'vang'],
+  nghi_tuan: ['Nghỉ tuần', 'neutral', 'nghi'],
+  nghi_phep: ['Nghỉ phép', 'info', 'nghiphep'],
+  chua_den: ['Chưa đến', 'neutral', 'trong'],
+  ngoai_thoi_gian_lam_viec: ['Ngoài thời gian làm việc', 'neutral', 'ngoai'],
 }
+
+/** Dòng bảng công (API) -> [chữ, tông] theo trạng thái backend */
+export function trangThaiNgay(r) {
+  const [text, tone] = TRANG_THAI_NGAY[r.trang_thai_ngay] ?? [r.ten_trang_thai ?? '', 'neutral']
+  return [r.ten_trang_thai ?? text, tone]
+}
+
+export const TRANG_THAI_PHIEN = {
+  mo: ['Đang mở', 'info'],
+  dong: ['Đã đóng', 'ok'],
+  thieu_gio_ra: ['Thiếu giờ ra', 'bad'],
+  huy: ['Đã huỷ', 'neutral'],
+}
+export const NGUON = { tu_dong: 'Tự động', thu_cong: 'Thủ công' }
+
+export const LOAI_PHEP = {
+  ve_som: 'Về sớm',
+  di_muon: 'Đi muộn',
+  ra_ngoai_cong_viec: 'Ra ngoài vì công việc',
+  nghi_ca_ngay: 'Nghỉ cả ngày',
+}
+
+export const NHAT_KY = {
+  them_phien: 'Thêm phiên',
+  sua_vao: 'Sửa giờ vào',
+  sua_ra: 'Sửa giờ ra',
+  huy_phien: 'Huỷ phiên',
+  dong_khi_nghi_viec: 'Đóng phiên khi nghỉ việc',
+  them_phep: 'Thêm phép',
+  huy_phep: 'Huỷ phép',
+  xac_nhan_khong_phep: 'Xác nhận không phép',
+  bao_nham: 'Báo nhầm',
+}
+
+/** Loại mục trong Việc cần xử lý -> [chữ, tông] */
+export const VIEC = {
+  thieu_gio_ra: ['Thiếu giờ ra', 'bad'],
+  di_muon_khong_phep: ['Đi muộn chưa có phép', 'warn'],
+  ve_som_khong_phep: ['Về sớm chưa có phép', 'warn'],
+}
+
+/** Ngày nghỉ hằng tuần (Cấu hình ca): [mã, chữ ngắn, chữ đủ] */
+export const THU_TUAN = [
+  ['thu_hai', 'T2', 'Thứ Hai'], ['thu_ba', 'T3', 'Thứ Ba'], ['thu_tu', 'T4', 'Thứ Tư'], ['thu_nam', 'T5', 'Thứ Năm'],
+  ['thu_sau', 'T6', 'Thứ Sáu'], ['thu_bay', 'T7', 'Thứ Bảy'], ['chu_nhat', 'CN', 'Chủ nhật'],
+]
 
 /** Trạng thái cổng (sự kiện trang_thai + tình trạng WebSocket) bằng câu dễ hiểu -> [câu ngắn, câu dài, tông] */
 export function trangThaiCong(st, ws) {

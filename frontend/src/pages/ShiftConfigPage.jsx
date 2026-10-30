@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Form, Spinner } from 'react-bootstrap'
-import { CircleAlert, Clock, Coffee, Info, ShieldCheck } from 'lucide-react'
+import { CalendarOff, CircleAlert, Clock, Coffee, Info, Repeat, ShieldCheck } from 'lucide-react'
 import { capNhatCaLam, layCaLam } from '../api/endpoints.js'
 import { Card, PageHead, Skeleton, TimeInput } from '../components/common/ui.jsx'
 import { hhmm } from '../lib/format.js'
+import { THU_TUAN } from '../lib/labels.js'
 import { toast } from '../lib/toast.js'
 
 const toForm = (ca) => ({
   name: ca?.name ?? '', start_time: ca?.start_time ?? '', end_time: ca?.end_time ?? '', break_start: ca?.break_start ?? '',
   break_minutes: ca?.break_minutes ?? 0, grace_minutes: ca?.grace_minutes ?? 0, early_checkin_minutes: ca?.early_checkin_minutes ?? 0,
+  phut_chong_trung: ca?.phut_chong_trung ?? 10, ngay_nghi_tuan: ca?.ngay_nghi_tuan ?? ['chu_nhat'],
 })
 
 /** "07:30" -> 450 phút (sai dạng -> null), dùng cho thanh thời gian minh hoạ */
@@ -69,7 +71,7 @@ export default function ShiftConfigPage() {
       setError('')
       toast.success(`Đã lưu ca làm${r.so_dong_tinh_lai ? `, tính lại ${r.so_dong_tinh_lai} dòng bảng công hôm nay` : ''}`)
       qc.setQueryData(['ca-lam'], r)
-      qc.invalidateQueries({ queryKey: ['bang-cong-ngay'] })
+      for (const key of ['bang-cong-ngay', 'bang-cong-thang', 'bang-cong-cn', 'ngay-cong', 'viec-can-xu-ly']) qc.invalidateQueries({ queryKey: [key] })
     },
     onError: (err) => setError(err.message),
   })
@@ -86,15 +88,20 @@ export default function ShiftConfigPage() {
         break_minutes: num(form.break_minutes),
         grace_minutes: num(form.grace_minutes),
         early_checkin_minutes: num(form.early_checkin_minutes),
+        phut_chong_trung: num(form.phut_chong_trung),
+        ngay_nghi_tuan: form.ngay_nghi_tuan,
       })
     } catch (err) { setError(err.message) }
   }
   const set = (k) => (v) => setForm((f) => ({ ...f, [k]: typeof v === 'string' ? v : v.target.value }))
   const changed = ca && JSON.stringify(toForm(ca)) !== JSON.stringify(form)
+  const toggleThu = (k) => setForm((f) => ({
+    ...f, ngay_nghi_tuan: f.ngay_nghi_tuan.includes(k) ? f.ngay_nghi_tuan.filter((x) => x !== k) : [...f.ngay_nghi_tuan, k],
+  }))
 
   return (
     <div className="page" style={{ maxWidth: 1100 }}>
-      <PageHead title="Ca làm" sub="Bản demo có một ca mặc định. Lưu xong, bảng công hôm nay được tính lại theo ca mới.">
+      <PageHead title="Ca làm" sub="Bản demo có một ca mặc định. Lưu xong, bảng công hôm nay được tính lại theo ca mới; ngày cũ giữ giờ ca đã áp dụng.">
         <Button variant="secondary" onClick={() => { setForm(toForm(ca)); setError('') }} disabled={!changed || save.isPending}>Hoàn tác</Button>
         <Button type="submit" form="shift-form" disabled={save.isPending || !ca}>{save.isPending && <Spinner size="sm" />}Lưu ca làm</Button>
       </PageHead>
@@ -135,13 +142,31 @@ export default function ShiftConfigPage() {
                   </div>
                 </div>
               </div>
+              <div className="row g-3 mt-1">
+                <div className="col-lg-4">
+                  <div className="form-group-title"><Repeat size={16} strokeWidth={1.5} />Chống quét trùng</div>
+                  <Form.Label htmlFor="s-dup">Chống quét trùng (phút)</Form.Label>
+                  <Form.Control id="s-dup" type="number" min={1} max={120} value={form.phut_chong_trung} onChange={set('phut_chong_trung')} style={{ maxWidth: 160 }} />
+                  <div className="small muted mt-1">Hai lần ghi công (vào / ra) của một người cách nhau ít hơn số phút này thì bỏ qua lần sau. Thường đặt 10; khi demo đặt 1.</div>
+                </div>
+                <div className="col-lg-8">
+                  <div className="form-group-title"><CalendarOff size={16} strokeWidth={1.5} />Ngày nghỉ hằng tuần</div>
+                  <div className="choice-row" role="group" aria-label="Ngày nghỉ hằng tuần">
+                    {THU_TUAN.map(([k, ngan, ten]) => (
+                      <button key={k} type="button" title={ten} aria-pressed={form.ngay_nghi_tuan.includes(k)}
+                        className={`choice${form.ngay_nghi_tuan.includes(k) ? ' active' : ''}`} onClick={() => toggleThu(k)}>{ngan}</button>
+                    ))}
+                  </div>
+                  <div className="small muted mt-1">Ngày nghỉ không có phiên thì là "Nghỉ tuần", không tính vắng. Đi làm vào ngày nghỉ vẫn được ghi công, có đánh dấu.</div>
+                </div>
+              </div>
               {error && <div className="note bad mt-3"><CircleAlert size={17} strokeWidth={1.5} />{error}</div>}
               <div className="note info mt-3">
                 <Info size={17} strokeWidth={1.5} />
                 <div>
-                  Giờ nhập dạng 24 giờ HH:MM, ví dụ 07:00. Đi muộn quá số phút ân hạn thì tính toàn bộ số phút từ giờ bắt đầu ca.
-                  Số giờ làm chỉ trừ phần nghỉ giữa ca nằm trong khoảng từ giờ vào đến giờ ra. Vào trước giờ bắt đầu quá số phút cho vào
-                  sớm, hoặc sau giờ kết thúc, thì ghi là "ngoài ca".
+                  Giờ nhập dạng 24 giờ HH:MM, ví dụ 07:00. Vào sau giờ bắt đầu + ân hạn (tính cả giây) là đi muộn, số phút tính từ giờ
+                  bắt đầu ca. Chỉ ghi giờ vào trong khoảng từ (giờ bắt đầu − cho vào sớm) tới giờ kết thúc; ngoài khoảng đó màn hình cổng
+                  báo "chưa đến giờ" / "đã hết giờ vào ca". Số giờ làm cộng các phiên vào – ra, trừ phần trùng giờ nghỉ.
                 </div>
               </div>
             </Form>

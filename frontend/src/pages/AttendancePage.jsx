@@ -1,23 +1,30 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Form, Spinner } from 'react-bootstrap'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, History, PencilLine, Users } from 'lucide-react'
+import {
+  CalendarDays, CalendarRange, ChevronDown, ChevronLeft, ChevronRight, ClipboardList, FileClock, History, PencilLine,
+  Users,
+} from 'lucide-react'
 import { layBangCongNgay, layDanhSachToDoi } from '../api/endpoints.js'
+import CheckDetailModal from '../components/common/CheckDetailModal.jsx'
+import DayStatus from '../components/common/DayStatus.jsx'
+import LeaveModal from '../components/common/LeaveModal.jsx'
 import ManualAttendanceModal from '../components/common/ManualAttendanceModal.jsx'
+import SessionList from '../components/common/SessionList.jsx'
 import { Card, EmptyRow, PageHead, Person, Pill, RowMenu, SkeletonRows } from '../components/common/ui.jsx'
 import { useWebConfig } from '../hooks/useWebConfig.js'
 import { useGateEvents } from '../lib/events.js'
-import { doiNgay, gioPhutChu, thuNgay } from '../lib/format.js'
-import { trangThaiNgay } from '../lib/labels.js'
+import { doiNgay, gioPhutChu, soVN, thuNgay } from '../lib/format.js'
 
-// Thẻ tóm tắt: bấm vào thì lọc bảng
+// Thẻ tóm tắt: bấm vào thì lọc bảng. Mọi điều kiện dựa trên số liệu / trạng thái BACKEND trả về.
 const SUMMARY = [
   { key: 'da_vao', label: 'Đã vào', test: (r) => !!r.gio_vao },
+  { key: 'dang_lam', label: 'Đang làm', test: (r) => r.trang_thai_ngay === 'dang_lam', tone: 'ok' },
   { key: 'di_muon', label: 'Đi muộn', test: (r) => r.di_muon_phut > 0, tone: 'warn' },
-  { key: 'co_mat', label: 'Đang có mặt', test: (r) => !!r.gio_vao && !r.gio_ra && !r.thieu_gio_ra, tone: 'ok' },
-  { key: 'chua_ra', label: 'Chưa ra', test: (r) => r.thieu_gio_ra, tone: 'bad' },
-  { key: 'chua_vao', label: 'Chưa vào', test: (r) => !r.gio_vao },
+  { key: 'thieu_gio_ra', label: 'Thiếu giờ ra', test: (r) => r.thieu_gio_ra, tone: 'bad' },
+  { key: 'can_xu_ly', label: 'Cần xử lý', test: (r) => r.thieu_gio_ra || r.can_giai_trinh, tone: 'bad' },
+  { key: 'chua_vao', label: 'Chưa vào / vắng', test: (r) => r.trang_thai_ngay === 'chua_vao' || r.trang_thai_ngay === 'vang' },
 ]
 
 /** "‹ Thứ Sáu, 30/10/2026 ›": bấm vào chữ để chọn ngày */
@@ -40,7 +47,10 @@ export default function AttendancePage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const [row, setRow] = useState(null)
+  const [dayModal, setDayModal] = useState(null)   // { row, tab }
+  const [leave, setLeave] = useState(null)
+  const [checkId, setCheckId] = useState(null)
+  const [open, setOpen] = useState(() => new Set(params.get('cn') ? [Number(params.get('cn'))] : []))
   const [only, setOnly] = useState(null)       // lọc theo thẻ tóm tắt
   const reloadTimer = useRef(null)
   const ngayXem = params.get('ngay') || cfg.today
@@ -70,10 +80,13 @@ export default function AttendancePage() {
   const ds = data?.ds ?? []
   const counts = Object.fromEntries(SUMMARY.map((s) => [s.key, ds.filter(s.test).length]))
   const rows = only ? ds.filter(SUMMARY.find((s) => s.key === only).test) : ds
+  const toggle = (id) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const cols = 11
 
   return (
     <div className="page">
       <PageHead title="Bảng công ngày" sub={data ? `${ds.length} công nhân${isFetching ? ' · đang cập nhật…' : ''}` : ' '}>
+        <Link to="/viec-can-xu-ly" className="btn btn-secondary"><ClipboardList size={18} />Việc cần xử lý</Link>
         <Link to="/bang-cong-thang" className="btn btn-secondary"><CalendarRange size={18} />Bảng công tháng</Link>
       </PageHead>
 
@@ -87,7 +100,7 @@ export default function AttendancePage() {
         {isFetching && <Spinner size="sm" />}
       </div>
 
-      <div className="summary mb-3">
+      <div className="summary summary-6 mb-3">
         {SUMMARY.map((s) => (
           <button key={s.key} type="button" className={`summary__item${only === s.key ? ' active' : ''}`}
             onClick={() => setOnly(only === s.key ? null : s.key)} aria-pressed={only === s.key}>
@@ -101,47 +114,83 @@ export default function AttendancePage() {
 
       <Card flush>
         <div className="table-wrap">
-          <table className="sg-table">
+          <table className="sg-table day-table">
             <thead>
-              <tr><th>Công nhân</th><th>Tổ đội</th><th>Giờ vào</th><th>Giờ ra</th><th>Đi muộn</th><th>Về sớm</th>
-                <th>Giờ làm</th><th>Trạng thái</th><th>Ghi chú</th><th className="shrink" /></tr>
+              <tr><th className="shrink" /><th>Công nhân</th><th>Giờ vào</th><th>Giờ ra</th><th>Đi muộn</th><th>Về sớm</th>
+                <th>Giờ làm</th><th>Ra ngoài</th><th className="right">Công</th><th>Trạng thái</th><th className="shrink" /></tr>
             </thead>
             <tbody>
-              {isLoading ? <SkeletonRows cols={10} />
+              {isLoading ? <SkeletonRows cols={cols} />
                 : !rows.length ? (
-                  <EmptyRow colSpan={10} icon={Users} title={only ? 'Không có ai trong nhóm này' : 'Chưa có công nhân nào'}
+                  <EmptyRow colSpan={cols} icon={Users} title={only ? 'Không có ai trong nhóm này' : 'Chưa có công nhân nào'}
                     text={only ? 'Bấm lại vào thẻ tóm tắt để xem tất cả.' : 'Thêm công nhân ở trang Công nhân.'} />
                 ) : rows.map((r) => {
-                  const [text, tone] = trangThaiNgay(r)
+                  const isOpen = open.has(r.worker_id)
+                  const hasSegs = (r.phien?.length ?? 0) > 0
                   return (
-                    <tr key={r.worker_id}>
-                      <td><Person name={r.ho_ten} code={r.ma} workerId={r.worker_id} to={`/cong-nhan/${r.worker_id}`} /></td>
-                      <td>{r.to_doi}</td>
-                      <td className="num" style={{ fontWeight: 600 }}>{r.gio_vao}</td>
-                      <td className="num" style={{ fontWeight: 600 }}>{r.gio_ra}</td>
-                      <td>{r.di_muon_phut > 0 && <Pill tone="warn">+{r.di_muon_phut} phút</Pill>}</td>
-                      <td className="nowrap">{r.ve_som_phut > 0 && r.gio_ra ? `${r.ve_som_phut} phút` : ''}</td>
-                      <td className="nowrap">{r.gio_ra ? gioPhutChu(r.so_phut_lam) : ''}</td>
-                      <td><Pill tone={tone}>{text}</Pill></td>
-                      <td><span className="note-cell" title={r.ghi_chu ?? ''}>{r.ghi_chu}</span></td>
-                      <td className="shrink">
-                        <RowMenu items={[
-                          { label: 'Chấm thủ công', icon: PencilLine, onClick: () => setRow(r) },
-                          { label: 'Xem lịch sử kiểm tra', icon: History, onClick: () => navigate(`/lich-su?ngay=${r.ngay}&cong_nhan_id=${r.worker_id}`) },
-                        ]} />
-                      </td>
-                    </tr>
+                    <Fragment key={r.worker_id}>
+                      <tr className={`clickable${isOpen ? ' expanded' : ''}`} onClick={() => toggle(r.worker_id)}>
+                        <td className="shrink">
+                          <span className={`expand-btn${isOpen ? ' open' : ''}`} aria-label={isOpen ? 'Thu gọn' : 'Xem các phiên'}>
+                            <ChevronDown size={16} strokeWidth={1.5} />
+                          </span>
+                        </td>
+                        <td><Person name={r.ho_ten} code={r.ma} sub={r.to_doi} workerId={r.worker_id} to={`/cong-nhan/${r.worker_id}`} /></td>
+                        <td className="num" style={{ fontWeight: 600 }}>{r.gio_vao}</td>
+                        <td className="num" style={{ fontWeight: 600 }}>{r.gio_ra}</td>
+                        <td>{r.di_muon_phut > 0 && <Pill tone={r.muon_co_phep ? 'info' : 'warn'}>+{r.di_muon_phut} phút</Pill>}</td>
+                        <td className="nowrap">{r.ve_som_phut > 0 && r.gio_ra ? `${r.ve_som_phut} phút` : ''}</td>
+                        <td className="nowrap">{r.so_phut_lam ? gioPhutChu(r.so_phut_lam) : ''}</td>
+                        <td className="nowrap">{r.so_lan_ra_ngoai > 0 ? `${r.so_lan_ra_ngoai} lần · ${r.phut_ra_ngoai} phút` : ''}</td>
+                        <td className="right num">{hasSegs ? soVN(r.cong_quy_doi) : ''}</td>
+                        <td><DayStatus r={r} /></td>
+                        <td className="shrink">
+                          <RowMenu items={[
+                            { label: 'Chấm công thủ công', icon: PencilLine, onClick: () => setDayModal({ row: r, tab: 'phien' }) },
+                            { label: 'Thêm phép', icon: ClipboardList, onClick: () => setLeave(r) },
+                            { label: 'Nhật ký sửa', icon: FileClock, onClick: () => setDayModal({ row: r, tab: 'nhat_ky' }) },
+                            { label: 'Xem lịch sử kiểm tra', icon: History, onClick: () => navigate(`/lich-su?ngay=${r.ngay}&cong_nhan_id=${r.worker_id}`) },
+                          ]} />
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="expand-row">
+                          <td />
+                          <td colSpan={cols - 1}>
+                            <div className="expand-body">
+                              <SessionList phien={r.phien} onOpenCheck={setCheckId} />
+                              {(r.phep?.length ?? 0) > 0 && (
+                                <div className="d-flex gap-2 flex-wrap align-items-center mt-2">
+                                  <span className="small muted">Phép:</span>
+                                  {r.phep.map((p) => <Pill key={p.id} tone="info" className="no-dot">{p.mo_ta}</Pill>)}
+                                </div>
+                              )}
+                              <div className="d-flex gap-2 mt-2">
+                                <Button size="sm" variant="secondary" onClick={() => setDayModal({ row: r, tab: 'phien' })}><PencilLine size={15} />Chấm công thủ công</Button>
+                                {r.attendance_id && <Button size="sm" variant="text" onClick={() => setDayModal({ row: r, tab: 'nhat_ky' })}><FileClock size={15} />Nhật ký sửa</Button>}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   )
                 })}
             </tbody>
           </table>
         </div>
+        <div className="sg-card__foot"><span>Bấm vào một dòng để xem các phiên vào – ra. Trạng thái do máy chủ tính theo quy tắc chấm công.</span></div>
       </Card>
 
-      {row && (
-        <ManualAttendanceModal worker={{ id: row.worker_id, ma: row.ma, ten: row.ho_ten }} ngay={row.ngay}
-          gioVao={row.gio_vao ?? ''} gioRa={row.gio_ra ?? ''} onClose={() => setRow(null)} />
+      {dayModal && (
+        <ManualAttendanceModal worker={{ id: dayModal.row.worker_id, ma: dayModal.row.ma, ten: dayModal.row.ho_ten }}
+          ngay={dayModal.row.ngay} tab={dayModal.tab} onClose={() => setDayModal(null)} />
       )}
+      {leave && (
+        <LeaveModal worker={{ id: leave.worker_id, ma: leave.ma, ten: leave.ho_ten }} defaults={{ ngay: leave.ngay }}
+          onClose={() => setLeave(null)} />
+      )}
+      <CheckDetailModal id={checkId} onHide={() => setCheckId(null)} />
     </div>
   )
 }

@@ -138,7 +138,8 @@ def web_config(request: Request):
             "mau_toi_thieu": s["face"]["min_samples"], "mau_toi_da": s["face"]["max_samples"],
             "giay_hien_ket_qua": s["web"]["gate_result_seconds"],
             "so_dong_trang": s["web"]["page_size"], "so_dong_toi_da": s["web"]["max_page_size"],
-            "tai_len_toi_da_mb": s["web"]["max_upload_mb"]}
+            "tai_len_toi_da_mb": s["web"]["max_upload_mb"],
+            "nguong_giai_trinh_phut": s["attendance"]["nguong_can_giai_trinh_phut"]}
 
 
 # ---------- cong nhan ----------
