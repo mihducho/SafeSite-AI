@@ -19,8 +19,8 @@ logging.getLogger("uvicorn.error").setLevel(logging.ERROR)  # an canh bao "chua 
 from fastapi.testclient import TestClient  # noqa: E402
 from starlette.websockets import WebSocketDisconnect  # noqa: E402
 
-from app_helpers import (PASSWORD, add_admin, add_shift, add_worker, app_config, fake_face_models, luot,  # noqa: E402
-                         sample_image, sample_jpeg_bytes, vn)
+from app_helpers import (PASSWORD, add_admin, add_shift, add_worker, app_config, ca_ca_ngay, fake_face_models,  # noqa: E402
+                         luot, sample_image, sample_jpeg_bytes, vn)
 from fakes import CAM_CFG, FULL, ZONE, FakeCapture  # noqa: E402
 from test_face import HEAD_FACE  # noqa: E402
 from test_gate import AlwaysDetector, FakeEmbedder, FakeFaceDetector  # noqa: E402
@@ -70,6 +70,11 @@ class AppCase(unittest.TestCase):
     def login(self):
         r = self.client.post("/api/dang-nhap", json={"username": "admin", "password": PASSWORD})
         self.assertEqual(r.status_code, 200, r.text)
+
+    def ca_ca_ngay(self):
+        """Test dung GIO THAT: ca phu ca ngay de luot luc nao cung trong cua so vao ca (Q3)."""
+        with self.app.state.db.session() as s:
+            ca_ca_ngay(s)
 
     def add_check(self, t, ket_qua=DAT, thieu=(), face_index=0) -> dict:
         st = self.app.state
@@ -270,6 +275,7 @@ class GateInAppTest(AppCase):
 
     def test_luot_vao_ghi_cong_va_phat_su_kien(self):
         self.login()
+        self.ca_ca_ngay()  # cong chay that: luot luc nay (gio that) phai trong cua so vao ca
         with self.app.state.db.session() as s:
             s.add(Gate(name="Cổng test", camera_source="0", zone=ZONE, rotate=0))
             s.commit()

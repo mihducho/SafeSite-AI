@@ -17,10 +17,11 @@ from app_helpers import (SETTINGS, TZ, add_admin, add_shift, add_worker, fake_fa
                          sample_image, vn)
 from sqlalchemy import func, select
 
-from app.models import NGHI_VIEC, Attendance, FaceSample, PpeCheck
+from app.models import NGHI_VIEC, Attendance, AttendanceSegment, FaceSample, PpeCheck
 from app.services import bao_cao, cong_nhan
-from app.services.cham_cong import (BINH_THUONG, BO_QUA_TRUNG, CHAM_THU_CONG, GHI_RA, GHI_VAO, KHONG_GHI, NGOAI_CA, RA,
-                                    VAO, ChamCongError, cham_thu_cong, ngay_cong, thieu_gio_ra, tinh_cong)
+from app.services.cham_cong import (BINH_THUONG, BO_QUA_TRUNG, CHAM_THU_CONG, GHI_RA, GHI_VAO, KHONG_GHI, NGOAI_GIO_VAO,
+                                    RA, VAO, ChamCongError, cham_thu_cong, danh_dau_thieu_gio_ra, gio_ca, ngay_cong)
+from app.services.tinh_cong import phut_xuong, thoi_gian_lam
 from app.services.dang_ky_mat import CAMERA, DangKyMat, DangKyMatError
 from app.services.luot import DA_NHAN_RA, DO, KHONG_NHAN_RA, KHONG_THAY_MAT, VANG, XANH, xu_ly_luot
 from src.checkpoint.evaluate import DAT, KHONG_CO_NGUOI, KHONG_DAT, KHONG_XAC_DINH, NHIEU_NGUOI
@@ -97,29 +98,35 @@ class VaoRaTest(ServiceCase):
         self.assertEqual((a.check_in, a.check_out), (vn(29, 7, 0), vn(29, 17, 5)))
         self.assertEqual((a.worked_minutes, a.early_leave_minutes, a.late_minutes), (540, 0, 0))  # 10 gio - 60 nghi
 
-    def test_ra_trong_2_phut_sau_khi_vao_bi_bo_qua(self):
+    def test_ra_trong_10_phut_sau_khi_vao_bi_bo_qua(self):
+        # v2: chong trung 10 phut (shifts.phut_chong_trung), truoc la 2 phut
         self.run_luot(vn(29, 7, 0))
-        ev = self.run_luot(vn(29, 7, 1, 30))
+        ev = self.run_luot(vn(29, 7, 9, 59))
         self.assertEqual((ev["hanh_dong"], ev["huong"], ev["mau"]), (BO_QUA_TRUNG, RA, XANH))
         self.assertEqual(ev["thong_bao"], "Nguyễn Văn An: đã ghi giờ vào 07:00, không ghi lặp")
         self.assertIsNone(self.att(self.an).check_out)
         self.assertEqual(self.check(ev).action, BO_QUA_TRUNG)
-        self.assertEqual(self.run_luot(vn(29, 7, 2))["hanh_dong"], GHI_RA)  # du 2 phut: ghi gio ra
+        self.assertEqual(self.run_luot(vn(29, 7, 10))["hanh_dong"], GHI_RA)  # du 10 phut: ghi gio ra
 
-    def test_vao_lai_sau_khi_ra_giu_gio_vao_dau_cap_nhat_gio_ra(self):
+    def test_vao_lai_mo_phien_moi_giu_gio_ra_cu(self):
+        # v2: vao lai mo phien moi, KHONG xoa gio ra 11:30; phut lam = tong cac phien (truoc: 540 vi khong tru 12:30-13:00)
         self.run_luot(vn(29, 7, 0))
         self.run_luot(vn(29, 11, 30))                                        # ra an trua
         ev = self.run_luot(vn(29, 12, 55), KHONG_DAT, ["thieu_mu"])          # vao lai phai kiem tra bao ho
         self.assertEqual((ev["huong"], ev["hanh_dong"]), (VAO, KHONG_GHI))
         self.assertEqual(self.att(self.an).check_out, vn(29, 11, 30))
         ev = self.run_luot(vn(29, 13, 0))
-        self.assertEqual((ev["hanh_dong"], ev["thong_bao"]), (GHI_VAO, "Xin chào Nguyễn Văn An. Đã ghi vào lại 13:00"))
+        self.assertEqual((ev["hanh_dong"], ev["thong_bao"]),
+                         (GHI_VAO, "Chào mừng trở lại Nguyễn Văn An. Đã ghi giờ vào 13:00"))
         a = self.att(self.an)
         self.assertEqual((a.check_in, a.check_out), (vn(29, 7, 0), None))   # giu gio vao dau, dang co mat
+        self.assertEqual([(s.vao_at, s.ra_at) for s in a.segments],
+                         [(vn(29, 7, 0), vn(29, 11, 30)), (vn(29, 13, 0), None)])  # phien sang con nguyen gio ra
         self.assertEqual(self.run_luot(vn(29, 13, 1))["hanh_dong"], BO_QUA_TRUNG)  # tinh tu lan vao gan nhat (13:00)
         self.assertEqual(self.run_luot(vn(29, 17, 10))["hanh_dong"], GHI_RA)
         a = self.att(self.an)
-        self.assertEqual((a.check_in, a.check_out, a.worked_minutes), (vn(29, 7, 0), vn(29, 17, 10), 540))
+        self.assertEqual((a.check_in, a.check_out, a.worked_minutes), (vn(29, 7, 0), vn(29, 17, 10), 510))
+        self.assertEqual((a.so_lan_ra_ngoai, a.phut_ra_ngoai), (1, 30))  # 12:30-13:00 (ngoai gio nghi)
 
     def test_di_muon_trong_va_ngoai_an_han(self):
         self.run_luot(vn(29, 7, 5), face_index=0)    # muon 5 phut = an han -> khong tinh
@@ -127,13 +134,17 @@ class VaoRaTest(ServiceCase):
         self.assertEqual(self.att(self.an).late_minutes, 0)
         self.assertEqual(self.att(self.binh).late_minutes, 20)
 
-    def test_ngoai_ca(self):
-        self.run_luot(vn(29, 5, 30), face_index=0)   # truoc 06:00 (bat dau - 60 phut)
+    def test_ngoai_cua_so_vao_khong_ghi(self):
+        # v2: ngoai [bat dau - 60 phut, ket thuc] KHONG ghi (truoc: van ghi, gan nhan ngoai_ca)
+        ev = self.run_luot(vn(29, 5, 30), face_index=0)   # truoc 06:00 (bat dau - 60 phut)
+        self.assertEqual((ev["hanh_dong"], ev["ly_do_ghi"], ev["mau"], ev["thong_bao"]),
+                         (KHONG_GHI, NGOAI_GIO_VAO, VANG, "Chưa đến giờ vào ca (từ 06:00)"))
+        self.assertIsNone(self.att(self.an))
         self.run_luot(vn(29, 6, 0), face_index=1)    # dung 06:00: trong khung
-        self.assertEqual((self.att(self.an).status, self.att(self.an).check_in), (NGOAI_CA, vn(29, 5, 30)))
         self.assertEqual(self.att(self.binh).status, BINH_THUONG)
-        self.run_luot(vn(30, 18, 0), face_index=1)   # ngay hom sau, sau gio ket thuc ca
-        self.assertEqual(self.att(self.binh, day=30).status, NGOAI_CA)
+        ev = self.run_luot(vn(30, 18, 0), face_index=1)   # ngay hom sau, sau gio ket thuc ca
+        self.assertEqual((ev["hanh_dong"], ev["thong_bao"]), (KHONG_GHI, "Đã hết giờ vào ca hôm nay"))
+        self.assertIsNone(self.att(self.binh, day=30))
 
     def test_ngay_cong_tinh_theo_gio_viet_nam(self):
         t = vn(29, 6, 30).astimezone(timezone.utc)   # 23:30 UTC ngay 28
@@ -198,6 +209,7 @@ class ThongBaoTest(ServiceCase):
         ]
         for before, (kq, thieu, fi), color, text in cases:
             with self.subTest(ket_qua=kq, thieu=thieu, mat=fi, truoc=before):
+                self.s.execute(AttendanceSegment.__table__.delete())
                 self.s.execute(Attendance.__table__.delete())
                 self.s.execute(PpeCheck.__table__.delete())
                 self.s.commit()
@@ -324,10 +336,8 @@ class GioNghiTest(ServiceCase):
     """So phut lam chi tru phan giao nhau voi gio nghi trua 11:30-12:30 (ca 07:00-17:00)."""
 
     def worked(self, vao, ra) -> int:
-        a = Attendance(worker_id=self.an.id, work_date=date(2026, 10, 29), shift_id=self.shift.id,
-                       check_in=vn(29, *vao), check_out=vn(29, *ra))
-        tinh_cong(a, self.shift, TZ)
-        return a.worked_minutes
+        # v2: ham thuan tinh_cong.thoi_gian_lam (1 phien), truoc la cham_cong.tinh_cong(attendance)
+        return phut_xuong(thoi_gian_lam(vn(29, *vao), vn(29, *ra), gio_ca(self.shift, date(2026, 10, 29), TZ)))
 
     def test_lam_ca_ngay_tru_nghi_trua(self):
         self.assertEqual(self.worked((7, 0), (17, 0)), 540)    # 600 - 60
@@ -352,21 +362,23 @@ class BaoCaoTest(ServiceCase):
     def test_bang_cong_ngay_va_tong_quan(self):
         self.run_luot(vn(29, 7, 2), face_index=0)
         self.run_luot(vn(29, 7, 10), KHONG_DAT, ["thieu_mu"], face_index=1)
+        tq = bao_cao.tong_quan(self.s, ATT, vn(29, 12, 0))
+        self.assertEqual({k: tq[k] for k in ("so_cong_nhan", "da_vao", "dang_co_mat", "so_luot", "luot_khong_dat")},
+                         {"so_cong_nhan": 2, "da_vao": 1, "dang_co_mat": 1, "so_luot": 2, "luot_khong_dat": 1})
+        self.assertEqual(tq["luot_moi_nhat"][0].result, KHONG_DAT)
+        danh_dau_thieu_gio_ra(self.s, ATT, vn(29, 22, 0))  # v2: thieu gio ra duoc LUU boi tac vu nen
         rows = {r["ma"]: r for r in bao_cao.bang_cong_ngay(self.s, date(2026, 10, 29), ATT, vn(29, 22, 0))}
         self.assertEqual(set(rows), {"CN001", "CN002"})  # ca nguoi chua vao
         self.assertEqual((rows["CN001"]["gio_vao"], rows["CN001"]["gio_ra"], rows["CN001"]["thieu_gio_ra"]),
                          ("07:02", None, True))  # 22:00 > 17:00 + 4 gio
         self.assertEqual(rows["CN002"]["trang_thai"], "chua_vao")
-        tq = bao_cao.tong_quan(self.s, ATT, vn(29, 12, 0))
-        self.assertEqual({k: tq[k] for k in ("so_cong_nhan", "da_vao", "dang_co_mat", "so_luot", "luot_khong_dat")},
-                         {"so_cong_nhan": 2, "da_vao": 1, "dang_co_mat": 1, "so_luot": 2, "luot_khong_dat": 1})
-        self.assertEqual(tq["luot_moi_nhat"][0].result, KHONG_DAT)
 
     def test_thieu_gio_ra_sau_4_gio(self):
+        # v2: danh_dau_thieu_gio_ra LUU vao phien (truoc: ham thieu_gio_ra chi tinh luc hien thi)
         self.run_luot(vn(29, 7, 0))
-        a = self.att(self.an)
-        self.assertFalse(thieu_gio_ra(a, self.shift, vn(29, 20, 59), ATT))
-        self.assertTrue(thieu_gio_ra(a, self.shift, vn(29, 21, 1), ATT))
+        self.assertEqual(danh_dau_thieu_gio_ra(self.s, ATT, vn(29, 20, 59)), 0)
+        self.assertEqual(danh_dau_thieu_gio_ra(self.s, ATT, vn(29, 21, 1)), 1)
+        self.assertTrue(bao_cao.bang_cong_ngay(self.s, date(2026, 10, 29), ATT, vn(29, 21, 2))[0]["thieu_gio_ra"])
 
 
 class CongNhanTest(ServiceCase):

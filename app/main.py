@@ -3,8 +3,9 @@
     .venv\\Scripts\\python.exe -m uvicorn app.main:app --port 8000     (hoac  .\\web)
     -> mo http://127.0.0.1:8000 (giao dien React da build, frontend/dist), thu API o /docs, giao dien cu o /cu/
 
-Khoi dong (lifespan): tao bang neu chua co -> lay event loop cho Broadcaster -> bat cong (GateService, thread nen)
--> theo doi trang thai cong. Tat ung dung: dung vong lap cong va camera.
+Khoi dong (lifespan): tao bang neu chua co (CSDL cu thieu cot -> bao loi, chay seed_demo.py --reset) -> lay event loop
+cho Broadcaster -> bat cong (GateService, thread nen) -> theo doi trang thai cong -> tac vu nen danh dau "thieu gio ra"
+(luc khoi dong roi moi attendance.quet_thieu_gio_ra_phut phut). Tat ung dung: dung vong lap cong va camera.
 create_app(start_gate=False): khong bat cong (test, hoac GATE_ENABLED=0 trong .env).
 """
 import asyncio
@@ -30,7 +31,7 @@ from app.events import Broadcaster
 from app.gate_service import GateService
 from app.models import User
 from app.routers import api, frontend, pages, stream, ws
-from app.services.cham_cong import ChamCongError
+from app.services.cham_cong import ChamCongError, danh_dau_thieu_gio_ra
 from app.services.cong_nhan import CongNhanError
 from app.services.dang_ky_mat import DangKyMat, DangKyMatError
 from app.services.nhan_dien import NhanDien
@@ -86,11 +87,34 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
     gate = GateService(cfg, db, nhan_dien, events, settings["paths"]["check_images"], gate_models, reader_factory)
     run_gate = cfg.gate_enabled if start_gate is None else start_gate
 
+    def quet_thieu_gio_ra() -> int:
+        with db.session() as s:
+            return danh_dau_thieu_gio_ra(s, settings["attendance"])
+
+    async def quet_mot_lan():
+        try:
+            n = await run_in_threadpool(quet_thieu_gio_ra)
+            if n:
+                log.info("SafeGate: danh dau %d phien thieu gio ra", n)
+        except Exception:  # khong de tac vu nen chet im lang; lan sau thu lai
+            log.exception("SafeGate: loi khi danh dau thieu gio ra")
+
+    async def quet_dinh_ky():
+        """Q9: luu phien mo qua han thanh thieu_gio_ra moi quet_thieu_gio_ra_phut phut (lan dau: luc khoi dong)."""
+        while True:
+            await asyncio.sleep(settings["attendance"]["quet_thieu_gio_ra_phut"] * 60)
+            await quet_mot_lan()
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         db.create_all()
+        missing = db.cot_con_thieu()
+        if missing:
+            raise RuntimeError(f"CSDL tao tu phien ban cu, thieu cot {', '.join(missing[:6])}: chay "
+                               ".venv\\Scripts\\python.exe scripts\\seed_demo.py --reset (xoa du lieu thu, tao lai bang)")
         events.bind(asyncio.get_running_loop())
         log.info("SafeGate: CSDL %s", db.kind)
+        await quet_mot_lan()
         with db.session() as s:
             if not s.scalar(select(func.count(User.id))):
                 log.warning("Chua co tai khoan quan tri: chay  .venv\\Scripts\\python.exe scripts\\seed_demo.py")
@@ -99,6 +123,7 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
         if run_gate:
             gate.start()
         watcher = asyncio.create_task(ws.watch_gate_status(gate, events))
+        quet = asyncio.create_task(quet_dinh_ky())
 
         def on_exit():  # Ctrl+C: dung cong + camera ngay, ket thuc luong hinh va WebSocket de uvicorn tat duoc
             app.state.shutting_down.set()
@@ -109,6 +134,7 @@ def create_app(cfg: AppConfig | None = None, *, start_gate: bool | None = None, 
         finally:
             restore()
             watcher.cancel()
+            quet.cancel()
             await run_in_threadpool(gate.stop)
 
     app = FastAPI(title="SafeGate API", version="F2", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None,

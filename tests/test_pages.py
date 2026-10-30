@@ -14,7 +14,7 @@ from test_app import AppCase  # noqa: E402  (dung chung cach tao ung dung test +
 
 from app_helpers import vn  # noqa: E402
 from app.db import utcnow  # noqa: E402
-from app.models import Attendance  # noqa: E402
+from app.models import Attendance, AttendanceSegment  # noqa: E402
 from app.services.cham_cong import mui_gio  # noqa: E402
 from src.checkpoint.evaluate import KHONG_DAT  # noqa: E402
 
@@ -84,10 +84,11 @@ class UiApiTest(AppCase):
         # hom nay co 1 dong cong 08:00-11:00 -> doi gio nghi sang 10:00 thi bi tru 60 phut
         tz = mui_gio(self.app.state.settings["attendance"])
         today = utcnow().astimezone(tz).date()
-        with self.app.state.db.session() as db:
-            a = Attendance(worker_id=self.an_id, work_date=today, shift_id=1,
-                           check_in=vn(today.day, 8, 0, month=today.month, year=today.year),
-                           check_out=vn(today.day, 11, 0, month=today.month, year=today.year), worked_minutes=180)
+        with self.app.state.db.session() as db:  # 1 phien 08:00-11:00 (attendance tinh lai tu cac phien)
+            vao, ra = (vn(today.day, h, 0, month=today.month, year=today.year) for h in (8, 11))
+            a = Attendance(worker_id=self.an_id, work_date=today, shift_id=1, check_in=vao, check_out=ra,
+                           worked_minutes=180)
+            a.segments.append(AttendanceSegment(worker_id=self.an_id, vao_at=vao, ra_at=ra, trang_thai="dong"))
             db.add(a)
             db.commit()
             aid = a.id
@@ -127,6 +128,7 @@ class UiApiTest(AppCase):
         self.assertEqual(wb["Chi tiet"].cell(row=2, column=1).value, "28/10/2026")
 
     def test_tong_quan_co_ty_le_dat_va_nguoi_dang_co_mat(self):
+        self.ca_ca_ngay()
         now = utcnow().astimezone(mui_gio(self.app.state.settings["attendance"]))
         self.add_check(now, KHONG_DAT, ["thieu_mu"])
         self.add_check(now)  # DAT -> vao
@@ -138,6 +140,7 @@ class UiApiTest(AppCase):
         w = self.client.post("/api/cong-nhan", json={"code": "CN009", "full_name": "Hà Văn Kiên"}).json()
         r = self.client.post(f"/api/cong-nhan/{w['id']}/dong-y", json={"dong_y": True}).json()
         self.assertEqual(r["consent_by_name"], "Quản trị")
+        self.ca_ca_ngay()
         now = utcnow().astimezone(mui_gio(self.app.state.settings["attendance"]))
         self.add_check(now)
         rows = self.client.get(f"/api/cong-nhan/{self.an_id}/bang-cong").json()["ds"]

@@ -2,7 +2,8 @@
 
   CHO / CHO_ROI_DI: lay khung moi nhat, tim mat tren khung thu nho (idle_long_side), toi da idle_max_fps lan/giay,
                     dua "co mat trong vung khong" vao may trang thai (state.py).
-  KIEM_TRA:         chay 1 luot (round.run_round, khoang timeout giay) roi goi on_result(ket_qua).
+  KIEM_TRA:         chay 1 luot (round.run_round, khoang timeout giay) roi goi on_result(ket_qua). ket_qua["bat_dau_luc"]
+                    = luc bat dau luot (gio UTC): thoi diem ghi cong cua luot.
                     on_result tra ve True neu luot nay da ghi cong (de may trang thai biet co cho nguoi roi di khong).
 
 Ban dong lenh (scripts/run_gate.py) va sau nay ung dung FastAPI (F2) deu dung lop nay.
@@ -10,6 +11,7 @@ Ban dong lenh (scripts/run_gate.py) va sau nay ung dung FastAPI (F2) deu dung lo
 import threading
 import time
 import traceback
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.checkpoint.camera import CameraError
@@ -63,6 +65,7 @@ class GateWorker:
         if not start:
             return None
 
+        bat_dau = datetime.now(timezone.utc)  # luc mat on dinh du trigger_frames khung = thoi diem cua luot
         rnd = self.round = GateRound(self.zone, self.settings, self.detector, self.fd, self.emb, self.required_ppe)
         try:
             result = run_round(self.reader, rnd, self.settings["checkpoint"]["timeout_s"])
@@ -72,6 +75,7 @@ class GateWorker:
             return None
         finally:
             self.round = None
+        result["bat_dau_luc"] = bat_dau
         if self._first_seen is not None:
             result["tu_luc_thay_mat_ms"] = round((time.monotonic() - self._first_seen) * 1000)
         recorded = bool(self.on_result(result)) if self.on_result else False

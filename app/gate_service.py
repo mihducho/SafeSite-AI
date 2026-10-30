@@ -157,7 +157,8 @@ class GateService:
 
     # --- moi luot (thread cua GateWorker) ---
     def _on_result(self, result: dict) -> bool:
-        luot = LuotKiemTra.tu_ket_qua_cong(result, utcnow())
+        # thoi diem cua luot = luc BAT DAU luot (mat on dinh du trigger_frames khung), khong phai luc co ket qua
+        luot = LuotKiemTra.tu_ket_qua_cong(result, result.get("bat_dau_luc") or utcnow())
         with self.db.session() as s:
             event = xu_ly_luot(s, luot, settings=self.settings, nhan_dien=self.nhan_dien, image_dir=self.image_dir,
                                gate_id=self.gate_id)

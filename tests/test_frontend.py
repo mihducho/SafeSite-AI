@@ -91,16 +91,19 @@ class WebConfigTest(AppCase):
 
 class LuotTheoGioTest(AppCase):
     def test_tong_quan_dem_luot_theo_gio_hom_nay(self):
+        self.ca_ca_ngay()
         tz = mui_gio(self.app.state.settings["attendance"])
         now = utcnow().astimezone(tz)
-        self.add_check(now, KHONG_DAT, ["thieu_mu"])
-        self.add_check(now)                      # DAT
-        self.add_check(now, KHONG_XAC_DINH)
+        self.add_check(now, KHONG_DAT, ["thieu_mu"])   # vao khong dat: do
+        self.add_check(now)                      # DAT: ghi vao, xanh
+        self.add_check(now, KHONG_XAC_DINH)      # ngay sau luot vao: bo qua trung, xanh
         self.add_check(now - timedelta(days=1))  # hom qua: khong tinh
         self.login()
         rows = self.client.get("/api/tong-quan").json()["luot_theo_gio"]
         self.assertEqual([r["gio"] for r in rows], list(range(24)))
-        self.assertEqual(rows[now.hour], {"gio": now.hour, "dat": 1, "khong_dat": 1, "khac": 1})
+        old = {k: rows[now.hour][k] for k in ("gio", "dat", "khong_dat", "khac")}  # truong cu: theo ket qua bao ho
+        self.assertEqual(old, {"gio": now.hour, "dat": 1, "khong_dat": 1, "khac": 1})
+        self.assertEqual({k: rows[now.hour][k] for k in ("xanh", "do", "vang")}, {"xanh": 2, "do": 1, "vang": 0})
         self.assertEqual(sum(r["dat"] + r["khong_dat"] + r["khac"] for r in rows), 3)
 
 
