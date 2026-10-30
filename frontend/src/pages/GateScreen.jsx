@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  ArrowLeft, Camera, CameraOff, Check, Expand, HardHat, Minimize, PersonStanding, ServerCrash, Shirt, TriangleAlert,
+  Volume2, VolumeX, X,
+} from 'lucide-react'
 import { STREAM_URL } from '../api/endpoints.js'
+import { LogoMark } from '../components/common/Logo.jsx'
 import { LiveStream } from '../components/common/ui.jsx'
 import { useWebConfig } from '../hooks/useWebConfig.js'
 import { useGateEvents, useWsState } from '../lib/events.js'
 import { dongHo } from '../lib/format.js'
-import { THIEU_NGAN } from '../lib/labels.js'
+import { THIEU_NGAN, trangThaiCong } from '../lib/labels.js'
 import './GateScreen.css'
 
 /**
- * Màn hình cổng (DE_TAI.md mục 5 bước 6). Mở toàn màn hình trên màn hình đặt ở cổng.
+ * Màn hình cổng (DE_TAI.md mục 5 bước 6). Mở toàn màn hình trên màn hình đặt ở cổng, nền tối.
  *  - Trái: hình trực tiếp /stream/gate (qua backend; KHÔNG mở thẳng URL DroidCam vì DroidCam chỉ nhận 1 kết nối),
  *    giữ đúng tỉ lệ hình (điện thoại kẹp dọc 720x1280 -> cột hẹp, cao hết màn hình). Lỗi luồng hình -> tự thử lại.
  *  - Phải: ô kết quả lớn. Chờ (đồng hồ + hướng dẫn) -> đang kiểm tra (pha KIEM_TRA) -> kết quả xanh/đỏ/vàng theo `mau`
@@ -17,10 +22,11 @@ import './GateScreen.css'
  *  - Âm thanh: trình duyệt chặn phát tiếng khi người dùng chưa bấm gì -> nút "Bật âm thanh". Đọc `thong_bao` bằng
  *    giọng tiếng Việt (ưu tiên giọng cài sẵn trong máy, không cần mạng); không có giọng -> tiếng bíp
  *    (1 tiếng = xanh, 2 tiếng = đỏ/vàng).
- *  - Mất camera / cổng lỗi / mất kết nối máy chủ -> lớp phủ "tạm gián đoạn"; WebSocket tự kết nối lại (lib/events.js).
+ *  - Mất camera / cổng lỗi / mất kết nối máy chủ -> ô đỏ "tạm gián đoạn"; WebSocket tự kết nối lại (lib/events.js).
  */
 
-const RESULT_ICON = { xanh: '✓', do: '✗', vang: '!' }
+const RESULT_ICON = { xanh: Check, do: X, vang: TriangleAlert }
+const MISSING_ICON = { thieu_mu: HardHat, thieu_ao: Shirt }
 
 /** Câu thông báo trên màn hình: tên đã hiện chữ lớn ở trên nên bỏ "Tên: " ở đầu (giọng đọc vẫn đọc đủ câu). */
 function displayMessage(ev) {
@@ -100,22 +106,24 @@ function useSound() {
 
   const info = !enabled ? 'Âm thanh đang tắt (trình duyệt cần bấm nút trước khi phát).'
     : voice ? `Giọng đọc: ${voice.name}${voice.localService ? ' (có sẵn trong máy)' : ' (trực tuyến, cần mạng)'}`
-      : 'Máy không có giọng tiếng Việt → phát tiếng bíp (1 tiếng: đạt, 2 tiếng: không đạt hoặc cần làm lại)'
+      : 'Máy không có giọng tiếng Việt, sẽ phát tiếng bíp (1 tiếng: đạt, 2 tiếng: không đạt hoặc cần làm lại)'
   return { enabled, enable, announce, info }
 }
 
-// ─── hình camera ───────────────────────────────────────────────────────────────
+/// ─── hình camera ───────────────────────────────────────────────────────────────
 function GateStream({ status }) {
   const imgRef = useRef(null)
   const [src, setSrc] = useState(STREAM_URL)
   const [ratio, setRatio] = useState(null)      // rộng / cao của hình thật
   const retryRef = useRef(null)
+  const lostRef = useRef(false)   // mất camera: backend gửi ảnh báo lỗi nằm ngang -> giữ tỉ lệ khung dọc cũ
+  lostRef.current = !!status?.mat_camera
 
   // Luồng MJPEG: trình duyệt không phải lúc nào cũng báo "load" -> đọc kích thước định kỳ (đổi góc xoay cũng tự chỉnh)
   useEffect(() => {
     const t = setInterval(() => {
       const im = imgRef.current
-      if (im?.naturalWidth) setRatio(im.naturalWidth / im.naturalHeight)
+      if (im?.naturalWidth && !lostRef.current) setRatio(im.naturalWidth / im.naturalHeight)
     }, 1000)
     return () => { clearInterval(t); clearTimeout(retryRef.current) }
   }, [])
@@ -126,11 +134,11 @@ function GateStream({ status }) {
   }
 
   return (
-    <div className="gate-cam" style={ratio ? { aspectRatio: String(ratio) } : { width: '40vw' }}>
+    <div className="gs-cam" style={ratio ? { aspectRatio: String(ratio) } : { width: '34vw' }}>
       <LiveStream ref={imgRef} src={src} alt="Hình trực tiếp camera cổng" onError={onError} />
-      {!ratio && <div className="gate-cam__wait" style={{ position: 'absolute' }}>Đang chờ hình từ camera…</div>}
+      {!ratio && <div className="gs-cam__wait"><Camera size={36} />Đang chờ hình từ camera…</div>}
       {status?.do_phan_giai && (
-        <div className="gate-cam__tag">{status.do_phan_giai.replace('x', '×')}{status.khung_giay != null ? ` · ${status.khung_giay} khung/giây` : ''}</div>
+        <div className="gs-cam__tag">{status.do_phan_giai.replace('x', '×')}{status.khung_giay != null ? ` · ${status.khung_giay} khung/giây` : ''}</div>
       )}
     </div>
   )
@@ -146,14 +154,21 @@ function useClock(tz) {
   return now
 }
 
-function gateChip(status, wsState) {
-  if (wsState === 'mat') return ['err', 'Mất kết nối máy chủ']
-  if (wsState !== 'mo' || !status) return ['warn', 'Đang kết nối…']
-  if (status.mat_camera) return ['err', 'Mất kết nối camera']
-  if (status.trang_thai === 'dang_khoi_dong') return ['warn', 'Đang khởi động']
-  if (status.trang_thai === 'dang_chay' && !status.loi) return ['ok', status.pha === 'KIEM_TRA' ? 'Đang kiểm tra' : 'Đang chạy']
-  if (status.trang_thai === 'tat') return ['err', 'Cổng đang tắt']
-  return ['err', 'Cổng lỗi']
+/** Hình minh hoạ: người đứng trong khung, đội mũ bảo hộ */
+function StandIllustration() {
+  return (
+    <svg className="gs-illus" viewBox="0 0 200 220" fill="none" aria-hidden="true">
+      <rect x="40" y="8" width="120" height="196" rx="16" stroke="#334155" strokeWidth="4" strokeDasharray="10 8" />
+      <ellipse cx="100" cy="196" rx="44" ry="8" fill="#1E293B" />
+      <path d="M78 52a22 22 0 0 1 44 0z" fill="#F59E0B" />
+      <rect x="72" y="50" width="56" height="7" rx="3.5" fill="#FCD34D" />
+      <circle cx="100" cy="72" r="16" fill="#CBD5E1" />
+      <path d="M70 120c0-17 13-28 30-28s30 11 30 28v26H70z" fill="#F59E0B" />
+      <path d="M80 104h40M78 120h44" stroke="#E2E8F0" strokeWidth="5" strokeLinecap="round" />
+      <rect x="78" y="146" width="16" height="44" rx="6" fill="#64748B" />
+      <rect x="106" y="146" width="16" height="44" rx="6" fill="#64748B" />
+    </svg>
+  )
 }
 
 // ─── trang ─────────────────────────────────────────────────────────────────────
@@ -162,7 +177,7 @@ export default function GateScreen() {
   const wsState = useWsState()
   const [status, setStatus] = useState(null)
   const [result, setResult] = useState(null)
-  const [recent, setRecent] = useState([])
+  const [full, setFull] = useState(!!document.fullscreenElement)
   const timerRef = useRef(null)
   const sound = useSound()
   const clock = useClock(cfg.tz)
@@ -171,107 +186,111 @@ export default function GateScreen() {
     if (ev.loai === 'trang_thai') setStatus(ev)
     if (ev.loai === 'luot') {
       setResult(ev)
-      setRecent((r) => [ev, ...r].slice(0, 4))
       sound.announce(ev)
       clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => setResult(null), cfg.resultSeconds * 1000)
     }
   })
   useEffect(() => () => clearTimeout(timerRef.current), [])
+  useEffect(() => {
+    const on = () => setFull(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', on)
+    return () => document.removeEventListener('fullscreenchange', on)
+  }, [])
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen()
     else document.documentElement.requestFullscreen().catch(() => {})
   }
 
-  // Lớp phủ gián đoạn (không che khi cổng chỉ đang khởi động)
-  let overlay = null
+  // Gián đoạn -> ô đỏ (không tính lúc cổng chỉ đang khởi động)
+  let down = null
   if (wsState === 'mat') {
-    overlay = { camera: false, title: 'Hệ thống kiểm tra tạm gián đoạn', sub: 'Vui lòng gặp cán bộ',
-                detail: 'Mất kết nối tới máy chủ, đang thử kết nối lại…' }
+    down = { icon: ServerCrash, title: 'Hệ thống kiểm tra tạm gián đoạn', sub: 'Vui lòng gặp cán bộ',
+             detail: 'Mất kết nối tới máy chủ, đang thử kết nối lại…' }
   } else if (status?.mat_camera) {
-    overlay = { camera: true, title: 'Mất kết nối camera, đang thử lại',
-                sub: 'Kiểm tra điện thoại: mở ứng dụng camera, bật màn hình, cùng wifi', detail: '' }
+    down = { icon: CameraOff, title: 'Mất kết nối camera, đang thử lại',
+             sub: 'Kiểm tra điện thoại: mở ứng dụng camera, bật màn hình, cùng wifi', detail: '' }
   } else if (status && (status.trang_thai === 'loi' || status.trang_thai === 'tat' || (status.trang_thai === 'dang_chay' && status.loi))) {
-    overlay = { camera: false, title: 'Hệ thống kiểm tra tạm gián đoạn', sub: 'Vui lòng gặp cán bộ',
-                detail: status.trang_thai === 'tat' ? 'Cổng đang tắt' : status.loi }
+    down = { icon: TriangleAlert, title: 'Hệ thống kiểm tra tạm gián đoạn', sub: 'Vui lòng gặp cán bộ',
+             detail: status.trang_thai === 'tat' ? 'Cổng đang tắt' : '' }
   }
 
   const checking = !result && status?.trang_thai === 'dang_chay' && status.pha === 'KIEM_TRA'
   const starting = !result && status?.trang_thai === 'dang_khoi_dong'
-  const boxClass = result ? `gate-result--${result.mau}` : checking ? 'gate-result--kiem-tra' : 'gate-result--cho'
-  const [chipKind, chipText] = gateChip(status, wsState)
+  const boxClass = down ? 'do' : result ? result.mau : checking ? 'kiem-tra' : ''
+  const [statusText, , statusTone] = trangThaiCong(status, wsState)
+  const ResultIcon = result ? RESULT_ICON[result.mau] ?? TriangleAlert : null
+  const DownIcon = down?.icon
 
   return (
-    <div className="gate-screen">
+    <div className="gs">
       <GateStream status={status} />
 
-      <div className="gate-side">
-        <div className="gate-top">
-          <div className="gate-brand"><img src="/favicon.svg" alt="" />SafeGate</div>
-          <span className={`gate-chip gate-chip--${chipKind}`}><span className="gate-chip__dot" />{chipText}</span>
-          <button className={`gate-btn ${sound.enabled ? 'gate-btn--sound-on' : 'gate-btn--sound'}`} onClick={sound.enable}>
-            {sound.enabled ? '🔊 Âm thanh đang bật' : '🔊 Bật âm thanh'}
+      <div className="gs-side">
+        <div className="gs-top">
+          <span className="gs-brand"><LogoMark size={34} />SafeGate</span>
+          <span className={`gs-status ${statusTone}`}><i />{statusText}</span>
+          <button className={`gs-btn ${sound.enabled ? 'on' : 'attention'}`} onClick={sound.enable}>
+            {sound.enabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
+            {sound.enabled ? 'Âm thanh đang bật' : 'Bật âm thanh'}
           </button>
-          <button className="gate-btn" onClick={toggleFullscreen}>⛶ Toàn màn hình</button>
-          <Link className="gate-btn" to="/">← Quản lý</Link>
+          <button className="gs-btn icon" onClick={toggleFullscreen} title={full ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
+            aria-label="Toàn màn hình">
+            {full ? <Minimize size={17} /> : <Expand size={17} />}
+          </button>
+          <Link className="gs-btn icon" to="/" title="Về trang quản lý" aria-label="Về trang quản lý"><ArrowLeft size={17} /></Link>
         </div>
-        <div className="gate-voice">{sound.info}</div>
+        <div className="gs-voice">{sound.info}</div>
 
-        <div className={`gate-result ${boxClass}`}>
-          {result ? (
-            <div className="gate-result__anim" key={result.id}>
-              <div className="gate-icon">{RESULT_ICON[result.mau] ?? '!'}</div>
-              <div className="gate-name">{result.cong_nhan?.ten ?? result.thong_bao}</div>
-              {result.cong_nhan?.ma && <div className="gate-code">Mã {result.cong_nhan.ma}</div>}
-              {result.cong_nhan && <div className="gate-msg">{displayMessage(result)}</div>}
+        <div className={`gs-box ${boxClass}`}>
+          {down ? (
+            <div className="gs-in" key={`down-${down.title}`}>
+              <div className="gs-icon"><DownIcon /></div>
+              <div className="gs-title">{down.title}</div>
+              <div className="gs-sub">{down.sub}</div>
+              {down.detail && <div className="gs-detail">{down.detail}</div>}
+            </div>
+          ) : result ? (
+            <div className="gs-in" key={result.id}>
+              <div className="gs-icon"><ResultIcon strokeWidth={3} /></div>
+              <div className="gs-name">{result.cong_nhan?.ten ?? result.thong_bao}</div>
+              {result.cong_nhan?.ma && <div className="gs-code">Mã {result.cong_nhan.ma}</div>}
+              {result.cong_nhan && <div className="gs-msg">{displayMessage(result)}</div>}
               {result.thieu?.length > 0 && (
-                <div className="gate-missing">{result.thieu.map((t) => <span key={t}>{THIEU_NGAN[t] ?? t}</span>)}</div>
+                <div className="gs-missing">
+                  {result.thieu.map((t) => {
+                    const Icon = MISSING_ICON[t] ?? TriangleAlert
+                    return <span key={t}><Icon size={22} />{THIEU_NGAN[t] ?? t}</span>
+                  })}
+                </div>
               )}
-              <div className="gate-time">
-                {result.gio}
-                {result.huong ? ` · ${result.huong === 'vao' ? 'Vào' : 'Ra'}` : ''}
+              <div className="gs-meta">
+                {result.anh && <img className="gs-photo" src={result.anh} alt="Ảnh lượt kiểm tra" />}
+                <span>{result.gio}{result.huong ? ` · ${result.huong === 'vao' ? 'Vào' : 'Ra'}` : ''}</span>
               </div>
-              {result.anh && <img className="gate-photo" src={result.anh} alt="Ảnh lượt kiểm tra" />}
             </div>
           ) : checking ? (
-            <div className="gate-result__anim" key="kiem-tra">
-              <div className="gate-spinner" />
-              <div className="gate-name">Đang kiểm tra…</div>
-              <div className="gate-msg">Mời đứng yên, nhìn thẳng camera</div>
+            <div className="gs-in" key="kiem-tra">
+              <div className="gs-spinner" />
+              <div className="gs-title">Đang kiểm tra…</div>
+              <div className="gs-sub">Mời đứng yên, nhìn thẳng camera</div>
             </div>
           ) : (
-            <div className="gate-result__anim" key="cho">
-              <div className="gate-clock">{clock.gio}</div>
-              <div className="gate-date">{clock.ngay}</div>
-              <div className="gate-guide">{starting ? 'Đang khởi động camera…' : 'Mời đứng vào vị trí, nhìn vào camera'}</div>
-              <div className="gate-steps">
-                <span>⛑ Đội mũ bảo hộ</span><span>🦺 Mặc áo phản quang</span><span>🧍 Đứng yên 2 giây</span>
+            <div className="gs-in" key="cho">
+              <StandIllustration />
+              <div className="gs-clock">{clock.gio}</div>
+              <div className="gs-date">{clock.ngay}</div>
+              <div className="gs-guide">{starting ? 'Đang khởi động camera…' : 'Mời đứng vào vị trí, nhìn vào camera'}</div>
+              <div className="gs-steps">
+                <span><HardHat size={20} />Đội mũ bảo hộ</span>
+                <span><Shirt size={20} />Mặc áo phản quang</span>
+                <span><PersonStanding size={20} />Đứng yên 2 giây</span>
               </div>
             </div>
           )}
         </div>
-
-        {recent.length > 0 && (
-          <div className="gate-recent">
-            {recent.map((r) => (
-              <div key={r.id} className={`gate-recent__item gate-recent__item--${r.mau}`}>
-                <span>{r.gio}</span><b>{r.cong_nhan?.ten ?? 'Chưa nhận ra'}</b>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
-
-      {overlay && (
-        <div className={`gate-overlay${overlay.camera ? ' gate-overlay--camera' : ''}`}>
-          <div className="gate-overlay__icon">{overlay.camera ? '📷' : '⛔'}</div>
-          <div className="gate-overlay__title">{overlay.title}</div>
-          <div className="gate-overlay__sub">{overlay.sub}</div>
-          {overlay.detail && <div className="gate-overlay__detail">{overlay.detail}</div>}
-          <Link className="gate-btn" to="/">← Quản lý</Link>
-        </div>
-      )}
     </div>
   )
 }

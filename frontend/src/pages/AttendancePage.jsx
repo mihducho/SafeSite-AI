@@ -1,77 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Badge, Button, Card, Form, Modal, Spinner, Table } from 'react-bootstrap'
-import { Link, useSearchParams } from 'react-router-dom'
-import { chamCongThuCong, layBangCongNgay, layDanhSachToDoi } from '../api/endpoints.js'
-import { EmptyRow, StatusBadge, TimeInput } from '../components/common/ui.jsx'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button, Form, Spinner } from 'react-bootstrap'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { CalendarDays, CalendarRange, ChevronLeft, ChevronRight, History, PencilLine, Users } from 'lucide-react'
+import { layBangCongNgay, layDanhSachToDoi } from '../api/endpoints.js'
+import ManualAttendanceModal from '../components/common/ManualAttendanceModal.jsx'
+import { Card, EmptyRow, PageHead, Person, Pill, RowMenu, SkeletonRows } from '../components/common/ui.jsx'
 import { useWebConfig } from '../hooks/useWebConfig.js'
 import { useGateEvents } from '../lib/events.js'
-import { doiNgay, hhmm, ngay, phut } from '../lib/format.js'
-import { CHAM_CONG } from '../lib/labels.js'
-import { toast } from '../lib/toast.js'
+import { doiNgay, gioPhutChu, thuNgay } from '../lib/format.js'
+import { trangThaiNgay } from '../lib/labels.js'
 
-// ─── Modal chấm công thủ công (bắt buộc lý do) ────────────────────────────────
-function ChamCongModal({ row, onClose }) {
-  const qc = useQueryClient()
-  const [gioVao, setGioVao] = useState(row.gio_vao ?? '')
-  const [gioRa, setGioRa] = useState(row.gio_ra ?? '')
-  const [lyDo, setLyDo] = useState('')
-  const [error, setError] = useState('')
-  const save = useMutation({
-    mutationFn: chamCongThuCong,
-    meta: { silent: true },
-    onSuccess: () => {
-      toast.success('Đã lưu chấm công thủ công')
-      qc.invalidateQueries({ queryKey: ['bang-cong-ngay'] })
-      onClose()
-    },
-    onError: (err) => setError(err.message),
-  })
-  const submit = (e) => {
-    e.preventDefault()
-    try {
-      const body = { worker_id: row.worker_id, ngay: row.ngay, gio_vao: hhmm(gioVao, 'Giờ vào'), gio_ra: hhmm(gioRa, 'Giờ ra'), ly_do: lyDo }
-      if (!lyDo.trim()) throw new Error('Bắt buộc ghi lý do khi chấm công thủ công')
-      setError('')
-      save.mutate(body)
-    } catch (err) { setError(err.message) }
-  }
+// Thẻ tóm tắt: bấm vào thì lọc bảng
+const SUMMARY = [
+  { key: 'da_vao', label: 'Đã vào', test: (r) => !!r.gio_vao },
+  { key: 'di_muon', label: 'Đi muộn', test: (r) => r.di_muon_phut > 0, tone: 'warn' },
+  { key: 'co_mat', label: 'Đang có mặt', test: (r) => !!r.gio_vao && !r.gio_ra && !r.thieu_gio_ra, tone: 'ok' },
+  { key: 'chua_ra', label: 'Chưa ra', test: (r) => r.thieu_gio_ra, tone: 'bad' },
+  { key: 'chua_vao', label: 'Chưa vào', test: (r) => !r.gio_vao },
+]
 
+/** "‹ Thứ Sáu, 30/10/2026 ›": bấm vào chữ để chọn ngày */
+function DayPicker({ value, onChange }) {
+  const ref = useRef(null)
   return (
-    <Modal show onHide={onClose} centered backdrop="static">
-      <Form onSubmit={submit} noValidate>
-        <Modal.Header closeButton><Modal.Title>Chấm công thủ công</Modal.Title></Modal.Header>
-        <Modal.Body>
-          <p className="mb-3"><b>{row.ma} – {row.ho_ten}</b> · ngày <b>{ngay(row.ngay)}</b></p>
-          <div className="d-flex gap-3 mb-3">
-            <Form.Group className="flex-fill"><Form.Label htmlFor="m-in">Giờ vào</Form.Label><TimeInput id="m-in" value={gioVao} onChange={setGioVao} /></Form.Group>
-            <Form.Group className="flex-fill"><Form.Label htmlFor="m-out">Giờ ra</Form.Label><TimeInput id="m-out" value={gioRa} onChange={setGioRa} /></Form.Group>
-          </div>
-          <Form.Group>
-            <Form.Label htmlFor="m-reason">Lý do (bắt buộc)</Form.Label>
-            <Form.Control id="m-reason" as="textarea" rows={2} maxLength={500} value={lyDo} onChange={(e) => setLyDo(e.target.value)}
-              placeholder="vd Camera cổng hỏng, cán bộ xác nhận có mặt lúc 07:00" />
-          </Form.Group>
-          <div className="small mt-2" style={{ color: 'var(--text-muted)' }}>
-            Giờ dạng 24 giờ HH:MM. Để trống ô giờ nào thì giữ nguyên giờ đó. Dòng công chuyển sang trạng thái "chấm thủ công", lưu người sửa.
-          </div>
-          {error && <Alert variant="danger" className="mt-3 mb-0 py-2" id="m-error">{error}</Alert>}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={onClose} disabled={save.isPending}>Huỷ</Button>
-          <Button type="submit" disabled={save.isPending}>{save.isPending ? <Spinner size="sm" /> : 'Lưu chấm công'}</Button>
-        </Modal.Footer>
-      </Form>
-    </Modal>
+    <div className="day-picker">
+      <Button variant="secondary" className="btn-icon" onClick={() => onChange(doiNgay(value, -1))} aria-label="Ngày trước"><ChevronLeft size={18} /></Button>
+      <div className="day-picker__label" role="button" tabIndex={0} onClick={() => { try { ref.current?.showPicker?.() } catch { /* trình duyệt cũ */ } }}>
+        <CalendarDays size={17} />{thuNgay(value)}
+        <input ref={ref} type="date" value={value} onChange={(e) => e.target.value && onChange(e.target.value)} aria-label="Chọn ngày" tabIndex={-1} />
+      </div>
+      <Button variant="secondary" className="btn-icon" onClick={() => onChange(doiNgay(value, 1))} aria-label="Ngày sau"><ChevronRight size={18} /></Button>
+    </div>
   )
 }
 
-// ─── trang ─────────────────────────────────────────────────────────────────────
 export default function AttendancePage() {
   const cfg = useWebConfig()
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
   const [row, setRow] = useState(null)
+  const [only, setOnly] = useState(null)       // lọc theo thẻ tóm tắt
   const reloadTimer = useRef(null)
   const ngayXem = params.get('ngay') || cfg.today
   const toDoi = params.get('to_doi') ?? ''
@@ -95,71 +65,83 @@ export default function AttendancePage() {
     reloadTimer.current = setTimeout(() => qc.invalidateQueries({ queryKey: ['bang-cong-ngay'] }), 500)
   })
   useEffect(() => () => clearTimeout(reloadTimer.current), [])
+  useEffect(() => { setOnly(null) }, [ngayXem, toDoi])
 
   const ds = data?.ds ?? []
-  const came = ds.filter((r) => r.gio_vao).length
+  const counts = Object.fromEntries(SUMMARY.map((s) => [s.key, ds.filter(s.test).length]))
+  const rows = only ? ds.filter(SUMMARY.find((s) => s.key === only).test) : ds
 
   return (
-    <div className="sg-page">
-      <div className="section-header">
-        <h1 className="section-title mb-0">Bảng công <span className="sg-sub ms-2">ngày {ngay(ngayXem)}</span></h1>
-        <Link to="/bang-cong-thang" className="btn btn-outline-primary btn-sm">🗓️ Bảng công tháng</Link>
+    <div className="page">
+      <PageHead title="Bảng công ngày" sub={data ? `${ds.length} công nhân${isFetching ? ' · đang cập nhật…' : ''}` : ' '}>
+        <Link to="/bang-cong-thang" className="btn btn-secondary"><CalendarRange size={18} />Bảng công tháng</Link>
+      </PageHead>
+
+      <div className="d-flex align-items-center gap-2 flex-wrap mb-3">
+        <DayPicker value={ngayXem} onChange={(v) => go({ ngay: v })} />
+        <Button variant="secondary" onClick={() => go({ ngay: cfg.today })} disabled={ngayXem === cfg.today}>Hôm nay</Button>
+        <Form.Select value={toDoi} onChange={(e) => go({ to_doi: e.target.value })} aria-label="Tổ đội" style={{ width: 200 }}>
+          <option value="">Tất cả tổ</option>
+          {(teams?.ds ?? []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </Form.Select>
+        {isFetching && <Spinner size="sm" />}
       </div>
 
-      <div className="sg-filters">
-        <Button size="sm" variant="secondary" title="Ngày trước" onClick={() => go({ ngay: doiNgay(ngayXem, -1) })}>‹</Button>
-        <Form.Group>
-          <Form.Label>Ngày</Form.Label>
-          <Form.Control type="date" size="sm" value={ngayXem} onChange={(e) => e.target.value && go({ ngay: e.target.value })} />
-        </Form.Group>
-        <Button size="sm" variant="secondary" title="Ngày sau" onClick={() => go({ ngay: doiNgay(ngayXem, 1) })}>›</Button>
-        <Button size="sm" variant="outline-secondary" onClick={() => go({ ngay: cfg.today })} disabled={ngayXem === cfg.today}>Hôm nay</Button>
-        <Form.Group>
-          <Form.Label>Tổ đội</Form.Label>
-          <Form.Select size="sm" value={toDoi} onChange={(e) => go({ to_doi: e.target.value })} style={{ minWidth: 180 }}>
-            <option value="">Tất cả tổ</option>
-            {(teams?.ds ?? []).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </Form.Select>
-        </Form.Group>
-        {isFetching && <Spinner size="sm" className="mb-2" />}
+      <div className="summary mb-3">
+        {SUMMARY.map((s) => (
+          <button key={s.key} type="button" className={`summary__item${only === s.key ? ' active' : ''}`}
+            onClick={() => setOnly(only === s.key ? null : s.key)} aria-pressed={only === s.key}>
+            <span className="summary__label">{s.label}</span>
+            <span className={`summary__value${s.tone && counts[s.key] ? ` text-${s.tone}` : ''}`}>
+              {counts[s.key]}{s.key === 'da_vao' && <small>/{ds.length}</small>}
+            </span>
+          </button>
+        ))}
       </div>
 
-      <Card>
-        <div className="table-responsive">
-          <Table hover className="mb-0 sg-table">
+      <Card flush>
+        <div className="table-wrap">
+          <table className="sg-table">
             <thead>
-              <tr><th>Mã</th><th>Họ tên</th><th>Tổ đội</th><th>Giờ vào</th><th>Giờ ra</th><th>Đi muộn</th><th>Về sớm</th>
-                <th>Số giờ làm</th><th>Trạng thái</th><th>Ghi chú</th><th /></tr>
+              <tr><th>Công nhân</th><th>Tổ đội</th><th>Giờ vào</th><th>Giờ ra</th><th>Đi muộn</th><th>Về sớm</th>
+                <th>Giờ làm</th><th>Trạng thái</th><th>Ghi chú</th><th className="shrink" /></tr>
             </thead>
             <tbody>
-              {isLoading ? <EmptyRow colSpan={11}><Spinner size="sm" /></EmptyRow>
-                : !ds.length ? <EmptyRow colSpan={11}>Không có công nhân nào.</EmptyRow>
-                  : ds.map((r) => (
+              {isLoading ? <SkeletonRows cols={10} />
+                : !rows.length ? (
+                  <EmptyRow colSpan={10} icon={Users} title={only ? 'Không có ai trong nhóm này' : 'Chưa có công nhân nào'}
+                    text={only ? 'Bấm lại vào thẻ tóm tắt để xem tất cả.' : 'Thêm công nhân ở trang Công nhân.'} />
+                ) : rows.map((r) => {
+                  const [text, tone] = trangThaiNgay(r)
+                  return (
                     <tr key={r.worker_id}>
-                      <td style={{ fontWeight: 600 }}>{r.ma}</td>
-                      <td><Link to={`/cong-nhan/${r.worker_id}`}>{r.ho_ten}</Link></td>
-                      <td>{r.to_doi ?? ''}</td>
-                      <td>{r.gio_vao ?? ''}</td>
-                      <td>{r.gio_ra ?? (r.thieu_gio_ra ? <Badge bg="danger">Thiếu giờ ra</Badge>
-                        : r.gio_vao ? <span className="sg-sub">đang có mặt</span> : '')}</td>
-                      <td>{r.di_muon_phut ? <span className="text-danger">{r.di_muon_phut} phút</span> : ''}</td>
-                      <td>{r.ve_som_phut && r.gio_ra ? `${r.ve_som_phut} phút` : ''}</td>
-                      <td style={{ fontWeight: 600 }}>{r.gio_ra ? phut(r.so_phut_lam) : ''}</td>
-                      <td><StatusBadge map={CHAM_CONG} value={r.trang_thai} /></td>
-                      <td className="small" style={{ whiteSpace: 'pre-line', maxWidth: '22rem' }}>{r.ghi_chu ?? ''}</td>
-                      <td className="text-end"><Button size="sm" variant="outline-primary" className="text-nowrap" onClick={() => setRow(r)}>Chấm thủ công</Button></td>
+                      <td><Person name={r.ho_ten} code={r.ma} workerId={r.worker_id} to={`/cong-nhan/${r.worker_id}`} /></td>
+                      <td>{r.to_doi}</td>
+                      <td className="num" style={{ fontWeight: 600 }}>{r.gio_vao}</td>
+                      <td className="num" style={{ fontWeight: 600 }}>{r.gio_ra}</td>
+                      <td>{r.di_muon_phut > 0 && <Pill tone="warn">+{r.di_muon_phut} phút</Pill>}</td>
+                      <td className="nowrap">{r.ve_som_phut > 0 && r.gio_ra ? `${r.ve_som_phut} phút` : ''}</td>
+                      <td className="nowrap">{r.gio_ra ? gioPhutChu(r.so_phut_lam) : ''}</td>
+                      <td><Pill tone={tone}>{text}</Pill></td>
+                      <td><span className="note-cell" title={r.ghi_chu ?? ''}>{r.ghi_chu}</span></td>
+                      <td className="shrink">
+                        <RowMenu items={[
+                          { label: 'Chấm thủ công', icon: PencilLine, onClick: () => setRow(r) },
+                          { label: 'Xem lịch sử kiểm tra', icon: History, onClick: () => navigate(`/lich-su?ngay=${r.ngay}&cong_nhan_id=${r.worker_id}`) },
+                        ]} />
+                      </td>
                     </tr>
-                  ))}
+                  )
+                })}
             </tbody>
-          </Table>
+          </table>
         </div>
-        <Card.Footer className="small" style={{ color: 'var(--text-secondary)' }}>
-          {came}/{ds.length} người đã vào · {ds.filter((r) => r.di_muon_phut).length} người đi muộn ·{' '}
-          {ds.filter((r) => r.gio_vao && !r.gio_ra).length} người chưa ra
-        </Card.Footer>
       </Card>
 
-      {row && <ChamCongModal row={row} onClose={() => setRow(null)} />}
+      {row && (
+        <ManualAttendanceModal worker={{ id: row.worker_id, ma: row.ma, ten: row.ho_ten }} ngay={row.ngay}
+          gioVao={row.gio_vao ?? ''} gioRa={row.gio_ra ?? ''} onClose={() => setRow(null)} />
+      )}
     </div>
   )
 }

@@ -1,104 +1,121 @@
 import { useEffect, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Badge, Button, Card, Col, Form, ProgressBar, Row, Spinner, Tab, Table, Tabs } from 'react-bootstrap'
-import { Link, useParams } from 'react-router-dom'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button, Form, Modal, Spinner } from 'react-bootstrap'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
+import {
+  ArrowLeft, CalendarDays, Camera, CircleAlert, CircleCheck, History, Images, Pencil, ScanFace, ShieldCheck, Trash2,
+  Upload, UserRoundCheck, UserX, X,
+} from 'lucide-react'
 import {
   capNhatCongNhan, chupMauMat, diLamLai, ghiNhanDongY, layBangCongCongNhan, layCaLam, layChiTietCongNhan,
-  layDanhSachMauMat, layDanhSachToDoi, layLichSuLuot, layNoiDungDongY, nghiViec, taiLenMauMat,
-  xoaMauMat, xoaTatCaMauMat,
+  layDanhSachMauMat, layDanhSachToDoi, layLichSuLuot, layNoiDungDongY, nghiViec, taiLenMauMat, xoaMauMat, xoaTatCaMauMat,
 } from '../api/endpoints.js'
 import CheckDetailModal from '../components/common/CheckDetailModal.jsx'
+import CheckTable from '../components/common/CheckTable.jsx'
 import ConfirmModal from '../components/common/ConfirmModal.jsx'
-import { Avatar, EmptyRow, LiveStream, StatusBadge } from '../components/common/ui.jsx'
+import ManualAttendanceModal from '../components/common/ManualAttendanceModal.jsx'
+import {
+  Avatar, Card, EmptyRow, EmptyState, LiveStream, Meter, Pager, Pill, Skeleton, SkeletonRows, StatusBadge, Tabs,
+} from '../components/common/ui.jsx'
 import { useWebConfig } from '../hooks/useWebConfig.js'
 import { useGateEvents } from '../lib/events.js'
-import { gio, ngay, ngayGio, phut } from '../lib/format.js'
-import { CHAM_CONG, CONG_NHAN, HANH_DONG, KET_QUA, thieuText } from '../lib/labels.js'
+import { gio, gioPhutChu, ngay, soVN, thuNgay } from '../lib/format.js'
+import { CONG_NHAN, trangThaiNgay } from '../lib/labels.js'
 import { toast } from '../lib/toast.js'
 
-// ─── Thông tin cá nhân ─────────────────────────────────────────────────────────
-function ProfileCard({ worker, teams }) {
+// ─── Sửa thông tin (cửa sổ) ───────────────────────────────────────────────────
+function EditModal({ worker, teams, onClose }) {
   const qc = useQueryClient()
-  const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({})
-  const { data: shift } = useQuery({ queryKey: ['ca-lam'], queryFn: layCaLam, staleTime: 60_000 })
-
-  const startEdit = () => {
-    setForm({ code: worker.code, full_name: worker.full_name, phone: worker.phone ?? '', trade: worker.trade ?? '', team_id: worker.team_id ?? '' })
-    setEditing(true)
-  }
+  const [form, setForm] = useState({
+    code: worker.code, full_name: worker.full_name, phone: worker.phone ?? '', trade: worker.trade ?? '', team_id: worker.team_id ?? '',
+  })
+  const [error, setError] = useState('')
   const save = useMutation({
     mutationFn: (body) => capNhatCongNhan(worker.id, body),
+    meta: { silent: true },
     onSuccess: () => {
       toast.success('Đã lưu thông tin')
       qc.invalidateQueries({ queryKey: ['worker', worker.id] })
       qc.invalidateQueries({ queryKey: ['cong-nhan'] })
-      setEditing(false)
+      onClose()
     },
+    onError: (err) => setError(err.message),
   })
   const set = (f) => (e) => setForm((p) => ({ ...p, [f]: e.target.value }))
   const submit = (e) => {
     e.preventDefault()
+    if (!form.code.trim() || !form.full_name.trim()) { setError('Cần nhập mã công nhân và họ tên.'); return }
     save.mutate({
       code: form.code.trim(), full_name: form.full_name.trim(), phone: form.phone.trim() || null,
       trade: form.trade.trim() || null, team_id: form.team_id ? Number(form.team_id) : null,
     })
   }
-
-  const field = (label, value) => (
-    <div className="mb-2"><div className="sg-sub">{label}</div><div style={{ fontWeight: 500 }}>{value || '—'}</div></div>
-  )
-
   return (
-    <Card className="mb-3">
-      <Card.Body>
-        <div className="d-flex flex-column align-items-center text-center mb-3">
-          <Avatar name={worker.full_name} workerId={worker.id} size={96} face />
-          <h2 className="h4 mt-2 mb-0">{worker.full_name}</h2>
-          <div className="sg-sub">Mã {worker.code}</div>
-          <div className="mt-1"><StatusBadge map={CONG_NHAN} value={worker.status} /></div>
-        </div>
-        {!editing ? (
-          <>
-            {field('Tổ đội', worker.team_name)}
-            {field('Nghề', worker.trade)}
-            {field('Điện thoại', worker.phone)}
-            {field('Ca làm', shift ? `${shift.name}: ${shift.start_time}–${shift.end_time} (nghỉ trưa ${shift.break_start}, ${shift.break_minutes} phút)` : null)}
-            {field('Ngày thêm', worker.created_at ? ngay(worker.created_at) : null)}
-            <Button variant="outline-primary" size="sm" className="mt-1" onClick={startEdit}>✏️ Sửa thông tin</Button>
-          </>
-        ) : (
-          <Form onSubmit={submit}>
-            <Row className="g-2">
-              <Col xs={5}><Form.Label htmlFor="i-code">Mã *</Form.Label>
-                <Form.Control id="i-code" maxLength={20} required value={form.code} onChange={set('code')} /></Col>
-              <Col xs={7}><Form.Label htmlFor="i-name">Họ tên *</Form.Label>
-                <Form.Control id="i-name" maxLength={100} required value={form.full_name} onChange={set('full_name')} /></Col>
-              <Col xs={6}><Form.Label htmlFor="i-phone">Điện thoại</Form.Label>
-                <Form.Control id="i-phone" maxLength={20} value={form.phone} onChange={set('phone')} /></Col>
-              <Col xs={6}><Form.Label htmlFor="i-trade">Nghề</Form.Label>
-                <Form.Control id="i-trade" maxLength={50} value={form.trade} onChange={set('trade')} /></Col>
-              <Col xs={12}><Form.Label htmlFor="i-team">Tổ đội</Form.Label>
-                <Form.Select id="i-team" value={form.team_id} onChange={set('team_id')}>
-                  <option value="">(chưa xếp tổ)</option>
-                  {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </Form.Select></Col>
-            </Row>
-            <div className="d-flex gap-2 mt-3">
-              <Button type="submit" size="sm" disabled={save.isPending || !form.code?.trim() || !form.full_name?.trim()}>
-                {save.isPending ? <Spinner size="sm" /> : 'Lưu'}
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => setEditing(false)}>Huỷ</Button>
-            </div>
-          </Form>
-        )}
-      </Card.Body>
+    <Modal show onHide={onClose} centered>
+      <Form onSubmit={submit} noValidate>
+        <Modal.Header closeButton><Modal.Title>Sửa thông tin công nhân</Modal.Title></Modal.Header>
+        <Modal.Body>
+          <div className="row g-3">
+            <div className="col-5"><Form.Label htmlFor="i-code">Mã công nhân</Form.Label>
+              <Form.Control id="i-code" maxLength={20} value={form.code} onChange={set('code')} /></div>
+            <div className="col-7"><Form.Label htmlFor="i-name">Họ tên</Form.Label>
+              <Form.Control id="i-name" maxLength={100} value={form.full_name} onChange={set('full_name')} autoFocus /></div>
+            <div className="col-6"><Form.Label htmlFor="i-phone">Điện thoại</Form.Label>
+              <Form.Control id="i-phone" maxLength={20} value={form.phone} onChange={set('phone')} /></div>
+            <div className="col-6"><Form.Label htmlFor="i-trade">Nghề</Form.Label>
+              <Form.Control id="i-trade" maxLength={50} value={form.trade} onChange={set('trade')} /></div>
+            <div className="col-12"><Form.Label htmlFor="i-team">Tổ đội</Form.Label>
+              <Form.Select id="i-team" value={form.team_id} onChange={set('team_id')}>
+                <option value="">Chưa xếp tổ</option>
+                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </Form.Select></div>
+          </div>
+          {error && <div className="note bad mt-3"><CircleAlert size={18} />{error}</div>}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={onClose} disabled={save.isPending}>Huỷ</Button>
+          <Button type="submit" disabled={save.isPending}>{save.isPending && <Spinner size="sm" />}Lưu thông tin</Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
+  )
+}
+
+// ─── Thẻ hồ sơ ─────────────────────────────────────────────────────────────────
+function ProfileCard({ worker, onEdit, onQuit, onRejoin }) {
+  const { data: shift } = useQuery({ queryKey: ['ca-lam'], queryFn: layCaLam, staleTime: 60_000 })
+  const active = worker.status === 'dang_lam'
+  const rows = [
+    ['Mã công nhân', worker.code],
+    ['Tổ đội', worker.team_name],
+    ['Nghề', worker.trade],
+    ['Điện thoại', worker.phone],
+    ['Ca làm', shift ? `${shift.name}, ${shift.start_time} – ${shift.end_time}` : ''],
+    ['Ngày thêm', worker.created_at ? ngay(worker.created_at) : ''],
+  ]
+  return (
+    <Card>
+      <div className="d-flex flex-column align-items-center text-center pb-3 mb-2" style={{ borderBottom: '1px solid var(--line)' }}>
+        <Avatar name={worker.full_name} workerId={worker.id} size={96} />
+        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 12 }}>{worker.full_name}</div>
+        <div className="muted mb-2">{worker.code}</div>
+        <StatusBadge map={CONG_NHAN} value={worker.status} />
+      </div>
+      <table className="kv"><tbody>
+        {rows.map(([k, v]) => <tr key={k}><th>{k}</th><td>{v}</td></tr>)}
+      </tbody></table>
+      <div className="d-flex flex-column gap-2 mt-3">
+        <Button variant="secondary" onClick={onEdit}><Pencil size={17} />Sửa thông tin</Button>
+        {active
+          ? <Button variant="text-danger" className="btn-text-danger" onClick={onQuit}><UserX size={17} />Cho nghỉ việc</Button>
+          : <Button variant="secondary" onClick={onRejoin}><UserRoundCheck size={17} />Cho đi làm lại</Button>}
+      </div>
     </Card>
   )
 }
 
-// ─── Đồng ý + mẫu khuôn mặt ────────────────────────────────────────────────────
-function FaceCard({ worker }) {
+// ─── Tab Khuôn mặt: đồng ý + chụp / tải mẫu + lưới ảnh ────────────────────────
+function FaceTab({ worker }) {
   const qc = useQueryClient()
   const cfg = useWebConfig()
   const fileRef = useRef(null)
@@ -108,7 +125,7 @@ function FaceCard({ worker }) {
   const [confirm, setConfirm] = useState(null)         // { kind: 'one', id } | { kind: 'all' }
 
   const { data: consentText } = useQuery({ queryKey: ['dong-y-noi-dung'], queryFn: layNoiDungDongY, staleTime: Infinity })
-  const { data: mau } = useQuery({ queryKey: ['mau-mat', worker.id], queryFn: () => layDanhSachMauMat(worker.id) })
+  const { data: mau, isLoading } = useQuery({ queryKey: ['mau-mat', worker.id], queryFn: () => layDanhSachMauMat(worker.id) })
 
   const samples = mau?.ds ?? []
   const count = mau?.so_mau ?? 0
@@ -124,15 +141,14 @@ function FaceCard({ worker }) {
     qc.invalidateQueries({ queryKey: ['worker', worker.id] })
     qc.invalidateQueries({ queryKey: ['cong-nhan'] })
   }
-
   const consent = useMutation({
     mutationFn: () => ghiNhanDongY(worker.id),
     onSuccess: () => { toast.success('Đã ghi nhận đồng ý đăng ký khuôn mặt'); refresh() },
   })
   const capture = useMutation({
     mutationFn: () => chupMauMat(worker.id),
-    meta: { silent: true },                         // lỗi hiện ngay dưới nút chụp (rõ hơn toast)
-    onSuccess: (r) => { setCaptureMsg({ ok: true, text: `Đã chụp mẫu (chất lượng ${r.mau.quality.toFixed(2)}). Tổng ${r.so_mau} mẫu.` }); refresh() },
+    meta: { silent: true },                         // lỗi hiện ngay dưới khung xem trước (rõ hơn toast)
+    onSuccess: (r) => { setCaptureMsg({ ok: true, text: `Đã chụp mẫu, chất lượng ${soVN(r.mau.quality)}. Hiện có ${r.so_mau} mẫu.` }); refresh() },
     onError: (err) => setCaptureMsg({ ok: false, text: err.message }),
   })
   const upload = useMutation({
@@ -154,7 +170,6 @@ function FaceCard({ worker }) {
     },
     onError: () => setConfirm(null),
   })
-
   const onFiles = (e) => {
     const files = Array.from(e.target.files)
     e.target.value = ''
@@ -162,183 +177,161 @@ function FaceCard({ worker }) {
   }
 
   return (
-    <Card className="mb-3">
-      <Card.Header className="d-flex align-items-center gap-2 flex-wrap">
-        <span>🧑‍💻 Mẫu khuôn mặt</span>
-        <Badge bg={count >= MIN ? 'success' : 'warning'} text={count >= MIN ? undefined : 'dark'}>
-          {count}/{MAX} mẫu · {count >= MIN ? 'đủ để nhận diện' : `cần ít nhất ${MIN}`}
-        </Badge>
-        {count > 0 && (
-          <Button variant="outline-danger" size="sm" className="ms-auto" onClick={() => setConfirm({ kind: 'all' })}>🗑 Xoá tất cả</Button>
-        )}
-      </Card.Header>
-      <Card.Body>
-        {!active && <Alert variant="secondary" className="py-2">Công nhân đã nghỉ việc: không đăng ký khuôn mặt.</Alert>}
+    <div className="sg-card__body stack">
+      {!active && <div className="note neutral"><CircleAlert size={18} />Công nhân đã nghỉ việc nên không đăng ký khuôn mặt. Cho đi làm lại để đăng ký từ đầu.</div>}
 
-        {/* Đồng ý bắt buộc trước khi lấy dữ liệu sinh trắc học */}
-        <div className="p-3 mb-3 rounded" style={{ background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-color)' }}>
-          <div className="fw-semibold mb-1">Đồng ý đăng ký khuôn mặt</div>
-          <p className="small mb-2" style={{ color: 'var(--text-secondary)', whiteSpace: 'pre-line' }}>{consentText?.noi_dung ?? '…'}</p>
-          {consented ? (
-            <Alert variant="success" className="py-2 mb-0">
-              ✔ Đã ghi nhận đồng ý lúc <b>{gio(worker.consent_at)} {ngay(worker.consent_at)}</b>
-              {worker.consent_by_name && <> bởi <b>{worker.consent_by_name}</b></>}
-            </Alert>
-          ) : active && (
-            <div className="d-flex align-items-center gap-3 flex-wrap">
-              <Form.Check id="consent-check" checked={agree} onChange={(e) => setAgree(e.target.checked)}
-                label="Công nhân đã đọc và đồng ý với nội dung trên" />
-              <Button variant="success" size="sm" disabled={!agree || consent.isPending} onClick={() => consent.mutate()}>
-                {consent.isPending ? <Spinner size="sm" /> : 'Ghi nhận đồng ý'}
-              </Button>
-            </div>
-          )}
+      {/* (1) Đồng ý: bắt buộc trước khi lấy dữ liệu sinh trắc học */}
+      <section>
+        <div className="d-flex align-items-center gap-2 mb-2">
+          <ShieldCheck size={18} className="muted" /><b>Đồng ý đăng ký khuôn mặt</b>
+          {consented && <Pill tone="ok" icon={CircleCheck}>Đã đồng ý</Pill>}
         </div>
-
-        {active && !consented && (
-          <Alert variant="warning" className="py-2">Cần ghi nhận đồng ý của công nhân trước khi đăng ký khuôn mặt.</Alert>
+        <div className="p-3 rounded small" style={{ background: 'var(--surface-soft)', border: '1px solid var(--line)', lineHeight: 1.65, whiteSpace: 'pre-line' }}>
+          {consentText?.noi_dung ?? <Skeleton height={40} />}
+        </div>
+        {consented ? (
+          <div className="small muted mt-2">
+            Ghi nhận lúc <b className="num" style={{ color: 'var(--text)' }}>{gio(worker.consent_at)} {ngay(worker.consent_at)}</b>
+            {worker.consent_by_name && <> bởi <b style={{ color: 'var(--text)' }}>{worker.consent_by_name}</b></>}
+          </div>
+        ) : active && (
+          <div className="d-flex align-items-center gap-3 flex-wrap mt-2">
+            <Form.Check id="consent-check" checked={agree} onChange={(e) => setAgree(e.target.checked)}
+              label="Công nhân đã đọc và đồng ý với nội dung trên" />
+            <Button variant="secondary" size="sm" disabled={!agree || consent.isPending} onClick={() => consent.mutate()}>
+              {consent.isPending && <Spinner size="sm" />}Ghi nhận đồng ý
+            </Button>
+          </div>
         )}
+      </section>
 
-        {canEnroll && (
-          <Row className="g-3 mb-2">
-            <Col md={6}>
-              <div className="fw-semibold mb-1">Chụp từ camera cổng</div>
-              {!full ? (
-                <LiveStream className="sg-preview-portrait" style={{ maxHeight: '52vh', width: '100%' }} alt="Hình trực tiếp camera cổng" />
-              ) : <div className="sg-muted small">Đã đủ {MAX} mẫu.</div>}
-              <div className="small mt-1" style={{ color: 'var(--text-secondary)' }}>
-                Công nhân đứng vào vùng kiểm tra, nhìn thẳng camera; mỗi lần chụp đổi góc mặt một chút (có / không đội mũ).
-              </div>
-              <Button className="mt-2" disabled={full || capture.isPending} onClick={() => { setCaptureMsg(null); capture.mutate() }}>
-                {capture.isPending ? <><Spinner size="sm" className="me-1" />Đang chụp…</> : '📷 Chụp mẫu'}
+      {/* (2) Xem trước camera cổng + chụp / tải ảnh */}
+      {canEnroll && (
+        <section className="d-flex gap-4 flex-wrap">
+          <div style={{ flex: '0 0 auto' }}>
+            {!full ? <LiveStream className="portrait" style={{ height: 'min(46vh, 460px)', width: 'calc(min(46vh, 460px) * 0.5625)' }} alt="Hình trực tiếp camera cổng" />
+              : <div className="portrait d-flex align-items-center justify-content-center" style={{ height: 260, width: 146, color: '#94A3B8' }}>Đã đủ {MAX} mẫu</div>}
+          </div>
+          <div style={{ flex: "1 1 240px", minWidth: 240 }}>
+            <b>Chụp mẫu từ camera cổng</b>
+            <p className="small muted mt-1">Công nhân đứng vào vùng kiểm tra, nhìn thẳng camera. Mỗi lần chụp đổi góc mặt một chút; nên có cả mẫu đội mũ và không đội mũ.</p>
+            <div className="d-flex gap-2 flex-wrap">
+              <Button disabled={full || capture.isPending} onClick={() => { setCaptureMsg(null); capture.mutate() }}>
+                {capture.isPending ? <Spinner size="sm" /> : <Camera size={18} />}{capture.isPending ? 'Đang chụp…' : 'Chụp mẫu'}
               </Button>
-              {captureMsg && (
-                <Alert variant={captureMsg.ok ? 'success' : 'danger'} className="py-2 mt-2 mb-0">{captureMsg.text}</Alert>
-              )}
-            </Col>
-            <Col md={6}>
-              <div className="fw-semibold mb-1">Hoặc tải ảnh lên</div>
-              <div className="small mb-2" style={{ color: 'var(--text-secondary)' }}>
-                Mỗi ảnh đúng 1 khuôn mặt, rõ, đủ sáng (tối đa {cfg.maxUploadMb} MB). Chỉ lưu vector và ảnh mặt 112×112, không lưu ảnh gốc.
-              </div>
-              <Button variant="outline-primary" disabled={full || upload.isPending} onClick={() => fileRef.current?.click()}>
-                {upload.isPending ? <><Spinner size="sm" className="me-1" />Đang tải…</> : '⬆ Chọn ảnh và tải lên'}
+              <Button variant="secondary" disabled={full || upload.isPending} onClick={() => fileRef.current?.click()}>
+                {upload.isPending ? <Spinner size="sm" /> : <Upload size={18} />}Tải ảnh lên
               </Button>
               <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onFiles} />
-              {uploadMsg.length > 0 && (
-                <ul className="list-unstyled small mt-2 mb-0">
-                  {uploadMsg.map((x, i) => (
-                    <li key={i} className={x.ok ? 'text-success' : 'text-danger'}>{x.ok ? '✔' : '✕'} {x.ten}{x.ok ? '' : `: ${x.ly_do}`}</li>
-                  ))}
-                </ul>
-              )}
-            </Col>
-          </Row>
-        )}
-
-        <div className="mb-3">
-          <ProgressBar now={(count / MAX) * 100} variant={count >= MIN ? 'success' : 'warning'} style={{ height: 8 }} />
-        </div>
-        {samples.length ? (
-          <div className="sg-face-grid">
-            {samples.map((s) => (
-              <div key={s.id} className="sg-face">
-                <img src={s.anh} alt={`Mẫu ${s.id}`} />
-                <button type="button" title="Xoá mẫu này" onClick={() => setConfirm({ kind: 'one', id: s.id })}>×</button>
-                <small>{s.source === 'camera' ? 'camera' : 'tải lên'} · {s.quality.toFixed(2)}</small>
+            </div>
+            {captureMsg && (
+              <div className={`note ${captureMsg.ok ? 'ok' : 'bad'} mt-3`}>
+                {captureMsg.ok ? <CircleCheck size={18} /> : <CircleAlert size={18} />}{captureMsg.text}
               </div>
-            ))}
+            )}
+            {uploadMsg.length > 0 && (
+              <ul className="list-unstyled small mt-3 mb-0 d-flex flex-column gap-1">
+                {uploadMsg.map((x, i) => (
+                  <li key={i} className={`d-flex gap-2 ${x.ok ? 'text-ok' : 'text-bad'}`}>
+                    {x.ok ? <CircleCheck size={16} /> : <CircleAlert size={16} />}<span>{x.ten}{x.ok ? '' : `: ${x.ly_do}`}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="small muted mt-3 mb-0">Ảnh tải lên: mỗi ảnh đúng 1 khuôn mặt, rõ, đủ sáng (tối đa {cfg.maxUploadMb} MB). Hệ thống chỉ lưu vector và ảnh mặt 112×112, không lưu ảnh gốc.</p>
           </div>
-        ) : <div className="sg-muted">Chưa có mẫu khuôn mặt nào.</div>}
-      </Card.Body>
+        </section>
+      )}
+      {active && !consented && <div className="note warn"><CircleAlert size={18} />Cần ghi nhận đồng ý của công nhân trước khi chụp hoặc tải ảnh khuôn mặt.</div>}
+
+      {/* (3) Tiến độ + (4) lưới ảnh mẫu */}
+      <section>
+        <div className="d-flex align-items-center gap-3 mb-2">
+          <b>Ảnh mẫu</b>
+          <span className="small muted num">{count}/{MAX} mẫu, tối thiểu {MIN}</span>
+          {count > 0 && (
+            <Button variant="text-danger" size="sm" className="btn-text-danger ms-auto" onClick={() => setConfirm({ kind: 'all' })}>
+              <Trash2 size={16} />Xoá tất cả
+            </Button>
+          )}
+        </div>
+        <Meter value={count} max={MAX} warn={count < MIN} style={{ marginBottom: 16 }} />
+        {isLoading ? <Skeleton width={112} height={112} />
+          : samples.length ? (
+            <div className="face-grid">
+              {samples.map((s) => (
+                <figure key={s.id} className="face">
+                  <img src={s.anh} alt={`Mẫu ${s.id}`} />
+                  <button type="button" title="Xoá mẫu này" aria-label="Xoá mẫu này" onClick={() => setConfirm({ kind: 'one', id: s.id })}><X size={14} /></button>
+                  <figcaption>{s.source === 'camera' ? 'Camera' : 'Tải lên'} · {soVN(s.quality)}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : <EmptyState icon={Images} title="Chưa có ảnh mẫu" text={canEnroll ? 'Chụp từ camera cổng hoặc tải ảnh lên để đăng ký.' : undefined} />}
+      </section>
 
       <ConfirmModal
         show={!!confirm}
-        title={confirm?.kind === 'all' ? 'Xoá dữ liệu khuôn mặt' : 'Xoá mẫu khuôn mặt'}
+        title={confirm?.kind === 'all' ? 'Xoá toàn bộ dữ liệu khuôn mặt?' : 'Xoá mẫu khuôn mặt này?'}
         message={confirm?.kind === 'all'
-          ? <>Xoá <b>toàn bộ</b> mẫu khuôn mặt (vector và ảnh mẫu) của <b>{worker.full_name}</b>? Sau khi xoá, công nhân không
-              được nhận diện ở cổng cho tới khi đăng ký lại.</>
-          : 'Xoá mẫu khuôn mặt này?'}
+          ? <>Toàn bộ mẫu khuôn mặt (vector và ảnh mẫu) của <b>{worker.full_name}</b> sẽ bị xoá. Công nhân không được nhận diện ở cổng
+              cho tới khi đăng ký lại.</>
+          : 'Mẫu này sẽ bị xoá khỏi dữ liệu nhận diện.'}
         variant="danger"
         confirmLabel="Xoá"
         loading={remove.isPending}
         onConfirm={() => remove.mutate(confirm)}
         onCancel={() => setConfirm(null)}
       />
-    </Card>
+    </div>
   )
 }
 
-// ─── Lịch sử kiểm tra + bảng công của người này ───────────────────────────────
-function HistoryTabs({ workerId }) {
-  const qc = useQueryClient()
-  const [checkId, setCheckId] = useState(null)
-  const { data: checks, isLoading: l1 } = useQuery({
-    queryKey: ['lich-su-luot', { cong_nhan_id: workerId, so_dong: 10 }],
-    queryFn: () => layLichSuLuot({ cong_nhan_id: workerId, so_dong: 10 }),
+// ─── Tab Lịch sử kiểm tra ──────────────────────────────────────────────────────
+function HistoryTab({ workerId, onOpen, onManual }) {
+  const cfg = useWebConfig()
+  const [page, setPage] = useState(1)
+  const query = { cong_nhan_id: workerId, trang: page, so_dong: cfg.pageSize }
+  const { data, isLoading } = useQuery({
+    queryKey: ['lich-su-luot', query], queryFn: () => layLichSuLuot(query), placeholderData: keepPreviousData,
   })
-  const { data: sheet, isLoading: l2 } = useQuery({
-    queryKey: ['bang-cong-cn', workerId], queryFn: () => layBangCongCongNhan(workerId, 14),
-  })
-  useGateEvents((ev) => {
-    if (ev.loai === 'luot' && ev.cong_nhan?.id === workerId) {
-      qc.invalidateQueries({ queryKey: ['lich-su-luot'] })
-      qc.invalidateQueries({ queryKey: ['bang-cong-cn', workerId] })
-    }
-  })
-
   return (
-    <Card>
-      <Card.Body className="pt-2">
-        <Tabs defaultActiveKey="luot" className="mb-2">
-          <Tab eventKey="luot" title={`Lịch sử kiểm tra${checks ? ` (${checks.tong})` : ''}`}>
-            <div className="table-responsive">
-              <Table hover size="sm" className="mb-1 sg-table">
-                <thead><tr><th>Ảnh</th><th>Thời điểm</th><th>Kết quả</th><th>Điểm</th><th>Hành động</th></tr></thead>
-                <tbody>
-                  {l1 ? <EmptyRow colSpan={5}><Spinner size="sm" /></EmptyRow>
-                    : !checks?.ds.length ? <EmptyRow colSpan={5}>Chưa có lượt nào.</EmptyRow>
-                      : checks.ds.map((c) => (
-                        <tr key={c.id}>
-                          <td>{c.anh ? <img className="sg-thumb" src={c.anh} alt="" loading="lazy" onClick={() => setCheckId(c.id)} />
-                            : <span className="sg-thumb sg-thumb--empty" />}</td>
-                          <td className="text-nowrap">{ngayGio(c.thoi_diem, true)}</td>
-                          <td><StatusBadge map={KET_QUA} value={c.ket_qua} />
-                            {c.thieu.length > 0 && <div className="small text-danger">{thieuText(c.thieu)}</div>}</td>
-                          <td>{c.diem != null ? c.diem.toFixed(2) : '—'}</td>
-                          <td><StatusBadge map={HANH_DONG} value={c.hanh_dong} /></td>
-                        </tr>
-                      ))}
-                </tbody>
-              </Table>
-            </div>
-            <Link to={`/lich-su?cong_nhan_id=${workerId}`} className="small">Xem tất cả lượt của người này →</Link>
-          </Tab>
-          <Tab eventKey="cong" title="Bảng công 14 ngày">
-            <div className="table-responsive">
-              <Table hover size="sm" className="mb-0 sg-table">
-                <thead><tr><th>Ngày</th><th>Vào</th><th>Ra</th><th>Đi muộn</th><th>Giờ làm</th><th>Trạng thái</th></tr></thead>
-                <tbody>
-                  {l2 ? <EmptyRow colSpan={6}><Spinner size="sm" /></EmptyRow>
-                    : !sheet?.ds.length ? <EmptyRow colSpan={6}>Chưa có ngày công nào.</EmptyRow>
-                      : sheet.ds.map((r) => (
-                        <tr key={r.ngay}>
-                          <td className="text-nowrap">{ngay(r.ngay)}</td>
-                          <td>{r.gio_vao ?? '—'}</td>
-                          <td>{r.gio_ra ?? (r.thieu_gio_ra ? <span className="text-danger">thiếu</span> : '—')}</td>
-                          <td>{r.di_muon_phut ? <span className="text-warning">{r.di_muon_phut} phút</span> : '—'}</td>
-                          <td>{r.gio_ra ? phut(r.so_phut_lam) : '—'}</td>
-                          <td><StatusBadge map={CHAM_CONG} value={r.trang_thai} /></td>
-                        </tr>
-                      ))}
-                </tbody>
-              </Table>
-            </div>
-          </Tab>
-        </Tabs>
-      </Card.Body>
-      <CheckDetailModal id={checkId} onHide={() => setCheckId(null)} />
-    </Card>
+    <>
+      <div className="table-wrap no-max"><CheckTable ds={data?.ds} loading={isLoading} onOpen={onOpen} onManual={onManual}
+        emptyTitle="Chưa có lượt kiểm tra nào" emptyText="Lượt của công nhân này ở cổng sẽ hiện ở đây." /></div>
+      {(data?.so_trang ?? 1) > 1 && (
+        <div className="sg-card__foot"><span>{data.tong} lượt</span><Pager page={page} pages={data.so_trang} onChange={setPage} /></div>
+      )}
+    </>
+  )
+}
+
+// ─── Tab Bảng công 30 ngày ─────────────────────────────────────────────────────
+function SheetTab({ workerId }) {
+  const { data, isLoading } = useQuery({ queryKey: ['bang-cong-cn', workerId, 30], queryFn: () => layBangCongCongNhan(workerId, 30) })
+  return (
+    <div className="table-wrap no-max">
+      <table className="sg-table">
+        <thead><tr><th>Ngày</th><th>Giờ vào</th><th>Giờ ra</th><th>Đi muộn</th><th>Giờ làm</th><th>Trạng thái</th></tr></thead>
+        <tbody>
+          {isLoading ? <SkeletonRows cols={6} />
+            : !data?.ds.length ? <EmptyRow colSpan={6} icon={CalendarDays} title="Chưa có ngày công nào trong 30 ngày gần nhất" />
+              : data.ds.map((r) => {
+                const [text, tone] = trangThaiNgay(r)
+                return (
+                  <tr key={r.ngay}>
+                    <td className="nowrap" style={{ fontWeight: 600 }}>{thuNgay(r.ngay)}</td>
+                    <td className="num">{r.gio_vao}</td>
+                    <td className="num">{r.gio_ra}</td>
+                    <td>{r.di_muon_phut > 0 && <Pill tone="warn">+{r.di_muon_phut} phút</Pill>}</td>
+                    <td className="nowrap">{r.gio_ra ? gioPhutChu(r.so_phut_lam) : ''}</td>
+                    <td><Pill tone={tone}>{text}</Pill></td>
+                  </tr>
+                )
+              })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -347,13 +340,27 @@ export default function WorkerDetailPage() {
   const { id } = useParams()
   const workerId = Number(id)
   const qc = useQueryClient()
+  const [params, setParams] = useSearchParams()
+  const [tab, setTab] = useState('mat')
   const [confirm, setConfirm] = useState(null)   // 'nghi' | 'lai'
+  const [checkId, setCheckId] = useState(null)
+  const [manual, setManual] = useState(null)
+  const editing = params.get('sua') === '1'      // từ danh sách: menu "Sửa thông tin"
 
   const { data: worker, isLoading, isError } = useQuery({
     queryKey: ['worker', workerId], queryFn: () => layChiTietCongNhan(workerId), enabled: !!workerId,
   })
   const { data: teamData } = useQuery({ queryKey: ['to-doi'], queryFn: layDanhSachToDoi, staleTime: 60_000 })
-  useEffect(() => { document.title = worker ? `${worker.code} - ${worker.full_name} · SafeGate` : 'SafeGate' }, [worker])
+  const { data: checkCount } = useQuery({
+    queryKey: ['lich-su-luot', { cong_nhan_id: workerId, so_dong: 1 }], queryFn: () => layLichSuLuot({ cong_nhan_id: workerId, so_dong: 1 }),
+  })
+  useGateEvents((ev) => {
+    if (ev.loai === 'luot' && ev.cong_nhan?.id === workerId) {
+      qc.invalidateQueries({ queryKey: ['lich-su-luot'] })
+      qc.invalidateQueries({ queryKey: ['bang-cong-cn', workerId] })
+    }
+  })
+  useEffect(() => { if (worker) document.title = `${worker.full_name} · SafeGate` }, [worker])
 
   const action = useMutation({
     mutationFn: (kind) => (kind === 'nghi' ? nghiViec(workerId) : diLamLai(workerId)),
@@ -367,51 +374,65 @@ export default function WorkerDetailPage() {
     },
     onError: () => setConfirm(null),
   })
+  const closeEdit = () => { const p = new URLSearchParams(params); p.delete('sua'); setParams(p, { replace: true }) }
 
-  if (isLoading) return <div className="text-center py-5"><Spinner animation="border" /></div>
-  if (isError || !worker) {
+  if (isError) {
     return (
-      <div className="sg-page">
-        <Alert variant="danger">Không tìm thấy công nhân. <Link to="/cong-nhan">← Danh sách công nhân</Link></Alert>
+      <div className="page">
+        <Card><EmptyState icon={ScanFace} title="Không tìm thấy công nhân" action={<Link to="/cong-nhan" className="btn btn-secondary"><ArrowLeft size={17} />Về danh sách</Link>} /></Card>
       </div>
     )
   }
-  const active = worker.status === 'dang_lam'
 
   return (
-    <div className="sg-page">
-      <div className="section-header">
-        <div className="d-flex align-items-center gap-3 flex-wrap">
-          <Link to="/cong-nhan" className="btn btn-secondary btn-sm">← Danh sách</Link>
-          <h1 className="section-title mb-0">{worker.full_name}</h1>
-          <span className="sg-sub">{worker.code}</span>
+    <div className="page">
+      <div className="page-head">
+        <div>
+          <Link to="/cong-nhan" className="btn btn-text btn-sm mb-2" style={{ marginLeft: -8 }}><ArrowLeft size={16} />Danh sách công nhân</Link>
+          <h1>{worker ? worker.full_name : <Skeleton width={240} height={28} />}</h1>
+          <p>{worker ? `${worker.code}${worker.team_name ? ` · ${worker.team_name}` : ''}` : ' '}</p>
         </div>
-        {active
-          ? <Button variant="outline-danger" onClick={() => setConfirm('nghi')}>Cho nghỉ việc</Button>
-          : <Button variant="outline-success" onClick={() => setConfirm('lai')}>Cho đi làm lại</Button>}
       </div>
 
-      <Row className="g-3">
-        <Col xl={4}><ProfileCard key={worker.id} worker={worker} teams={teamData?.ds ?? []} /></Col>
-        <Col xl={8}>
-          <FaceCard worker={worker} />
-          <HistoryTabs workerId={workerId} />
-        </Col>
-      </Row>
+      <div className="grid grid-1-2" style={{ alignItems: 'start' }}>
+        {isLoading || !worker ? <Card><Skeleton height={320} /></Card>
+          : <ProfileCard worker={worker} onEdit={() => setParams({ sua: '1' }, { replace: true })}
+              onQuit={() => setConfirm('nghi')} onRejoin={() => setConfirm('lai')} />}
+        <section className="sg-card">
+          <Tabs active={tab} onChange={setTab} tabs={[
+            { key: 'mat', label: 'Khuôn mặt', icon: ScanFace },
+            { key: 'luot', label: 'Lịch sử kiểm tra', icon: History, count: checkCount?.tong },
+            { key: 'cong', label: 'Bảng công', icon: CalendarDays },
+          ]} />
+          {!worker ? <div className="sg-card__body"><Skeleton height={300} /></div>
+            : tab === 'mat' ? <FaceTab worker={worker} />
+              : tab === 'luot' ? <HistoryTab workerId={workerId} onOpen={setCheckId} onManual={setManual} />
+                : <SheetTab workerId={workerId} />}
+        </section>
+      </div>
 
-      <ConfirmModal
-        show={!!confirm}
-        title={confirm === 'nghi' ? 'Cho nghỉ việc' : 'Cho đi làm lại'}
-        message={confirm === 'nghi'
-          ? <>Cho <b>{worker.full_name}</b> nghỉ việc?<br /><br />Hệ thống sẽ <b>xoá toàn bộ dữ liệu khuôn mặt</b> (vector và ảnh
-              mẫu) của người này và không nhận diện người này ở cổng nữa. Lịch sử kiểm tra và bảng công vẫn được giữ.</>
-          : <>Nhận lại <b>{worker.full_name}</b>? Cần ghi nhận đồng ý và đăng ký khuôn mặt lại từ đầu.</>}
-        variant={confirm === 'nghi' ? 'danger' : 'success'}
-        confirmLabel={confirm === 'nghi' ? 'Cho nghỉ việc' : 'Cho đi làm lại'}
-        loading={action.isPending}
-        onConfirm={() => action.mutate(confirm)}
-        onCancel={() => setConfirm(null)}
-      />
+      {worker && editing && <EditModal worker={worker} teams={teamData?.ds ?? []} onClose={closeEdit} />}
+      <CheckDetailModal id={checkId} onHide={() => setCheckId(null)} />
+      {manual && (
+        <ManualAttendanceModal worker={manual.cong_nhan} ngay={manual.thoi_diem.slice(0, 10)}
+          gioVao={manual.huong !== 'ra' ? gio(manual.thoi_diem) : ''} gioRa={manual.huong === 'ra' ? gio(manual.thoi_diem) : ''}
+          note={`từ lượt lúc ${gio(manual.thoi_diem, true)}`} onClose={() => setManual(null)} />
+      )}
+      {worker && (
+        <ConfirmModal
+          show={!!confirm}
+          title={confirm === 'nghi' ? `Cho ${worker.full_name} nghỉ việc?` : `Nhận lại ${worker.full_name}?`}
+          message={confirm === 'nghi'
+            ? <>Hệ thống sẽ <b>xoá toàn bộ dữ liệu khuôn mặt</b> (vector và ảnh mẫu) của người này và không nhận diện ở cổng nữa.
+                Lịch sử kiểm tra và bảng công vẫn được giữ.</>
+            : 'Công nhân sẽ trở lại trạng thái đang làm. Cần ghi nhận đồng ý và đăng ký khuôn mặt lại từ đầu.'}
+          variant={confirm === 'nghi' ? 'danger' : 'primary'}
+          confirmLabel={confirm === 'nghi' ? 'Cho nghỉ việc' : 'Cho đi làm lại'}
+          loading={action.isPending}
+          onConfirm={() => action.mutate(confirm)}
+          onCancel={() => setConfirm(null)}
+        />
+      )}
     </div>
   )
 }

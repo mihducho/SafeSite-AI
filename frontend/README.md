@@ -29,8 +29,22 @@ cd ..
 ```
 
 FastAPI phục vụ `frontend/dist` ở `/` (đường dẫn của giao diện như `/cong-nhan/5` trả `index.html`), không che `/api`, `/ws`,
-`/stream`, `/docs`, `/cu`. Mọi font (Inter, gói `@fontsource-variable/inter`), icon, thư viện đều nằm trong bản build,
-không tải từ mạng.
+`/stream`, `/docs`, `/cu`. Mọi font (Be Vietnam Pro, gói `@fontsource/be-vietnam-pro`), icon (Lucide, gói `lucide-react`),
+thư viện đều nằm trong bản build, không tải từ mạng.
+
+## Hệ thống thiết kế (giao diện v2)
+
+Biến màu, cỡ chữ và các thành phần dùng chung ở `src/styles/global.css` (màn hình cổng: `src/pages/GateScreen.css`).
+
+- Trang quản lý nền sáng `#F4F6FA`, thẻ trắng viền `#E5E7EB` bo 12px; sidebar `#0F172A`. Màn hình cổng nền tối `#0B1220`.
+- Màu chủ đạo vàng an toàn `#F59E0B`, chữ trên nút vàng màu `#1F2937`. Mỗi trang một nút chính; nút nguy hiểm chỉ ở trang chi
+  tiết hoặc cửa sổ xác nhận.
+- Badge trạng thái (`lib/labels.js`): xanh = đạt / đã ghi giờ / đang làm; đỏ = không đạt / thiếu giờ ra / nghỉ việc; vàng = không
+  xác định / không nhận ra / đi muộn / ngoài ca; xanh dương = chấm thủ công; xám = chưa vào / không ghi công / bỏ qua trùng.
+- Không hiện mã kỹ thuật (`KHONG_DAT`, `bo_qua_trung`...), luôn đổi sang câu tiếng Việt; không dùng emoji.
+- Thành phần dùng chung (`components/common/ui.jsx`): `PageHead`, `Card`, `StatCard`, `StatusBadge`, `Pill`, `Person` (avatar
+  ảnh mẫu mặt đầu tiên hoặc chữ cái đầu trên nền pastel), `RowMenu` (nút "⋯"), `Tabs`, `Segmented`, `Meter`, `Skeleton`,
+  `EmptyState`, `LiveStream` (luồng hình, đóng kết nối khi gỡ khỏi trang).
 
 ## Các trang
 
@@ -59,7 +73,8 @@ src/
 ├── lib/labels.js         # nhãn + màu trạng thái (xanh = đạt/ghi công, đỏ = không đạt, vàng = không xác định)
 ├── lib/toast.js          # thông báo nhỏ dùng chung
 ├── hooks/useWebConfig.js # tham số từ settings.yaml qua /api/cau-hinh-web
-├── components/           # khung quản lý, toast, hộp xác nhận, chi tiết lượt, badge, phân trang, ảnh đại diện, luồng hình
+├── components/           # khung quản lý (sidebar, thanh trên), logo, toast, hộp xác nhận, bảng + chi tiết lượt,
+│                         # chấm công thủ công, thành phần dùng chung (ui.jsx)
 └── pages/                # từng trang
 tests/giao_dien.spec.js   # kiểm thử giao diện (Playwright)
 ```

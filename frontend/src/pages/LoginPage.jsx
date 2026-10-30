@@ -3,6 +3,8 @@ import { useDispatch, useSelector } from 'react-redux'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { selectIsAuthenticated, setUser } from '../store/authSlice.js'
 import { dangNhap } from '../api/endpoints.js'
+import { CircleAlert, LoaderCircle, LockKeyhole, LogIn, UserRound } from 'lucide-react'
+import { Logo } from '../components/common/Logo.jsx'
 
 // Trang do backend phục vụ (không thuộc giao diện React): sau khi đăng nhập phải tải lại cả trang
 const TRANG_BACKEND = ['/docs', '/openapi.json', '/cu', '/api']
@@ -56,182 +58,83 @@ export default function LoginPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: `
-          radial-gradient(ellipse at 20% 50%, rgba(247,147,30,0.08) 0%, transparent 60%),
-          radial-gradient(ellipse at 80% 20%, rgba(255,193,7,0.05) 0%, transparent 50%),
-          var(--navy)
-        `,
-        padding: '1rem',
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: '420px' }}>
-        {/* ── Logo / Header ── */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, var(--orange), var(--yellow))',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1rem',
-              fontSize: '1.6rem',
-              fontWeight: '800',
-              color: '#fff',
-              boxShadow: '0 0 32px rgba(247,147,30,0.35)',
-            }}
-          >
-            SG
+    <div className="login">
+      <aside className="login__art">
+        <Logo size={44} sub="Chấm công · Kiểm tra bảo hộ" />
+        <div>
+          <SiteIllustration />
+          <h1 className="login__tagline">Chấm công bằng khuôn mặt, kiểm tra bảo hộ tự động tại cổng</h1>
+          <p className="login__lead">Công nhân chỉ cần đứng trước camera ở cổng: hệ thống nhận ra người, kiểm tra mũ bảo hộ và áo phản quang,
+            đủ bảo hộ thì tự ghi giờ vào, giờ ra.</p>
+        </div>
+        <span className="login__foot">SafeGate · Đồ án tốt nghiệp</span>
+      </aside>
+
+      <main className="login__panel">
+        <form className="login__form" onSubmit={handleSubmit} noValidate>
+          <h2>Đăng nhập</h2>
+          <p className="muted mb-4">Dành cho cán bộ quản lý công trường.</p>
+          {error && <div className="note bad mb-3" role="alert"><CircleAlert size={18} />{error}</div>}
+          <div className="mb-3">
+            <label className="form-label" htmlFor="username">Tên đăng nhập</label>
+            <div className="input-icon">
+              <UserRound size={18} />
+              <input id="username" name="username" type="text" autoComplete="username" autoFocus className="form-control form-control-lg"
+                value={form.username} onChange={handleChange} disabled={isLoading} />
+            </div>
           </div>
-          <h1
-            style={{
-              fontSize: '1.75rem',
-              fontWeight: '800',
-              color: 'var(--text-primary)',
-              marginBottom: '0.25rem',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            SafeGate
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            Chấm công bằng khuôn mặt và kiểm tra bảo hộ tại cổng
-          </p>
-        </div>
-
-        {/* ── Login Card ── */}
-        <div
-          style={{
-            background: 'var(--surface-1)',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '2rem',
-            boxShadow: 'var(--shadow-lg)',
-          }}
-        >
-          <h2
-            style={{
-              fontSize: '1.05rem',
-              fontWeight: '700',
-              marginBottom: '1.5rem',
-              color: 'var(--text-primary)',
-            }}
-          >
-            Đăng nhập hệ thống
-          </h2>
-
-          {/* Error Alert */}
-          {error && (
-            <div
-              role="alert"
-              style={{
-                background: 'rgba(231,76,60,0.12)',
-                border: '1px solid rgba(231,76,60,0.3)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '0.75rem 1rem',
-                marginBottom: '1.25rem',
-                color: '#e74c3c',
-                fontSize: '0.875rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
-            >
-              <span>⚠️</span>
-              <span>{error}</span>
+          <div className="mb-4">
+            <label className="form-label" htmlFor="password">Mật khẩu</label>
+            <div className="input-icon">
+              <LockKeyhole size={18} />
+              <input id="password" name="password" type="password" autoComplete="current-password" className="form-control form-control-lg"
+                value={form.password} onChange={handleChange} disabled={isLoading} />
             </div>
-          )}
-
-          <form onSubmit={handleSubmit} noValidate>
-            {/* Username */}
-            <div style={{ marginBottom: '1rem' }}>
-              <label className="form-label" htmlFor="username">
-                Tên đăng nhập
-              </label>
-              <input
-                id="username"
-                name="username"
-                type="text"
-                autoComplete="username"
-                autoFocus
-                className="form-control"
-                placeholder="Nhập tên đăng nhập"
-                value={form.username}
-                onChange={handleChange}
-                disabled={isLoading}
-                style={{ padding: '0.625rem 0.875rem' }}
-              />
-            </div>
-
-            {/* Password */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <label className="form-label" htmlFor="password">
-                Mật khẩu
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                className="form-control"
-                placeholder="Nhập mật khẩu"
-                value={form.password}
-                onChange={handleChange}
-                disabled={isLoading}
-                style={{ padding: '0.625rem 0.875rem' }}
-              />
-            </div>
-
-            {/* Submit */}
-            <button
-              type="submit"
-              className="btn btn-primary w-100"
-              disabled={isLoading}
-              style={{
-                padding: '0.7rem',
-                fontSize: '0.95rem',
-                fontWeight: '700',
-                letterSpacing: '0.03em',
-                borderRadius: 'var(--radius-sm)',
-              }}
-            >
-              {isLoading ? (
-                <>
-                  <span
-                    className="spinner-border spinner-border-sm me-2"
-                    role="status"
-                    aria-hidden="true"
-                    style={{ color: '#fff' }}
-                  />
-                  Đang đăng nhập...
-                </>
-              ) : (
-                '🔓 Đăng Nhập'
-              )}
-            </button>
-          </form>
-        </div>
-
-        {/* Footer */}
-        <p
-          style={{
-            textAlign: 'center',
-            marginTop: '1.5rem',
-            color: 'var(--text-muted)',
-            fontSize: '0.75rem',
-          }}
-        >
-          © {new Date().getFullYear()} SafeGate &bull; Hệ thống nhận diện khuôn mặt
-        </p>
-      </div>
+          </div>
+          <button type="submit" className="btn btn-primary btn-lg w-100" disabled={isLoading}>
+            {isLoading ? <LoaderCircle size={18} className="spin" /> : <LogIn size={18} />}
+            {isLoading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+          </button>
+          <p className="small muted mt-4 mb-0">Giao diện gặp sự cố? Dùng <a href="/cu/login" className="text-decoration-underline">giao diện dự phòng</a>.</p>
+        </form>
+      </main>
     </div>
+  )
+}
+
+/** Minh hoạ công trường đơn giản: cần cẩu, toà nhà đang xây, cổng có camera, công nhân đội mũ */
+function SiteIllustration() {
+  return (
+    <svg className="login__svg" viewBox="0 0 420 240" fill="none" aria-hidden="true">
+      <rect x="0" y="214" width="420" height="4" rx="2" fill="#334155" />
+      {/* cần cẩu */}
+      <rect x="62" y="40" width="10" height="174" fill="#F59E0B" />
+      <path d="M62 40h180v8H62z" fill="#F59E0B" />
+      <path d="M72 48l20 -8M92 48l20 -8M112 48l20 -8M132 48l20 -8M152 48l20 -8M172 48l20 -8" stroke="#B45309" strokeWidth="2" />
+      <rect x="40" y="40" width="22" height="14" fill="#B45309" />
+      <path d="M210 48v52" stroke="#94A3B8" strokeWidth="2" />
+      <rect x="200" y="100" width="20" height="12" rx="2" fill="#64748B" />
+      {/* toà nhà đang xây */}
+      <rect x="110" y="110" width="100" height="104" fill="#1E293B" stroke="#475569" strokeWidth="2" />
+      {[0, 1, 2, 3].map((r) => [0, 1, 2].map((c) => (
+        <rect key={`${r}${c}`} x={122 + c * 30} y={122 + r * 22} width="18" height="12" rx="2" fill={r === 0 && c === 2 ? '#F59E0B' : '#334155'} />
+      )))}
+      <path d="M110 110h100M110 132h100M110 154h100M110 176h100" stroke="#475569" strokeWidth="1" />
+      {/* cổng + camera */}
+      <rect x="268" y="120" width="8" height="94" fill="#475569" />
+      <rect x="370" y="120" width="8" height="94" fill="#475569" />
+      <rect x="268" y="114" width="110" height="10" rx="3" fill="#64748B" />
+      <rect x="282" y="128" width="14" height="22" rx="3" fill="#0F172A" stroke="#F59E0B" strokeWidth="2" />
+      <circle cx="289" cy="135" r="3" fill="#F59E0B" />
+      {/* công nhân */}
+      <path d="M314 150a12 12 0 0 1 24 0z" fill="#F59E0B" />
+      <rect x="310" y="149" width="32" height="4" rx="2" fill="#FCD34D" />
+      <circle cx="326" cy="162" r="9" fill="#CBD5E1" />
+      <path d="M310 192c0-10 7-17 16-17s16 7 16 17v8h-32z" fill="#F59E0B" />
+      <path d="M314 184h24" stroke="#E2E8F0" strokeWidth="3" strokeLinecap="round" />
+      <rect x="315" y="200" width="8" height="14" rx="3" fill="#64748B" />
+      <rect x="329" y="200" width="8" height="14" rx="3" fill="#64748B" />
+      <path d="M296 140l14 14" stroke="#22C55E" strokeWidth="2" strokeDasharray="3 3" />
+    </svg>
   )
 }

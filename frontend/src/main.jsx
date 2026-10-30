@@ -8,7 +8,11 @@ import store from './store/index.js'
 import App from './App.jsx'
 import { toast } from './lib/toast.js'
 
-import '@fontsource-variable/inter'          // font Inter để trong máy (có chữ tiếng Việt), không dùng Google Fonts
+// font Be Vietnam Pro để trong máy (có đủ dấu tiếng Việt), không dùng Google Fonts
+import '@fontsource/be-vietnam-pro/400.css'
+import '@fontsource/be-vietnam-pro/500.css'
+import '@fontsource/be-vietnam-pro/600.css'
+import '@fontsource/be-vietnam-pro/700.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import './styles/global.css'
 

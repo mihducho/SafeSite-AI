@@ -65,9 +65,10 @@ cd frontend; npm install; npm run build; cd ..                                  
 
 ### Giao diện React (`frontend/`): hai cách chạy
 
-Công nghệ: React 18 + Vite 6, react-router 6, react-bootstrap (Bootstrap 5), TanStack Query, axios; font Inter để trong máy
-(`@fontsource-variable/inter`), không dùng CDN hay Google Fonts. Frontend chỉ gọi đường dẫn tương đối (`/api/...`, `/ws/events`,
-`/stream/gate`), không mở thẳng URL camera (DroidCam chỉ nhận một kết nối).
+Công nghệ: React 18 + Vite 6, react-router 6, react-bootstrap (Bootstrap 5), TanStack Query, axios. Giao diện v2: trang quản lý
+nền sáng, màn hình cổng nền tối; font Be Vietnam Pro 5.3.0 (`@fontsource/be-vietnam-pro`, OFL) và icon Lucide 1.57.0
+(`lucide-react`, ISC) để trong bản build, không dùng CDN hay Google Fonts, không dùng emoji. Frontend chỉ gọi đường dẫn tương đối
+(`/api/...`, `/ws/events`, `/stream/gate`), không mở thẳng URL camera (DroidCam chỉ nhận một kết nối).
 
 | | Chế độ phát triển (sửa giao diện) | **Chế độ demo** (hôm thi) |
 |---|---|---|

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, Card, Col, Form, Row, Spinner, Table } from 'react-bootstrap'
+import { Button, Form, Spinner } from 'react-bootstrap'
+import { Camera, CircleAlert, Eraser, HardHat, Maximize2, RotateCw, Save, Shirt, Undo2 } from 'lucide-react'
 import {
   capNhatCauHinhCong, getUrlAnhHienTai, khoiDongLaiCong, layCauHinhCong, layTrangThaiCong, STREAM_URL,
 } from '../api/endpoints.js'
-import { LiveStream } from '../components/common/ui.jsx'
+import { Card, LiveStream, PageHead, Pill, Segmented, Skeleton } from '../components/common/ui.jsx'
+import { useWsState } from '../lib/events.js'
+import { DO_BAO_HO_TEN, trangThaiCong } from '../lib/labels.js'
 import { toast } from '../lib/toast.js'
 
 /**
@@ -15,15 +18,7 @@ import { toast } from '../lib/toast.js'
 const ROT = [0, 90, 180, 270]
 const FULL = [[0, 0], [1, 0], [1, 1], [0, 1]]
 const fmtPts = (pts) => (pts ?? []).map(([x, y]) => `${x},${y}`).join(' ')
-
-function gateText(st) {
-  if (!st) return 'Đang tải…'
-  if (st.mat_camera) return 'Mất kết nối camera, đang thử lại'
-  if (st.trang_thai === 'dang_chay' && !st.loi) return `Đang chạy${st.pha === 'KIEM_TRA' ? ' · đang kiểm tra' : ''}`
-  if (st.trang_thai === 'dang_khoi_dong') return 'Đang khởi động'
-  if (st.trang_thai === 'tat') return 'Đang tắt'
-  return `Lỗi${st.loi ? ` – ${st.loi}` : ''}`
-}
+const PPE_ICON = { hardhat: HardHat, vest: Shirt }
 
 function ZoneEditor({ gate, onSaved }) {
   const imgRef = useRef(null)
@@ -46,44 +41,48 @@ function ZoneEditor({ gate, onSaved }) {
   }
 
   return (
-    <Card className="h-100">
-      <Card.Header>Vùng kiểm tra</Card.Header>
-      <Card.Body>
-        <p className="small mb-2" style={{ color: 'var(--text-secondary)' }}>
-          Bấm lên ảnh để thêm từng đỉnh của vùng (ít nhất 3 điểm), bao <b>chỗ người đứng</b>: hệ thống xét <b>điểm chân</b> của
-          người có nằm trong vùng không. Người đứng trong vùng phải thấy từ đầu đến chân.
-        </p>
-        <div className="sg-zone" onClick={onClick}>
-          <img ref={imgRef} src={snap} alt="Khung hình hiện tại" onError={() => setSnapError(true)} onLoad={() => setSnapError(false)} />
-          <svg viewBox="0 0 1 1" preserveAspectRatio="none">
-            <polygon className="sg-zone__saved" points={fmtPts(gate?.zone)} />
-            <polygon className="sg-zone__new" points={fmtPts(points)} />
-            {points.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="0.012" className="sg-zone__dot" />)}
-          </svg>
+    <Card title="Vùng kiểm tra" sub="chỗ người đứng trước camera">
+      <div className="d-flex gap-4 flex-wrap">
+        <div>
+          <div className="zone-edit" onClick={onClick}>
+            <img ref={imgRef} src={snap} alt="Khung hình hiện tại" onError={() => setSnapError(true)} onLoad={() => setSnapError(false)} />
+            <svg viewBox="0 0 1 1" preserveAspectRatio="none">
+              <polygon className="zone-saved" points={fmtPts(gate?.zone)} />
+              <polygon className="zone-new" points={fmtPts(points)} />
+              {points.map(([x, y], i) => <circle key={i} cx={x} cy={y} r="0.012" className="zone-dot" />)}
+            </svg>
+          </div>
         </div>
-        {snapError && <div className="small text-danger mt-1">Chưa có hình từ camera cổng (xem Trạng thái), bấm "Lấy ảnh mới" sau khi camera chạy.</div>}
-        <div className="d-flex flex-wrap gap-2 mt-2">
-          <Button size="sm" variant="outline-secondary" onClick={refresh}>📷 Lấy ảnh mới</Button>
-          <Button size="sm" variant="outline-secondary" onClick={() => setPoints((p) => p.slice(0, -1))} disabled={!points.length}>↶ Xoá điểm cuối</Button>
-          <Button size="sm" variant="outline-secondary" onClick={() => setPoints([])} disabled={!points.length}>Xoá hết</Button>
-          <Button size="sm" variant="outline-secondary" onClick={() => setPoints(FULL)}>Cả khung</Button>
-          <Button size="sm" variant="success" className="ms-auto" disabled={points.length < 3 || save.isPending}
-            onClick={() => save.mutate(points)}>
-            {save.isPending ? <Spinner size="sm" /> : 'Lưu vùng'}
+        <div style={{ flex: "1 1 260px", minWidth: 260, maxWidth: 520 }}>
+          <p className="muted" style={{ fontSize: 14 }}>
+            Bấm lên ảnh để thêm từng đỉnh của vùng (ít nhất 3 điểm), bao quanh <b style={{ color: 'var(--text)' }}>chỗ người đứng</b>.
+            Hệ thống xét <b style={{ color: 'var(--text)' }}>điểm chân</b> của người có nằm trong vùng không, nên người đứng trong vùng phải
+            thấy được từ đầu đến chân.
+          </p>
+          <div className="legend mb-3">
+            <span><i style={{ background: '#F59E0B' }} />Vùng đang dùng ({gate?.zone?.length ?? 0} điểm)</span>
+            <span><i style={{ background: '#2563EB' }} />Vùng mới ({points.length} điểm)</span>
+          </div>
+          <div className="d-flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={refresh}><Camera size={16} />Lấy ảnh mới</Button>
+            <Button variant="secondary" size="sm" onClick={() => setPoints((p) => p.slice(0, -1))} disabled={!points.length}><Undo2 size={16} />Xoá điểm cuối</Button>
+            <Button variant="secondary" size="sm" onClick={() => setPoints([])} disabled={!points.length}><Eraser size={16} />Xoá hết</Button>
+            <Button variant="secondary" size="sm" onClick={() => setPoints(FULL)}><Maximize2 size={16} />Cả khung</Button>
+          </div>
+          <Button variant="success" className="mt-3" disabled={points.length < 3 || save.isPending} onClick={() => save.mutate(points)}>
+            {save.isPending ? <Spinner size="sm" /> : <Save size={17} />}Lưu vùng kiểm tra
           </Button>
+          {points.length > 0 && points.length < 3 && <div className="small text-warn mt-2">Cần ít nhất 3 điểm.</div>}
+          {snapError && <div className="note warn mt-3"><CircleAlert size={18} />Chưa có hình từ camera cổng. Bấm "Lấy ảnh mới" sau khi camera chạy.</div>}
         </div>
-        <div className="small mt-2" style={{ color: 'var(--text-secondary)' }}>
-          {points.length
-            ? `Vùng mới: ${points.length} điểm${points.length < 3 ? ' (cần ít nhất 3)' : ''}. Bấm "Lưu vùng" để áp dụng.`
-            : <><span style={{ color: '#ffc800' }}>■</span> vùng đang dùng ({gate?.zone?.length ?? 0} điểm). Bấm lên ảnh để vẽ vùng mới.</>}
-        </div>
-      </Card.Body>
+      </div>
     </Card>
   )
 }
 
 export default function GateConfigPage() {
   const qc = useQueryClient()
+  const ws = useWsState()
   const { data: gate, isLoading } = useQuery({ queryKey: ['cong'], queryFn: layCauHinhCong })
   const { data: st } = useQuery({ queryKey: ['cong-trang-thai'], queryFn: layTrangThaiCong, refetchInterval: 2000, meta: { silent: true } })
   const [form, setForm] = useState({ name: '', camera_source: '', rotate: 0 })
@@ -99,13 +98,12 @@ export default function GateConfigPage() {
     qc.invalidateQueries({ queryKey: ['cong'] })
     setTimeout(() => setLiveKey((k) => k + 1), 2500)   // chờ cổng mở lại camera rồi tải lại hình xem trước
   }
-
   const save = useMutation({
     mutationFn: (body) => capNhatCauHinhCong(body),
     meta: { silent: true },
     onSuccess: (r) => {
       setError('')
-      if (r.ghi_chu) toast.warning(`Đã lưu, đang khởi động lại cổng – ${r.ghi_chu}`)
+      if (r.ghi_chu) toast.warning(`Đã lưu, đang khởi động lại cổng. ${r.ghi_chu}`)
       else toast.success('Đã lưu, đang khởi động lại cổng')
       afterRestart(r)
     },
@@ -121,80 +119,83 @@ export default function GateConfigPage() {
     save.mutate({ name: form.name.trim() || null, camera_source: form.camera_source.trim() || null, rotate: Number(form.rotate) })
   }
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  // trạng thái lấy định kỳ qua API (không phụ thuộc WebSocket); chỉ báo mất máy chủ khi WebSocket cũng mất
+  const [, sentence, tone] = trangThaiCong(st ?? null, ws === 'mat' ? 'mat' : st ? 'mo' : 'dang_ket_noi')
+  const ppe = gate?.required_ppe
 
   const statusRows = [
-    ['Trạng thái', gateText(st)],
-    ['Nguồn đang chạy', st?.nguon ?? '—'],
-    ['Góc xoay', st?.xoay != null ? `${st.xoay}°` : '—'],
-    ['Độ phân giải (sau xoay)', st?.do_phan_giai ? st.do_phan_giai.replace('x', ' × ') : '—'],
-    ['Số khung/giây nhận được', st?.khung_giay ?? '—'],
+    ['Nguồn đang chạy', st?.nguon],
+    ['Góc xoay', st?.xoay != null ? `${st.xoay}°` : ''],
+    ['Độ phân giải sau xoay', st?.do_phan_giai ? st.do_phan_giai.replace('x', ' × ') : ''],
+    ['Số khung hình mỗi giây', st?.khung_giay != null ? String(st.khung_giay).replace('.', ',') : ''],
     ['Số lượt từ lúc khởi động', st?.so_luot ?? 0],
   ]
 
   return (
-    <div className="sg-page">
-      <div className="section-header"><h1 className="section-title">Cấu hình cổng</h1></div>
+    <div className="page">
+      <PageHead title="Cấu hình cổng" sub={gate ? gate.name : ' '} />
       {gate?.ghi_de_boi_env && (
-        <Alert variant="warning" className="py-2">
-          Nguồn hình đang bị ghi đè bởi <code>GATE_SOURCE</code> trong file <code>.env</code> ({gate.nguon_env}). Xoá dòng đó
-          trong <code>.env</code> rồi khởi động lại ứng dụng nếu muốn dùng nguồn ở đây.
-        </Alert>
+        <div className="note warn mb-3"><CircleAlert size={18} />
+          <div>Nguồn hình đang được đặt bằng <code>GATE_SOURCE</code> trong file <code>.env</code> ({gate.nguon_env}). Muốn dùng nguồn ở
+            đây thì xoá dòng đó trong <code>.env</code> rồi khởi động lại ứng dụng.</div>
+        </div>
       )}
-      {isLoading ? <div className="text-center py-5"><Spinner animation="border" /></div> : (
-        <Row className="g-3">
-          <Col xl={4}>
-            <Card className="mb-3">
-              <Card.Header>Camera cổng</Card.Header>
-              <Form onSubmit={submit}>
-                <Card.Body>
-                  <Form.Group className="mb-3">
-                    <Form.Label htmlFor="g-name">Tên cổng</Form.Label>
-                    <Form.Control id="g-name" maxLength={50} value={form.name} onChange={set('name')} />
-                  </Form.Group>
-                  <Form.Group className="mb-3">
-                    <Form.Label htmlFor="g-source">Nguồn hình</Form.Label>
-                    <Form.Control id="g-source" maxLength={500} value={form.camera_source} onChange={set('camera_source')}
-                      placeholder="0 hoặc http://IP:4747/video/force/1280x720" />
-                    <Form.Text>Số webcam (0), URL camera điện thoại (DroidCam), hoặc đường dẫn file video (demo dự phòng, tự lặp lại).
-                      DroidCam chỉ cho <b>một</b> kết nối: đừng mở URL này ở trình duyệt hay chương trình khác khi ứng dụng đang chạy.</Form.Text>
-                  </Form.Group>
-                  <Form.Group>
-                    <Form.Label htmlFor="g-rotate">Xoay hình (theo chiều kim đồng hồ)</Form.Label>
-                    <Form.Select id="g-rotate" value={form.rotate} onChange={set('rotate')}>
-                      {ROT.map((r) => <option key={r} value={r}>{r}°{r === 0 ? ' (giữ nguyên)' : ''}</option>)}
-                    </Form.Select>
-                    <Form.Text>Điện thoại kẹp dọc mà hình nhận về nằm ngang: chọn 90°, nếu người bị lộn ngược thì chọn 270°.
-                      Đổi góc xoay thì vùng kiểm tra đặt lại thành cả khung, cần vẽ lại.</Form.Text>
-                  </Form.Group>
-                  {error && <Alert variant="danger" className="mt-3 mb-0 py-2">{error}</Alert>}
-                </Card.Body>
-                <Card.Footer className="d-flex gap-2 flex-wrap">
-                  <Button type="submit" disabled={save.isPending}>{save.isPending ? <Spinner size="sm" /> : 'Lưu và khởi động lại cổng'}</Button>
+      {isLoading ? <Card><Skeleton height={300} /></Card> : (
+        <div className="stack">
+          <div className="grid gate-cfg">
+            <Card title="Camera cổng">
+              <Form id="gate-form" onSubmit={submit}>
+                <Form.Group className="mb-3">
+                  <Form.Label htmlFor="g-name">Tên cổng</Form.Label>
+                  <Form.Control id="g-name" maxLength={50} value={form.name} onChange={set('name')} />
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label htmlFor="g-source">Nguồn camera</Form.Label>
+                  <Form.Control id="g-source" maxLength={500} value={form.camera_source} onChange={set('camera_source')}
+                    placeholder="0 hoặc http://IP:4747/video/force/1280x720" />
+                  <Form.Text>Số webcam (0), địa chỉ camera điện thoại (DroidCam) hoặc đường dẫn file video (demo dự phòng, tự lặp lại).
+                    DroidCam chỉ cho một kết nối: không mở địa chỉ này ở trình duyệt hay chương trình khác khi ứng dụng đang chạy.</Form.Text>
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label as="div">Xoay hình (theo chiều kim đồng hồ)</Form.Label>
+                  <div><Segmented ariaLabel="Góc xoay" value={Number(form.rotate)} onChange={(v) => setForm((f) => ({ ...f, rotate: v }))}
+                    options={ROT.map((r) => ({ value: r, label: `${r}°` }))} /></div>
+                  <Form.Text>Điện thoại kẹp dọc mà hình nhận về nằm ngang thì chọn 90°; người bị lộn ngược thì chọn 270°. Đổi góc xoay thì
+                    vùng kiểm tra đặt lại thành cả khung, cần vẽ lại.</Form.Text>
+                </Form.Group>
+                <Form.Group className="mb-4">
+                  <Form.Label as="div">Đồ bảo hộ bắt buộc</Form.Label>
+                  <div className="d-flex gap-2 flex-wrap">
+                    {Array.isArray(ppe) && ppe.length
+                      ? ppe.map((k) => <Pill key={k} tone="neutral" icon={PPE_ICON[k] ?? HardHat}>{DO_BAO_HO_TEN[k] ?? k}</Pill>)
+                      : <><Pill tone="neutral" icon={HardHat}>Mũ bảo hộ</Pill><Pill tone="neutral" icon={Shirt}>Áo phản quang</Pill></>}
+                  </div>
+                  <Form.Text>{Array.isArray(ppe) && ppe.length ? 'Theo cấu hình riêng của cổng.' : 'Theo cấu hình chung của hệ thống.'}</Form.Text>
+                </Form.Group>
+                {error && <div className="note bad mb-3"><CircleAlert size={18} />{error}</div>}
+                <div className="d-flex gap-2 flex-wrap">
+                  <Button type="submit" disabled={save.isPending}>{save.isPending ? <Spinner size="sm" /> : <Save size={18} />}Lưu và khởi động lại cổng</Button>
                   <Button variant="secondary" onClick={() => restart.mutate()} disabled={restart.isPending}>
-                    {restart.isPending ? <Spinner size="sm" /> : '⟳ Khởi động lại'}
+                    {restart.isPending ? <Spinner size="sm" /> : <RotateCw size={17} />}Chỉ khởi động lại
                   </Button>
-                </Card.Footer>
+                </div>
               </Form>
             </Card>
-            <Card>
-              <Card.Header>Trạng thái</Card.Header>
-              <Table size="sm" className="mb-0 sg-table">
-                <tbody>{statusRows.map(([k, v]) => <tr key={k}><th className="text-nowrap">{k}</th><td>{v}</td></tr>)}</tbody>
-              </Table>
+            <Card title="Xem trước" sub="hình sau khi xoay">
+              <div className="d-flex gap-4 flex-wrap">
+                <LiveStream key={liveKey} className="portrait" src={`${STREAM_URL}?t=${liveKey}`} alt="Hình trực tiếp camera cổng"
+                  style={{ height: 'min(56vh, 560px)', width: 'calc(min(56vh, 560px) * 0.5625)', margin: 0 }} />
+                <div style={{ flex: "1 1 220px", minWidth: 220 }}>
+                  <div className={`note ${tone === 'ok' ? 'ok' : tone === 'bad' ? 'bad' : 'warn'} mb-3`} style={{ fontWeight: 600 }}>{sentence}</div>
+                  <table className="kv"><tbody>
+                    {statusRows.map(([k, v]) => <tr key={k}><th>{k}</th><td className="num" style={{ wordBreak: 'break-all' }}>{v}</td></tr>)}
+                  </tbody></table>
+                </div>
+              </div>
             </Card>
-          </Col>
-          <Col xl={4}>
-            <Card className="h-100">
-              <Card.Header>Xem trực tiếp (sau khi xoay)</Card.Header>
-              <Card.Body className="text-center">
-                <LiveStream key={liveKey} className="sg-preview-portrait" src={`${STREAM_URL}?t=${liveKey}`} alt="Hình trực tiếp camera cổng" />
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xl={4}>
-            <ZoneEditor gate={gate} onSaved={afterRestart} />
-          </Col>
-        </Row>
+          </div>
+          <ZoneEditor gate={gate} onSaved={afterRestart} />
+        </div>
       )}
     </div>
   )

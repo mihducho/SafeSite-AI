@@ -1,31 +1,25 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { CircleAlert, CircleCheck, CircleX, Info, X } from 'lucide-react'
 import { removeToast, subscribeToasts } from '../../lib/toast.js'
 import './Toast.css'
 
-const TYPE_CONFIG = {
-  success: { bg: '#198754', icon: '✅' },
-  error:   { bg: '#dc3545', icon: '❌' },
-  warning: { bg: '#ffc107', icon: '⚠️', dark: true },
-  info:    { bg: '#0dcaf0', icon: 'ℹ️', dark: true },
-}
+const ICON = { success: CircleCheck, error: CircleX, warning: CircleAlert, info: Info }
 
-/** Nơi hiển thị mọi toast của ứng dụng (gắn một lần trong App). Gửi toast: toast.error('...') trong lib/toast.js. */
+/** Nơi hiển thị mọi toast của ứng dụng (gắn một lần trong App), góc trên bên phải. Gửi toast: toast.error('...') */
 export default function ToastHost() {
   const [toasts, setToasts] = useState([])
   useEffect(() => subscribeToasts(setToasts), [])
   if (!toasts.length) return null
   return createPortal(
-    <div className="sg-toast-container">
+    <div className="toast-stack" aria-live="polite">
       {toasts.map((t) => {
-        const cfg = TYPE_CONFIG[t.type] ?? TYPE_CONFIG.info
+        const Icon = ICON[t.type] ?? Info
         return (
-          <div key={t.id} className="sg-toast sg-toast--enter" role="alert"
-            style={{ background: cfg.bg, color: cfg.dark ? '#212529' : '#fff' }}>
-            <span className="sg-toast__icon">{cfg.icon}</span>
-            <span className="sg-toast__msg">{t.message}</span>
-            <button className="sg-toast__close" style={{ color: cfg.dark ? '#212529' : '#fff' }}
-              onClick={() => removeToast(t.id)} aria-label="Đóng">×</button>
+          <div key={t.id} className={`toast-item ${t.type}`} role="alert">
+            <Icon size={20} />
+            <p>{t.message}</p>
+            <button onClick={() => removeToast(t.id)} aria-label="Đóng"><X size={16} /></button>
           </div>
         )
       })}

@@ -462,3 +462,10 @@ mọi chức năng chạy bằng dữ liệu thật của backend; không đổi
   `GET /api/tong-quan` (biểu đồ số lượt theo giờ hôm nay: đạt / không đạt / khác).
 - Font Inter để trong bản build (`@fontsource-variable/inter`, OFL), bỏ Google Fonts. Kiểm thử giao diện bằng Playwright
   (`npm run test:ui`, chạy trên Edge có sẵn).
+
+**2026-10-30 (theo yêu cầu của tôi, nhánh `giao-dien-v2`, chờ tôi duyệt rồi mới gộp): làm lại phần trình bày giao diện React**
+cho dễ đọc khi chiếu máy chiếu; không đổi module gọi API, hook lấy dữ liệu, định tuyến, WebSocket, backend.
+- Trang quản lý nền sáng, màn hình cổng nền tối; font Be Vietnam Pro (thay Inter) và icon Lucide, để trong bản build; bỏ emoji
+  và mọi mã kỹ thuật trên giao diện.
+- Chưa làm vì backend chưa có: nút lọc nhanh "7 ngày" ở Lịch sử kiểm tra (`/api/luot` chỉ lọc một ngày hoặc mọi ngày);
+  sửa "đồ bảo hộ bắt buộc" ở Cấu hình cổng (`PATCH /api/cong` không nhận `required_ppe`, giao diện chỉ hiển thị).
