@@ -66,10 +66,11 @@ test('đăng nhập, mở từng trang, không lỗi', async ({ page }) => {
     await giaoDienSach(page, 'chi tiết công nhân')
   }
 
-  // màn hình cổng: toàn màn hình, có ô kết quả và nút bật âm thanh, WebSocket báo trạng thái cổng
+  // màn hình cổng: toàn màn hình, có ô kết quả, loa luôn bật (không có nút tắt), WebSocket báo trạng thái cổng
   await page.goto('/man-hinh-cong')
   await expect(page.locator('.gs-box')).toBeVisible()
-  await expect(page.getByRole('button', { name: /Bật âm thanh/ })).toBeVisible()
+  await expect(page.locator('.gs-top')).toContainText(/Loa đang bật|Chạm để bật loa/)
+  await expect(page.getByRole('button', { name: /Tắt loa|Bật âm thanh/ })).toHaveCount(0)
   await expect(page.locator('.gs-status')).not.toHaveText(/Đang kết nối/, { timeout: 10_000 })
   await giaoDienSach(page, '/man-hinh-cong')
 

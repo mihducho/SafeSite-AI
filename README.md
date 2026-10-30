@@ -78,9 +78,15 @@ nền sáng, màn hình cổng nền tối; font Be Vietnam Pro 5.3.0 (`@fontsou
 
 - Sửa code giao diện xong muốn dùng ở chế độ demo thì chạy lại `npm run build` (FastAPI đọc `frontend\dist` lúc có yêu cầu,
   không cần khởi động lại). Chưa build thì `http://127.0.0.1:8000` tự chuyển sang giao diện dự phòng `/cu/`.
-- Trang: `/` Tổng quan · `/man-hinh-cong` Màn hình cổng (bấm "Bật âm thanh", "Toàn màn hình"; nên mở bằng Microsoft Edge vì có sẵn
+- Trang: `/` Tổng quan · `/man-hinh-cong` Màn hình cổng (loa luôn bật, xem dưới; nên mở bằng Microsoft Edge vì có sẵn
   giọng tiếng Việt "Microsoft An") · `/cong-nhan` (+ chi tiết: đồng ý, chụp / tải mẫu mặt) · `/to-doi` · `/lich-su` · `/bang-cong`
   (chấm công thủ công) · `/bang-cong-thang` (xuất Excel) · `/cau-hinh-ca` · `/cau-hinh-cong` (nguồn camera, góc xoay, vùng kiểm tra).
+- **Màn hình cổng, loa luôn bật**: không có nút tắt loa. Trình duyệt chỉ cho trang phát tiếng khi đã có người chạm vào trang,
+  nên ở máy đặt tại cổng hãy mở bằng **`.\cong`** (cong.bat, chạy sau `.\web`): Edge toàn màn hình (kiosk) với tham số cho phép
+  tự phát tiếng, loa bật ngay khi mở. `cong.bat` dùng hồ sơ Edge riêng `data\edge_cong\` (không đưa lên git), lần đầu phải đăng
+  nhập trong cửa sổ đó; thoát: Alt+F4. Cách khác: trong Edge vào `edge://settings/content/mediaAutoplay`, thêm
+  `http://127.0.0.1:8000` vào mục Cho phép. Nếu trình duyệt vẫn chặn, màn hình hiện dòng chữ vàng "Chạm vào màn hình một lần
+  để bật loa": chạm (hoặc bấm phím) bất kỳ đâu một lần là loa bật.
 - **Giao diện dự phòng** (Jinja2, F3) vẫn giữ ở `http://127.0.0.1:8000/cu/` (đăng nhập `/cu/login`), dùng khi giao diện React gặp sự cố.
   Bootstrap và file tĩnh của nó nằm trong `app\static\`.
 - Kiểm thử giao diện tự động (Playwright, chạy trên Edge có sẵn trong máy, cần backend đang chạy ở chế độ demo):

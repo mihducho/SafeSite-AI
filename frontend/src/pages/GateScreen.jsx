@@ -19,9 +19,9 @@ import './GateScreen.css'
  *    giữ đúng tỉ lệ hình (điện thoại kẹp dọc 720x1280 -> cột hẹp, cao hết màn hình). Lỗi luồng hình -> tự thử lại.
  *  - Phải: ô kết quả lớn. Chờ (đồng hồ + hướng dẫn) -> đang kiểm tra (pha KIEM_TRA) -> kết quả xanh/đỏ/vàng theo `mau`
  *    của sự kiện lượt, trong giay_hien_ket_qua giây -> về chờ.
- *  - Âm thanh: trình duyệt chặn phát tiếng khi người dùng chưa bấm gì -> nút "Bật âm thanh". Đọc `thong_bao` bằng
- *    giọng tiếng Việt (ưu tiên giọng cài sẵn trong máy, không cần mạng); không có giọng -> tiếng bíp
- *    (1 tiếng = xanh, 2 tiếng = đỏ/vàng).
+ *  - Loa luôn bật (useSound): tự bật khi trình duyệt cho phép (mở bằng cong.bat); bị chặn thì chạm màn hình một lần.
+ *    Đọc `thong_bao` bằng giọng tiếng Việt (ưu tiên giọng cài sẵn trong máy, không cần mạng); không có giọng -> tiếng
+ *    bíp (1 tiếng = xanh, 2 tiếng = đỏ/vàng).
  *  - Mất camera / cổng lỗi / mất kết nối máy chủ -> ô đỏ "tạm gián đoạn"; WebSocket tự kết nối lại (lib/events.js).
  */
 
@@ -40,12 +40,19 @@ function displayMessage(ev) {
 }
 const STREAM_RETRY_MS = 2000
 
-// ─── âm thanh ──────────────────────────────────────────────────────────────────
+// ─── âm thanh: loa LUÔN BẬT ────────────────────────────────────────────────────
+// Trình duyệt chỉ cho phát tiếng (giọng đọc, tiếng bíp) khi người dùng đã bấm vào trang, TRỪ KHI được phép tự phát:
+//  - mở bằng cong.bat (Edge kiosk, tham số --autoplay-policy=no-user-gesture-required), hoặc
+//  - trong Edge đặt "Tự động phát nội dung đa phương tiện: Cho phép" cho địa chỉ ứng dụng.
+// Khi đó trang tự bật loa ngay lúc mở. Nếu vẫn bị chặn: chạm / bấm phím BẤT KỲ đâu trên màn hình một lần là bật.
+// Không có nút tắt loa.
 function useSound() {
-  const [enabled, setEnabled] = useState(false)
+  const [state, setState] = useState('dang_bat')   // dang_bat | bat | bi_chan
   const [voice, setVoice] = useState(null)
   const ctxRef = useRef(null)
   const voiceRef = useRef(null)
+  const stateRef = useRef('dang_bat')
+  stateRef.current = state
 
   const pickVoice = useCallback(() => {
     if (!('speechSynthesis' in window)) return
@@ -58,6 +65,7 @@ function useSound() {
   const beep = useCallback((n) => {
     const ctx = ctxRef.current
     if (!ctx) return
+    ctx.resume()
     for (let i = 0; i < n; i++) {
       const t = ctx.currentTime + i * 0.3
       const osc = ctx.createOscillator()
@@ -71,46 +79,72 @@ function useSound() {
     }
   }, [])
 
-  const enable = useCallback(() => {
+  // Bật loa: được gọi lúc mở trang (thử tự bật) và ở lần chạm / bấm phím đầu tiên (nếu trình duyệt chặn).
+  const unlock = useCallback((fromUser) => {
     const Ctx = window.AudioContext || window.webkitAudioContext
-    if (Ctx && !ctxRef.current) ctxRef.current = new Ctx()
-    ctxRef.current?.resume()
+    if (Ctx && !ctxRef.current) {
+      const c = new Ctx()
+      // resume() chạy bất đồng bộ: loa chỉ bật thật khi AudioContext chuyển sang 'running'
+      c.onstatechange = () => {
+        if (c.state !== 'running' || stateRef.current === 'bat') return
+        if (stateRef.current === 'bi_chan') beep(1)                // vừa chạm để bật: bíp một tiếng xác nhận
+        setState('bat')
+      }
+      ctxRef.current = c
+    }
+    const ctx = ctxRef.current
+    if (!ctx || ctx.state === 'running') { setState('bat'); return }   // không có Web Audio: vẫn thử giọng đọc
+    ctx.resume().catch(() => {})
+    // Không có thao tác của người dùng thì resume() bị treo nếu trình duyệt chặn -> xem trạng thái sau một lát
+    if (!fromUser) setTimeout(() => { if (ctx.state !== 'running') setState('bi_chan') }, 400)
+  }, [beep])
+
+  useEffect(() => {
     if ('speechSynthesis' in window) {
       pickVoice()
-      window.speechSynthesis.onvoiceschanged = pickVoice   // danh sách giọng tải chậm
+      window.speechSynthesis.onvoiceschanged = pickVoice        // danh sách giọng tải chậm
     }
-    setEnabled(true)
-    beep(1)
-  }, [beep, pickVoice])
+    unlock(false)
+    // Bị chặn: lần chạm / bấm phím đầu tiên ở bất kỳ đâu sẽ bật loa (bắt ở pha capture, trước mọi nút khác)
+    const onUser = () => unlock(true)
+    const events = ['pointerdown', 'keydown', 'touchstart']
+    events.forEach((e) => document.addEventListener(e, onUser, { capture: true }))
+    return () => {
+      events.forEach((e) => document.removeEventListener(e, onUser, { capture: true }))
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+        window.speechSynthesis.onvoiceschanged = null
+      }
+      ctxRef.current?.close()
+      ctxRef.current = null
+    }
+  }, [pickVoice, unlock])
 
   const announce = useCallback((ev) => {
-    if (!enabled) return
     const beeps = ev.mau === 'xanh' ? 1 : 2
     const v = voiceRef.current
-    if (!v || !ev.thong_bao) { beep(beeps); return }
-    window.speechSynthesis.cancel()
+    if (!v || !ev.thong_bao || !('speechSynthesis' in window)) { beep(beeps); return }
+    const synth = window.speechSynthesis
+    synth.cancel()
+    synth.resume()                                   // Chrome / Edge đôi khi tự tạm dừng hàng đợi đọc sau lâu không dùng
     const u = new SpeechSynthesisUtterance(ev.thong_bao)
     u.voice = v
     u.lang = v.lang
-    u.onerror = () => beep(beeps)                 // vd giọng trực tuyến nhưng mất mạng
-    window.speechSynthesis.speak(u)
-  }, [enabled, beep])
-
-  useEffect(() => () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.onvoiceschanged = null
+    u.onerror = (e) => {
+      if (e.error === 'not-allowed') setState('bi_chan')         // trình duyệt chặn: hiện hướng dẫn chạm màn hình
+      if (e.error !== 'interrupted' && e.error !== 'canceled') beep(beeps)   // vd giọng trực tuyến nhưng mất mạng
     }
-    ctxRef.current?.close()
-  }, [])
+    synth.speak(u)
+  }, [beep])
 
-  const info = !enabled ? 'Âm thanh đang tắt (trình duyệt cần bấm nút trước khi phát).'
-    : voice ? `Giọng đọc: ${voice.name}${voice.localService ? ' (có sẵn trong máy)' : ' (trực tuyến, cần mạng)'}`
-      : 'Máy không có giọng tiếng Việt, sẽ phát tiếng bíp (1 tiếng: đạt, 2 tiếng: không đạt hoặc cần làm lại)'
-  return { enabled, enable, announce, info }
+  const info = state === 'bi_chan'
+    ? 'Trình duyệt đang chặn âm thanh: chạm vào màn hình một lần để bật loa (mở bằng cong.bat thì loa tự bật).'
+    : voice ? `Loa luôn bật · giọng đọc ${voice.name}${voice.localService ? ' (có sẵn trong máy)' : ' (trực tuyến, cần mạng)'}`
+      : 'Loa luôn bật · máy không có giọng tiếng Việt nên phát tiếng bíp (1 tiếng: đạt, 2 tiếng: không đạt hoặc cần làm lại)'
+  return { state, announce, info }
 }
 
-/// ─── hình camera ───────────────────────────────────────────────────────────────
+// ─── hình camera ───────────────────────────────────────────────────────────────
 function GateStream({ status }) {
   const imgRef = useRef(null)
   const [src, setSrc] = useState(STREAM_URL)
@@ -231,10 +265,9 @@ export default function GateScreen() {
         <div className="gs-top">
           <span className="gs-brand"><LogoMark size={34} />SafeGate</span>
           <span className={`gs-status ${statusTone}`}><i />{statusText}</span>
-          <button className={`gs-btn ${sound.enabled ? 'on' : 'attention'}`} onClick={sound.enable}>
-            {sound.enabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
-            {sound.enabled ? 'Âm thanh đang bật' : 'Bật âm thanh'}
-          </button>
+          {sound.state === 'bi_chan'
+            ? <button className="gs-btn attention"><VolumeX size={17} />Chạm để bật loa</button>
+            : <span className="gs-btn on" title="Loa luôn bật"><Volume2 size={17} />Loa đang bật</span>}
           <button className="gs-btn icon" onClick={toggleFullscreen} title={full ? 'Thoát toàn màn hình' : 'Toàn màn hình'}
             aria-label="Toàn màn hình">
             {full ? <Minimize size={17} /> : <Expand size={17} />}
@@ -243,6 +276,14 @@ export default function GateScreen() {
         </div>
         <div className="gs-voice">{sound.info}</div>
 
+        {sound.state === 'bi_chan' && (
+          <div role="alert" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '14px 18px', borderRadius: 6,
+            background: '#D97706', color: '#FFFFFF', fontSize: 24, fontWeight: 700, cursor: 'pointer',
+          }}>
+            <VolumeX size={28} />Chạm vào màn hình một lần để bật loa
+          </div>
+        )}
         <div className={`gs-box ${boxClass}`}>
           {down ? (
             <div className="gs-in" key={`down-${down.title}`}>
