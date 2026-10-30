@@ -250,11 +250,24 @@ class ChamTayV2Test(V2Case):
         self.assertEqual(self.s.get(Worker, self.an.id).ngay_nghi_viec, D29)
         self.assertEqual([n.hanh_dong for n in self.nhat_ky()], ["dong_khi_nghi_viec"])
         self.assertEqual(self.run_luot(vn(29, 17, 0))["trang_thai_mat"], "KHONG_NHAN_RA")
+        self.assertEqual(self.viec(), [])  # dong phien luc cho nghi viec: khong phai "ve som chua co phep"
         r = self.ngay(d=date(2026, 10, 30), now=vn(31, 9, 0))
         self.assertEqual(r["trang_thai_ngay"], tc.TT_NGOAI_THOI_GIAN)  # sau ngay nghi viec: khong tinh vang
         cong_nhan.di_lam_lai(self.s, self.an, self.dk, now=vn(31, 8, 0))
         w = self.s.get(Worker, self.an.id)
         self.assertEqual((w.ngay_nghi_viec, w.ngay_vao_lam, w.consent_at), (None, date(2026, 10, 31), None))
+
+    def test_sua_ca_khong_doi_so_lieu_ngay_cu(self):
+        """Gio ca duoc chep vao dong cong luc tao: sua ca chi tinh lai hom nay, ngay cu giu nguyen."""
+        for t in (vn(28, 7, 10), vn(28, 17, 0), vn(29, 7, 10)):
+            self.run_luot(t)
+        cham_cong.sua_ca(self.s, self.shift, {"start_time": time(7, 30)}, ATT, now=vn(29, 9, 0))
+        self.run_luot(vn(29, 17, 0))
+        hom_qua, hom_nay = self.ngay(d=date(2026, 10, 28)), self.ngay()
+        self.assertEqual((hom_qua["di_muon_phut"], hom_qua["so_phut_lam"], hom_qua["trang_thai_ngay"]),
+                         (10, 530, tc.TT_DI_MUON))
+        self.assertEqual((hom_nay["di_muon_phut"], hom_nay["so_phut_lam"], hom_nay["trang_thai_ngay"]),
+                         (0, 510, tc.TT_DU_CONG))
 
     def test_t21_chua_dong_y_khong_so_khop(self):
         add_worker(self.s, "CN030", "Đặng Văn Hải", face_index=30, consent=False)  # co 3 mau, chua dong y

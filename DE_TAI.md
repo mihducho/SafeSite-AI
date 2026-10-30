@@ -169,17 +169,33 @@ viết thành hàm thuần (nhận thời gian và kết quả tìm mặt) để
 
 ## 7. Quy tắc nghiệp vụ
 
-- **Vào hay ra** theo trạng thái công nhân trong ngày: chưa có giờ vào, hoặc đã có cả giờ vào và giờ ra → lượt này là **vào**;
-  đã vào mà chưa ra → lượt này là **ra**.
-- **Lượt vào**: chỉ khi nhận ra công nhân VÀ kết quả bảo hộ `DAT` mới ghi giờ vào. Không đạt thì **chưa ghi công**
-  (không phải mất công), bổ sung đủ rồi kiểm tra lại. Giờ vào = thời điểm lượt `DAT` đầu tiên.
-- **Lượt ra**: ghi giờ ra, **không yêu cầu bảo hộ**. Nếu lượt ra cách giờ vào dưới `duplicate_minutes` (mặc định 2 phút)
-  thì bỏ qua (coi là đứng lại trước camera), ghi lượt với hành động `bo_qua_trung`.
-- Vào lại sau khi đã ra (ví dụ đi ăn trưa): phải kiểm tra bảo hộ lại; giữ giờ vào đầu tiên, giờ ra lấy lần ra cuối cùng.
-- `KHONG_NHAN_RA` / `KHONG_THAY_MAT`: không ghi công, vẫn lưu lượt và ảnh để cán bộ xem. Cán bộ có thể **chấm công thủ công**
-  trên web, **bắt buộc ghi lý do**.
-- Công nhân **nghỉ việc**: không còn được nhận diện; **xoá toàn bộ mẫu khuôn mặt** (vector và ảnh mẫu) của người đó.
-- Mọi lượt kiểm tra đều lưu 1 ảnh. Ảnh có thời hạn lưu cấu hình được (mặc định 90 ngày; giai đoạn nước rút chưa cần tự xoá).
+Chấm công v2 (30/10/2026; chi tiết, công thức và ví dụ: `docs/LOGIC_CHAM_CONG.md`):
+
+- **Phiên làm việc:** mỗi lần vào **mở một phiên**, mỗi lần ra **đóng phiên đang mở** (bảng `attendance_segments`); vào lại không
+  xoá giờ ra cũ. Dòng `attendance` (1 dòng / công nhân / ngày) là bảng tổng hợp, tính lại từ các phiên: giờ vào = phiên đầu,
+  giờ ra = phiên cuối (nếu đã đóng), số lần và số phút ra ngoài.
+- **Vào hay ra:** ngày công của lượt có phiên đang mở → **ra**; không có → **vào**. Phiên mở của ngày khác không ảnh hưởng.
+- **Lượt vào:** nhận ra công nhân (đang làm, đã đồng ý) VÀ bảo hộ `DAT` VÀ thời điểm trong cửa sổ [bắt đầu ca − cho vào sớm,
+  kết thúc ca] (tính cả hai biên). Ngoài cửa sổ: không ghi ("Chưa đến giờ vào ca (từ 06:00)" / "Đã hết giờ vào ca hôm nay").
+  Không đạt thì **chưa ghi công**, bổ sung đủ rồi kiểm tra lại. Giờ vào = thời điểm lượt `DAT` đầu tiên.
+- **Lượt ra:** nhận ra công nhân và kết quả khác `NHIEU_NGUOI`; **không yêu cầu bảo hộ**.
+- **Chống trùng hai chiều:** chưa đủ `phut_chong_trung` phút (mặc định 10, sửa trên trang Cấu hình ca) kể từ lần ghi công gần
+  nhất trong ngày (vào hoặc ra, tự động hoặc chấm tay) → `bo_qua_trung`, màn hình xanh "…đã ghi giờ vào/ra HH:MM, không ghi lặp".
+- **Thiếu giờ ra được LƯU:** phiên mở quá giờ kết thúc ca + `missing_checkout_hours` (4 giờ) → `thieu_gio_ra` (tác vụ nền lúc khởi
+  động và mỗi 5 phút). Ngày đó không được tính ngày công cho tới khi cán bộ xử lý; có trong danh sách **Việc cần xử lý**.
+- **Trạng thái ngày** do MỘT hàm backend tính (bảng công ngày, tháng, Excel, API): đang làm, thiếu giờ ra, đủ công, đi muộn,
+  về sớm, đi muộn và về sớm, đi muộn / về sớm có phép, chưa vào, vắng, nghỉ tuần (`attendance.ngay_nghi_tuan`), nghỉ phép,
+  chưa đến, ngoài thời gian làm việc ([ngày vào làm, ngày nghỉ việc]). Ngày công = 1 khi đủ công / đi muộn / về sớm (kể cả có phép).
+- `KHONG_NHAN_RA` / `KHONG_THAY_MAT`: không ghi công, vẫn lưu lượt và ảnh để cán bộ xem. Cán bộ **chấm công thủ công theo phiên**
+  (thêm, sửa giờ vào / ra, huỷ phiên), **bắt buộc ghi lý do**; từ chối thời điểm chưa tới, giờ ra ≤ giờ vào, phiên chồng lấn,
+  ngày ngoài thời gian làm việc, hai phiên mở. Mỗi thao tác 1 dòng **nhật ký** (giá trị cũ, mới, người sửa, lý do).
+- **Phép / giải trình:** về sớm, đi muộn (dung sai 15 phút), ra ngoài công việc (tính công), nghỉ cả ngày. Đi muộn / về sớm không
+  phép quá 15 phút vào Việc cần xử lý; cán bộ thêm phép hoặc "Xác nhận không phép".
+- Công nhân **nghỉ việc**: lưu ngày nghỉ việc; đang có phiên mở thì đóng tại lúc thao tác; không còn được nhận diện; **xoá toàn bộ
+  mẫu khuôn mặt** (vector và ảnh mẫu). Đi làm lại: ngày vào làm mới, phải đồng ý lại.
+- Ghi đồng thời: mỗi lượt và mỗi thao tác tay chạy dưới khoá theo công nhân; lỗi trùng khoá thì đọc lại, thử lại 1 lần.
+- Mọi lượt kiểm tra đều lưu 1 ảnh (ghi sau khi lưu CSDL thành công); thời điểm lượt = lúc bắt đầu lượt. Ảnh có thời hạn lưu cấu
+  hình được (mặc định 90 ngày; giai đoạn nước rút chưa cần tự xoá).
 
 **Dữ liệu khuôn mặt (Luật Bảo vệ dữ liệu cá nhân 91/2025/QH15, Nghị định 356/2025/NĐ-CP: dữ liệu sinh trắc học là dữ liệu nhạy cảm):**
 - Chỉ đăng ký khuôn mặt khi đã **ghi nhận sự đồng ý** của công nhân: ô xác nhận trên trang đăng ký, lưu thời điểm đồng ý
@@ -189,12 +205,14 @@ viết thành hàm thuần (nhận thời gian và kết quả tìm mặt) để
 
 ### Ca làm
 
-- **Bản demo TTTN:** một ca mặc định trong bảng `shifts` (ví dụ 07:00–17:00, nghỉ 60 phút, ân hạn 5 phút, cho vào sớm 60 phút).
-  Tính: phút đi muộn (vượt ân hạn mới tính), phút về sớm, số phút làm = min(ra, kết thúc) − max(vào, bắt đầu) − **phần giao nhau
-  với giờ nghỉ trưa** [`break_start`, `break_start` + `break_minutes`] (mặc định 11:30, 60 phút), không âm: làm cả ngày trừ đủ nghỉ trưa,
-  vào rồi ra trong buổi sáng thì không trừ.
-  Giờ vào ngoài khung [bắt đầu − 60 phút, kết thúc] → trạng thái `ngoai_ca`. Chưa có giờ ra sau giờ kết thúc ca 4 giờ → hiển thị "thiếu giờ ra".
-- **Đồ án:** nhiều ca, phân ca theo tổ đội và cá nhân, ca qua đêm, tăng ca (giữ nguyên quy tắc ở bản cũ).
+- **Bản demo TTTN:** một ca mặc định trong bảng `shifts` (ví dụ 07:00–17:00, nghỉ 60 phút, ân hạn 5 phút, cho vào sớm 60 phút,
+  chống quét trùng 10 phút). Giờ ca được **chép vào dòng công** lúc tạo dòng: sửa ca chỉ tính lại hôm nay, ngày cũ giữ nguyên.
+  - Đi muộn khi giờ vào phiên đầu > bắt đầu + ân hạn (so tới giây); số phút = làm tròn LÊN (giờ vào − bắt đầu ca).
+  - Về sớm khi phiên cuối đã đóng và giờ ra < kết thúc; số phút = làm tròn LÊN (kết thúc − giờ ra); không có ân hạn.
+  - Số phút làm = tổng trên các phiên ĐÃ ĐÓNG của phần giao với giờ ca, trừ phần giao với giờ nghỉ [`break_start`,
+    `break_start` + `break_minutes`], làm tròn xuống. Phút ra ngoài = khoảng trống giữa hai phiên trong giờ ca, không tính giờ
+    nghỉ; phần có phép công tác (tính công) cộng vào phút công tác. Công quy đổi = (phút làm + công tác) / phút chuẩn của ca.
+- **Đồ án:** nhiều ca, phân ca theo tổ đội và cá nhân, ca qua đêm, tăng ca, ngày lễ (giữ nguyên quy tắc ở bản cũ).
 
 ## 8. Kiến trúc và cấu trúc thư mục
 
@@ -462,3 +480,17 @@ mọi chức năng chạy bằng dữ liệu thật của backend; không đổi
   `GET /api/tong-quan` (biểu đồ số lượt theo giờ hôm nay: đạt / không đạt / khác).
 - Font Inter để trong bản build (`@fontsource-variable/inter`, OFL), bỏ Google Fonts. Kiểm thử giao diện bằng Playwright
   (`npm run test:ui`, chạy trên Edge có sẵn).
+
+**2026-10-30: chấm công v2 (nhánh `logic-v2`, Phần A backend)** — làm chặt quy tắc sau khi rà soát `docs/LOGIC_CHAM_CONG.md`.
+- Phiên vào-ra (`attendance_segments`) thay cho "giờ vào đầu, giờ ra cuối": vào lại không xoá giờ ra, khoảng ra ngoài giữa ca
+  bị trừ. Chỉ ghi vào trong cửa sổ vào ca (bỏ việc sinh `ngoai_ca`). Chống quét trùng hai chiều, 10 phút, sửa trên trang Cấu hình
+  ca (`shifts.phut_chong_trung`, bỏ `attendance.duplicate_minutes`). Thiếu giờ ra được lưu bằng tác vụ nền.
+- Một hàm trạng thái ngày cho mọi báo cáo (vắng, nghỉ tuần, nghỉ phép, chưa đến, ngoài thời gian làm việc); thêm
+  `workers.ngay_vao_lam`, `workers.ngay_nghi_viec`. Muộn / về sớm làm tròn lên, so tới giây.
+- Chấm tay theo phiên + bảng `nhat_ky_cham_cong` (giá trị cũ / mới); phép / giải trình (bảng `phep`); danh sách Việc cần xử lý.
+- "Lượt không đạt" ở Tổng quan = lượt màn hình đỏ (dùng chung hàm phân loại màu với màn hình cổng).
+- Chỉ so khớp khuôn mặt công nhân đã ghi nhận đồng ý. Khoá theo công nhân + `SELECT … FOR UPDATE`, thử lại khi trùng khoá.
+  Thời điểm lượt = lúc bắt đầu lượt (thay đổi duy nhất phía cổng); ảnh ghi sau khi lưu CSDL.
+- Chép giờ ca vào dòng công (một phần của quy tắc Q19) để sửa ca không đổi số liệu ngày cũ.
+- API giữ trường cũ, chỉ thêm trường mới. CSDL cũ phải `seed_demo.py --reset` (ứng dụng báo lỗi rõ nếu thiếu cột).
+- Đợt 2: báo nhầm có tác dụng (Q17), ngày lễ (Q18), sửa ca "áp dụng từ ngày mai" (Q19), Excel có màu (Q20); giao diện (Phần B).

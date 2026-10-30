@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import DANG_LAM, Attendance, AttendanceSegment, Phep, PpeCheck, Shift, Worker
 from app.services import tinh_cong as tc
-from app.services.cham_cong import (GHI_VAO, ca_mac_dinh, gio_phut, khoang_ngay, moc_ca, mui_gio, ngay_cong,
+from app.services.cham_cong import (GHI_VAO, ca_mac_dinh, gio_ca_ngay, gio_phut, khoang_ngay, mui_gio, ngay_cong,
                                     phep_cua_ngay, tinh_tu_du_lieu)
 from app.services.luot import DO, VANG, XANH, phan_loai_luot
 from app.services.phep import TEN_LOAI, mo_ta
@@ -259,7 +259,9 @@ def viec_can_xu_ly(db: Session, att_cfg: dict, now: datetime) -> list[dict]:
             continue
         if th.late_minutes > nguong and not th.muon_co_phep:
             out.append(item(a, "di_muon_khong_phep", f"Đi muộn {th.late_minutes} phút, chưa có phép", th.late_minutes))
-        if th.early_leave_minutes > nguong and not th.som_co_phep and now >= moc_ca(a.shift, a.work_date, tz)[1]:
+        nghi_viec_hom_do = a.worker.ngay_nghi_viec == a.work_date  # phien bi dong luc cho nghi viec: khong phai ve som
+        if th.early_leave_minutes > nguong and not th.som_co_phep and not nghi_viec_hom_do \
+                and now >= gio_ca_ngay(a, a.shift, a.work_date, tz).ket_thuc:
             out.append(item(a, "ve_som_khong_phep", f"Về sớm {th.early_leave_minutes} phút, chưa có phép",
                             th.early_leave_minutes))
     return sorted(out, key=lambda x: (x["ngay"], x["ma"], x["loai"]), reverse=True)

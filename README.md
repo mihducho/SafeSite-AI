@@ -88,7 +88,11 @@ Công nghệ: React 18 + Vite 6, react-router 6, react-bootstrap (Bootstrap 5), 
   $env:SAFEGATE_PASSWORD = "<ADMIN_PASSWORD trong .env>"; npm run test:ui; Remove-Item Env:SAFEGATE_PASSWORD
   ```
 - **Trước buổi demo**: `seed_demo.py --reset` (xoá sạch CSDL, ảnh lượt, ảnh mẫu mặt rồi tạo lại dữ liệu ban đầu; hỏi xác nhận)
-  và chỉnh giờ ca cho hợp giờ thi: `seed_demo.py --ca 13:00-17:00` (hoặc trang Ca làm).
+  và chỉnh giờ ca cho hợp giờ thi: `seed_demo.py --ca 13:00-17:00` (hoặc trang Ca làm). Chống quét trùng mặc định 10 phút; khi
+  demo nên đặt 1 phút ở trang Cấu hình ca (`PATCH /api/ca-lam` `phut_chong_trung`).
+- **Chấm công v2** (phiên vào-ra, phép, nhật ký, Việc cần xử lý): quy tắc trong `docs/LOGIC_CHAM_CONG.md`; thử bằng
+  `.venv\Scripts\python.exe scripts\kich_ban_cham_cong.py`. CSDL tạo từ bản trước v2 thiếu bảng / cột mới: ứng dụng báo lỗi khi
+  khởi động, chạy `seed_demo.py --reset` rồi đăng ký lại mẫu mặt.
 - Thử API ở `http://127.0.0.1:8000/docs` (đăng nhập trước). Luồng hình: `/stream/gate`. Sự kiện từng lượt: WebSocket `/ws/events`.
 - Đổi nguồn hình của cổng: `seed_demo.py --source <0 | URL điện thoại | file video> [--zone <tên vùng trong configs\gates.yaml>]`
   rồi gọi `POST /api/cong/khoi-dong-lai` (hoặc khởi động lại ứng dụng). Nhanh hơn: đặt `GATE_SOURCE=...` trong `.env`.

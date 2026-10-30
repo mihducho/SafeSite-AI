@@ -141,6 +141,13 @@ class Attendance(Base):
     phut_ra_ngoai: Mapped[int] = mapped_column(Integer, default=0)
     phut_cong_tac: Mapped[int] = mapped_column(Integer, default=0)  # ra ngoai co phep cong tac (tinh cong)
     da_xac_nhan_khong_phep: Mapped[bool] = mapped_column(Boolean, default=False)  # "Xac nhan khong phep" (Viec can xu ly)
+    # gio ca da ap dung cho ngay nay (chep luc tao dong): sua ca sau do khong lam doi so lieu ngay cu
+    ca_bat_dau: Mapped[time | None] = mapped_column(Time)
+    ca_ket_thuc: Mapped[time | None] = mapped_column(Time)
+    ca_nghi_tu: Mapped[time | None] = mapped_column(Time)
+    ca_nghi_phut: Mapped[int | None] = mapped_column(Integer)
+    ca_an_han: Mapped[int | None] = mapped_column(Integer)
+    ca_vao_som: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(20), default="binh_thuong")  # binh_thuong / cham_thu_cong (ngoai_ca: cu)
     note: Mapped[str | None] = mapped_column(Text)  # cham thu cong: ly do (lich su day du o nhat_ky_cham_cong)
     updated_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))  # lan sua tay gan nhat

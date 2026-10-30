@@ -102,6 +102,23 @@ def gio_ca(shift: Shift, ngay: date, tz: ZoneInfo) -> GioCa:
     return GioCa(start, end, *moc_nghi(shift, ngay, tz), an_han=shift.grace_minutes, vao_som=shift.early_checkin_minutes)
 
 
+def gio_ca_ngay(att: Attendance | None, shift: Shift, ngay: date, tz: ZoneInfo) -> GioCa:
+    """Gio ca cua 1 ngay: ban chep trong dong cong (luc tao dong) neu co, khong thi ca hien tai."""
+    if att is None or att.ca_bat_dau is None:
+        return gio_ca(shift, ngay, tz)
+    start = datetime.combine(ngay, att.ca_bat_dau, tzinfo=tz)
+    end = datetime.combine(ngay, att.ca_ket_thuc, tzinfo=tz)
+    nghi = datetime.combine(ngay, att.ca_nghi_tu, tzinfo=tz)
+    return GioCa(start, end, nghi, nghi + timedelta(minutes=att.ca_nghi_phut), an_han=att.ca_an_han,
+                 vao_som=att.ca_vao_som)
+
+
+def chep_gio_ca(att: Attendance, shift: Shift) -> None:
+    att.ca_bat_dau, att.ca_ket_thuc, att.ca_nghi_tu = shift.start_time, shift.end_time, shift.break_start
+    att.ca_nghi_phut, att.ca_an_han, att.ca_vao_som = shift.break_minutes, shift.grace_minutes, \
+        shift.early_checkin_minutes
+
+
 def trong_khung_vao(shift: Shift, t: datetime, ngay: date, tz: ZoneInfo) -> bool:
     """t trong [bat dau - cho vao som, ket thuc], tinh ca 2 bien, chinh xac toi giay."""
     ca = gio_ca(shift, ngay, tz)
@@ -172,7 +189,8 @@ def tinh_tu_du_lieu(worker: Worker, ngay: date, att: Attendance | None, segs: li
     tz = mui_gio(att_cfg)
     vao_lam, nghi = khoang_lam_viec(worker, tz)
     return tc.tong_hop(
-        ngay, gio_ca(shift, ngay, tz), [Phien(s.vao_at, s.ra_at, s.trang_thai, s.nguon_vao, s.nguon_ra) for s in segs],
+        ngay, gio_ca_ngay(att, shift, ngay, tz),
+        [Phien(s.vao_at, s.ra_at, s.trang_thai, s.nguon_vao, s.nguon_ra) for s in segs],
         [phep_ngay(p, tz) for p in pheps], now=now, ngay_vao_lam=vao_lam, ngay_nghi_viec=nghi,
         nghi_tuan=tc.nghi_tuan_tu_cau_hinh(att_cfg), dung_sai_phut=att_cfg["dung_sai_phep_phut"],
         nguong_phut=att_cfg["nguong_can_giai_trinh_phut"], da_xac_nhan_khong_phep=bool(att and att.da_xac_nhan_khong_phep))
@@ -200,6 +218,7 @@ def tinh_lai_ngay(db: Session, att: Attendance, att_cfg: dict, now: datetime | N
 
 def _tao_bang_cong(db: Session, worker: Worker, ngay: date, shift: Shift) -> Attendance:
     att = Attendance(worker=worker, work_date=ngay, shift=shift, status=BINH_THUONG)
+    chep_gio_ca(att, shift)
     db.add(att)
     return att
 
@@ -237,7 +256,7 @@ def cham_cong_tu_dong(db: Session, worker: Worker, ket_qua: str, t: datetime, pp
     if mo is not None:  # RA: dong phien dang mo
         mo.ra_at, mo.ra_check_id, mo.nguon_ra, mo.trang_thai = t, ppe_check.id, TU_DONG, DONG
         th = tinh_lai_ngay(db, att, att_cfg, t)
-        ca = gio_ca(shift, ngay, tz)
+        ca = gio_ca_ngay(att, shift, ngay, tz)
         dung_sai = timedelta(minutes=att_cfg["dung_sai_phep_phut"])
         ra_nghi = ca.nghi_tu - dung_sai <= t <= ca.nghi_den
         cong_tac = any(p.loai == tc.RA_NGOAI_CONG_VIEC and p.tu and p.den and p.tu - dung_sai <= t <= p.den
@@ -246,7 +265,7 @@ def cham_cong_tu_dong(db: Session, worker: Worker, ket_qua: str, t: datetime, pp
             and not ra_nghi and not cong_tac
         return KetQuaChamCong(RA, GHI_RA, att, tong_hop=th, nhac_ve_som=nhac)
 
-    ca = gio_ca(shift, ngay, tz)
+    ca = gio_ca_ngay(att, shift, ngay, tz)
     if t < ca.mo_cua_vao or t > ca.ket_thuc:
         return KetQuaChamCong(VAO, KHONG_GHI, att, ly_do=NGOAI_GIO_VAO, som_qua=t < ca.mo_cua_vao, moc=ca.mo_cua_vao)
     if ket_qua != DAT:
@@ -268,7 +287,7 @@ def danh_dau_thieu_gio_ra(db: Session, att_cfg: dict, now: datetime | None = Non
     han = timedelta(hours=att_cfg["missing_checkout_hours"])
 
     def qua_han(att: Attendance) -> bool:
-        return now > moc_ca(att.shift, att.work_date, tz)[1] + han
+        return now > gio_ca_ngay(att, att.shift, att.work_date, tz).ket_thuc + han
 
     rows = db.execute(select(AttendanceSegment.worker_id, Attendance)
                       .join(Attendance, AttendanceSegment.attendance_id == Attendance.id)
@@ -499,8 +518,8 @@ SHIFT_FIELDS = ("name", "start_time", "end_time", "break_start", "break_minutes"
 
 
 def sua_ca(db: Session, shift: Shift, data: dict, att_cfg: dict, now: datetime | None = None) -> int:
-    """Sua ca (ban demo: 1 ca, khong qua dem). Kiem tra hop le roi tinh lai bang cong HOM NAY theo ca moi
-    (ngay cu giu nguyen nhu da ghi). Tra ve so dong bang cong da tinh lai."""
+    """Sua ca (ban demo: 1 ca, khong qua dem). Kiem tra hop le roi tinh lai bang cong HOM NAY theo ca moi (chep lai
+    gio ca vao cac dong hom nay); ngay cu giu gio ca da chep nen so lieu khong doi. Tra ve so dong da tinh lai."""
     values = {k: data[k] for k in SHIFT_FIELDS if k in data and data[k] is not None}
     new = {k: values.get(k, getattr(shift, k)) for k in SHIFT_FIELDS}
     if not str(new["name"]).strip():
@@ -524,6 +543,7 @@ def sua_ca(db: Session, shift: Shift, data: dict, att_cfg: dict, now: datetime |
     today = ngay_cong(now, tz)
     rows = db.scalars(select(Attendance).where(Attendance.shift_id == shift.id, Attendance.work_date == today)).all()
     for a in rows:
+        chep_gio_ca(a, shift)
         tinh_lai_ngay(db, a, att_cfg, now)
     db.commit()
     return len(rows)
