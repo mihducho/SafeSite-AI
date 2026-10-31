@@ -7,6 +7,8 @@ thoi diem hien tai. Dau ra: TongHopNgay. Moi thoi diem co mui gio; so sanh chinh
   - Phut lam: tong phan giao cua cac phien DA DONG voi gio ca, tru phan giao voi gio nghi, lam tron XUONG.
   - Ra ngoai: khoang trong giua 2 phien lien tiep, trong gio ca, khong tinh gio nghi. Phan nam trong phep
     ra_ngoai_cong_viec khong tinh ra ngoai; phep co tinh_cong thi cong phan do vao phut cong tac.
+  - Phep di muon / ve som CO tinh_cong: phan vang dau ca (truoc gio duoc phep den) / cuoi ca (tu gio duoc phep ve)
+    cong vao phut phep tinh cong. Cong quy doi = (phut lam + cong tac + phep tinh cong) / phut chuan.
   - Trang thai ngay (1 ham duy nhat cho bang cong ngay, thang, Excel, API): xem trang_thai_ngay().
 """
 import math
@@ -97,6 +99,7 @@ class TongHopNgay:
     so_lan_ra_ngoai: int = 0
     phut_ra_ngoai: int = 0
     phut_cong_tac: int = 0
+    phut_phep_tinh_cong: int = 0  # phep di muon / ve som co tinh cong: phut vang mat nam trong phep
     cong_quy_doi: float = 0.0
     trang_thai_ngay: str = TT_CHUA_VAO
     ngay_cong: int = 0
@@ -166,8 +169,8 @@ def tong_hop(ngay: date, ca: GioCa, phien: list[Phien], phep: list[PhepNgay] = (
             r.late_minutes = phut_len(first.vao - ca.bat_dau)
         if r.check_out is not None and r.check_out < ca.ket_thuc:
             r.early_leave_minutes = phut_len(ca.ket_thuc - r.check_out)
-        r.worked_minutes = phut_xuong(sum((thoi_gian_lam(p.vao, p.ra, ca) for p in ps if p.trang_thai == DONG and p.ra),
-                                          timedelta(0)))
+        lam = sum((thoi_gian_lam(p.vao, p.ra, ca) for p in ps if p.trang_thai == DONG and p.ra), timedelta(0))
+        r.worked_minutes = phut_xuong(lam)
         # ra ngoai / cong tac: khoang trong giua 2 phien lien tiep (phien truoc phai co gio ra)
         cong_tac = [(p.tu, p.den) for p in phep if p.loai == RA_NGOAI_CONG_VIEC and p.tinh_cong and p.tu and p.den]
         co_phep = [(p.tu, p.den) for p in phep if p.loai == RA_NGOAI_CONG_VIEC and p.tu and p.den]
@@ -188,10 +191,21 @@ def tong_hop(ngay: date, ca: GioCa, phien: list[Phien], phep: list[PhepNgay] = (
             p.loai == DI_MUON and p.den and r.check_in <= p.den + dung_sai for p in phep)
         r.som_co_phep = r.early_leave_minutes > 0 and any(
             p.loai == VE_SOM and p.tu and r.check_out >= p.tu - dung_sai for p in phep)
+        # phep di muon / ve som CO tinh cong: chi phan vang nam trong phep (dau ca -> gio duoc phep den, gio duoc phep
+        # ve -> het ca), tru gio nghi; chi tinh khi phien lien ke da dong (nhu phut lam). Lam tron chung voi phut lam
+        # de vao 08:50:30 + phep den 09:00 van du 540.
+        den_phep = max((p.den for p in phep if p.loai == DI_MUON and p.tinh_cong and p.den), default=None)
+        tu_phep = min((p.tu for p in phep if p.loai == VE_SOM and p.tinh_cong and p.tu), default=None)
+        vang = timedelta(0)
+        if den_phep is not None and first.trang_thai == DONG:
+            vang += thoi_gian_lam(ca.bat_dau, min(first.vao, den_phep), ca)
+        if tu_phep is not None and r.check_out is not None:
+            vang += thoi_gian_lam(max(r.check_out, tu_phep), ca.ket_thuc, ca)
+        r.phut_phep_tinh_cong = phut_xuong(lam + vang) - r.worked_minutes
         r.thieu_gio_ra = any(p.trang_thai == THIEU_GIO_RA for p in ps)
         r.lam_ngay_nghi = ngay.weekday() in nghi_tuan
     if ca.phut_chuan > 0:
-        r.cong_quy_doi = round((r.worked_minutes + r.phut_cong_tac) / ca.phut_chuan, 2)
+        r.cong_quy_doi = round((r.worked_minutes + r.phut_cong_tac + r.phut_phep_tinh_cong) / ca.phut_chuan, 2)
     r.trang_thai_ngay = trang_thai_ngay(ngay, r, phep, now=now, ca=ca, ngay_vao_lam=ngay_vao_lam,
                                         ngay_nghi_viec=ngay_nghi_viec, nghi_tuan=nghi_tuan)
     r.ngay_cong = 1 if r.trang_thai_ngay in CO_CONG else 0

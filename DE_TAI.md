@@ -501,3 +501,9 @@ cho dễ đọc khi chiếu máy chiếu; không đổi module gọi API, hook l
 - Chép giờ ca vào dòng công (một phần của quy tắc Q19) để sửa ca không đổi số liệu ngày cũ.
 - API giữ trường cũ, chỉ thêm trường mới. CSDL cũ phải `seed_demo.py --reset` (ứng dụng báo lỗi rõ nếu thiếu cột).
 - Đợt 2: báo nhầm có tác dụng (Q17), ngày lễ (Q18), sửa ca "áp dụng từ ngày mai" (Q19), Excel có màu (Q20); giao diện (Phần B).
+
+**2026-10-31: phép đi muộn / về sớm có thể tính công** (tôi chọn, lựa chọn C14 trong `docs/LOGIC_CHAM_CONG.md`).
+- Có phép thì không tính vi phạm; ngày công vẫn là 1 như ngày không phép. Ô "Có tính công" của phép đi muộn / về sớm mặc định
+  **không** tích: công quy đổi theo giờ làm thực tế. Có tích: phần vắng nằm trong phép (đầu ca → giờ được phép đến, giờ được
+  phép về → hết ca, trừ giờ nghỉ) được cộng vào công quy đổi, như phép ra ngoài công việc.
+- Thêm trường `phut_phep_tinh_cong` (bảng công ngày / tháng) và cột "Giờ phép tính công" trong Excel. Không thêm cột CSDL.

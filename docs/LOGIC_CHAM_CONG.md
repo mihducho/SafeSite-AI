@@ -1,20 +1,20 @@
 # Logic chấm công của SafeGate — v2 (theo code đang chạy)
 
-Tài liệu này mô tả **đúng những gì code làm** trên nhánh `logic-v2` (30/10/2026), sau khi cài bộ quy tắc mới:
+Tài liệu này mô tả **đúng những gì code làm** trên nhánh `main` (31/10/2026, sau khi gộp `logic-v2`), sau khi cài bộ quy tắc mới:
 - **Đã cài** (Phần A backend): Q1–Q16 và Q21 (phép / giải trình).
 - **Cài trước một phần Q19**: chép giờ ca vào dòng công, để sửa ca không làm đổi số liệu ngày cũ (xem mục 5).
 - **Đợt 2, chưa làm**: Q17 (báo nhầm có tác dụng), Q18 (ngày lễ), phần "chỉ áp dụng từ ngày mai" của Q19, Q20 (Excel có màu, ô vắng).
 - Bản mô tả logic cũ (trước v2): xem lịch sử git của file này (commit `4f4697f`).
 
 Mọi ví dụ đều đã chạy thật bằng [scripts/kich_ban_cham_cong.py](../scripts/kich_ban_cham_cong.py):
-- 34 kịch bản, gọi đúng các hàm nghiệp vụ, chạy trên SQLite trong bộ nhớ, với thời điểm giả lập.
-- Kết quả đầy đủ ở **Phụ lục**. Ký hiệu **[KB n]** là kịch bản số n. **T1–T25, P1–P7** là các test nghiệm thu trong [tests/test_cham_cong_v2.py](../tests/test_cham_cong_v2.py).
+- 35 kịch bản, gọi đúng các hàm nghiệp vụ, chạy trên SQLite trong bộ nhớ, với thời điểm giả lập.
+- Kết quả đầy đủ ở **Phụ lục**. Ký hiệu **[KB n]** là kịch bản số n. **T1–T25, P1–P9** là các test nghiệm thu trong [tests/test_cham_cong_v2.py](../tests/test_cham_cong_v2.py).
 
 Mỗi quy tắc ghi theo thứ tự: **Lời** · **Điều kiện / công thức** · **Code** · **Tham số** · **Test** · **Ví dụ**.
 
 **Làm tròn** (mọi phép so sánh đều chính xác tới giây):
 - Phút muộn, phút về sớm: làm tròn **lên** (`phut_len`; ví dụ 5 phút 59 giây tính là 6 phút).
-- Phút làm, phút ra ngoài, phút công tác: làm tròn **xuống** (`phut_xuong`, tính trên tổng thời gian).
+- Phút làm, phút ra ngoài, phút công tác, phút phép tính công: làm tròn **xuống** (`phut_xuong`, tính trên tổng thời gian).
 - Không số nào âm.
 - Code: [tinh_cong.py](../app/services/tinh_cong.py).
 
@@ -29,7 +29,7 @@ Mỗi quy tắc ghi theo thứ tự: **Lời** · **Điều kiện / công thứ
 - **Thiếu giờ ra được lưu.** Tác vụ nền đánh dấu phiên mở quá hạn. Ngày có phiên thiếu giờ ra **không được tính ngày công** cho tới khi cán bộ xử lý.
 - **Trạng thái ngày.** Một hàm backend duy nhất cho bảng công ngày, tháng, Excel và API. Vắng, nghỉ tuần, chưa đến, ngoài thời gian làm việc đều do backend tính.
 - **Chấm tay theo phiên.** Thêm, sửa, huỷ phiên; bắt buộc lý do; mỗi thao tác một dòng **nhật ký có giá trị cũ / mới**.
-- **Phép / giải trình.** Về sớm, đi muộn, ra ngoài công việc (có thể tính công), nghỉ cả ngày.
+- **Phép / giải trình.** Về sớm, đi muộn, ra ngoài công việc, nghỉ cả ngày. Có phép thì **không tính vi phạm**; ngày công vẫn là 1 như ngày không phép. Công quy đổi tính theo giờ làm thực tế, trừ khi phép có tích **"tính công"** (mục 8).
 - **Việc cần xử lý.** Ngày thiếu giờ ra; ngày đi muộn / về sớm không phép quá 15 phút.
 - **Ghi đồng thời.** Khoá theo công nhân (trong tiến trình và `SELECT … FOR UPDATE`), thử lại một lần khi lỗi. Thời điểm lượt là **lúc bắt đầu lượt**. Ảnh chỉ ghi ra đĩa **sau khi commit**.
 
@@ -50,6 +50,7 @@ Mỗi quy tắc ghi theo thứ tự: **Lời** · **Điều kiện / công thứ
 | C11 | CSDL cũ thiếu cột mới | Ứng dụng **không khởi động**, báo rõ cần chạy `seed_demo.py --reset` | `create_all` không thêm cột; tránh lỗi SQL khó hiểu |
 | C12 | Sửa ca làm đổi số liệu ngày cũ | **Cài trước phần chép giờ ca của Q19**: dòng công giữ giờ ca lúc tạo | Bản v2 tính lại khi đọc; không chép thì ngày cũ đổi theo ca mới (hồi quy so với bản cũ) |
 | C13 | P1 không nói giờ vào | Test dùng 07:02 (làm 420 khớp đề) | 07:00 sẽ cho 422 phút |
+| C14 | Phép đi muộn / về sớm có trả công cho giờ vắng không (chọn ngày 31/10) | Tuỳ từng phép: ô **"Có tính công"** (mặc định **không**). Có tích thì phần vắng nằm trong phép được cộng vào công quy đổi | Trả lương giờ vắng là chính sách của công ty; ghi rõ từng phép để kế toán thấy |
 
 ---
 
@@ -218,13 +219,20 @@ khoảng trống = [giờ ra phiên i, giờ vào phiên i+1] ∩ giờ ca − g
 phút ra ngoài = ⌊ Σ (khoảng trống − phần nằm trong phép ra_ngoai_cong_viec) ⌋
 phút công tác = ⌊ Σ (khoảng trống ∩ phép ra_ngoai_cong_viec có tinh_cong) ⌋
 số lần ra ngoài = số khoảng trống có phút ra ngoài > 0         (lựa chọn C2)
-công quy đổi = làm tròn 2 chữ số của (phút làm + phút công tác) / phút chuẩn,   phút chuẩn = giờ ca − giờ nghỉ (540)
+phần vắng trong phép = [bắt đầu ca, min(giờ vào đầu, giờ được phép đến)]   (phép di_muon có tinh_cong)
+                     + [max(giờ ra cuối, giờ được phép về), kết thúc ca]   (phép ve_som có tinh_cong)
+                     − giờ nghỉ
+phút phép tính công = ⌊ phần làm + phần vắng trong phép ⌋ − phút làm      (làm tròn chung, lựa chọn C14)
+công quy đổi = làm tròn 2 chữ số của (phút làm + phút công tác + phút phép tính công) / phút chuẩn,
+               phút chuẩn = giờ ca − giờ nghỉ (540)
 ```
 
-- Phiên đang mở hoặc thiếu giờ ra **không cộng** vào phút làm.
+- Phiên đang mở hoặc thiếu giờ ra **không cộng** vào phút làm. Phép tính công cũng chỉ cộng khi phiên liền kề đã đóng (phiên đầu cho phép đi muộn, phiên cuối cho phép về sớm).
+- Phép **không** tích "tính công" (mặc định cho đi muộn / về sớm): chỉ đổi trạng thái thành "có phép", công quy đổi theo giờ làm thực tế.
+- Chỉ phần **nằm trong phép** được cộng. Ví dụ phép về sớm từ 15:00, ra 14:50 (vẫn trong dung sai nên là có phép): 14:50–15:00 không được cộng.
 - Ngoài giờ ca (đến sớm, ở lại muộn) không tính. Chưa có tăng ca.
-- **Test:** T1 (540), T2 (536), T8 (19:30 → 540), T9 (540, ra ngoài 0), T10 (450, ra ngoài 90, 1 lần), T11 (510, ra ngoài 30), P5 (420 + công tác 120, ra ngoài 0, công quy đổi 1,00), `GioNghiTest`.
-- **Ví dụ:** [KB 9], [KB 10] (vào lại 12:35 → làm 535, ra ngoài 5), [KB 14], [KB 29], [KB 34].
+- **Test:** T1 (540), T2 (536), T8 (19:30 → 540), T9 (540, ra ngoài 0), T10 (450, ra ngoài 90, 1 lần), T11 (510, ra ngoài 30), P5 (420 + công tác 120, ra ngoài 0, công quy đổi 1,00), P1 (phép về sớm không tính công: 420, 0,78), P8 (phép về sớm 15:00 có tính công: ra 15:00 → 420 + 120 = 1,00; ra 14:50 → 410 + 120 = 0,98), P9 (phép đi muộn 09:00 có tính công: vào 08:50:30 → 429 + 111 = 1,00; phiên còn mở → 0; vào 09:10 → 410 + 120 = 0,98), `GioNghiTest`.
+- **Ví dụ:** [KB 9], [KB 10] (vào lại 12:35 → làm 535, ra ngoài 5), [KB 14], [KB 29], [KB 34], [KB 35].
 
 ---
 
@@ -325,7 +333,8 @@ công quy đổi = làm tròn 2 chữ số của (phút làm + phút công tác)
 
 ### 12.2. Phép / giải trình (Q21)
 
-- **Bảng `phep`:** loại `ve_som` (cần `tu_gio`), `di_muon` (cần `den_gio`), `ra_ngoai_cong_viec` (cần `tu_gio < den_gio`, mặc định **tính công**), `nghi_ca_ngay`.
+- **Bảng `phep`:** loại `ve_som` (cần `tu_gio`), `di_muon` (cần `den_gio`), `ra_ngoai_cong_viec` (cần `tu_gio < den_gio`), `nghi_ca_ngay`.
+- **`tinh_cong`:** mặc định **có** cho `ra_ngoai_cong_viec`, **không** cho `ve_som` / `di_muon`; trên giao diện là ô "Có tính công". Cách cộng: mục 8. Mô tả phép có thêm "(tính công)", ví dụ "Về sớm từ 15:00 (tính công)".
 - **Ràng buộc:**
   - lý do bắt buộc;
   - ngày ≤ hôm nay + `phep_toi_da_truoc_ngay` (30); không giới hạn quá khứ;
@@ -334,7 +343,7 @@ công quy đổi = làm tròn 2 chữ số của (phút làm + phút công tác)
 - **Thêm hoặc huỷ phép:** một dòng nhật ký (`them_phep` / `huy_phep`) và tính lại ngày đó.
 - **API:** `POST /api/phep`, `POST /api/phep/{id}/huy`, `GET /api/phep?worker_id=&ngay=&tu=&den=`.
 - **Ảnh hưởng:** mục 6, 7, 8, 10.
-- **Test:** P1–P7, `test_huy_phep_va_kiem_tra`, `test_bao_cao_thang_tach_co_phep_khong_phep`. **Ví dụ:** [KB 33], [KB 34].
+- **Test:** P1–P9, `test_huy_phep_va_kiem_tra`, `test_bao_cao_thang_tach_co_phep_khong_phep`. **Ví dụ:** [KB 33], [KB 34], [KB 35].
 
 ### 12.3. Xác nhận không phép
 `POST /api/viec-can-xu-ly/xac-nhan-khong-phep` {attendance_id, ly_do?}:
@@ -389,15 +398,15 @@ Mỗi mục gồm: loại, công nhân, ngày, mô tả, `attendance_id`.
 
 - **Bảng công ngày** (`GET /api/bang-cong`):
   - giữ đủ các trường cũ (`gio_vao`, `gio_ra`, `di_muon_phut`, `ve_som_phut`, `so_phut_lam`, `trang_thai` cũ, `thieu_gio_ra`, `ghi_chu`);
-  - thêm `attendance_id`, `trang_thai_ngay`, `ten_trang_thai`, `ngay_cong`, `cong_quy_doi`, `so_lan_ra_ngoai`, `phut_ra_ngoai`, `phut_cong_tac`, các cờ, `phien` (danh sách phiên), `phep`.
+  - thêm `attendance_id`, `trang_thai_ngay`, `ten_trang_thai`, `ngay_cong`, `cong_quy_doi`, `so_lan_ra_ngoai`, `phut_ra_ngoai`, `phut_cong_tac`, `phut_phep_tinh_cong`, các cờ, `phien` (danh sách phiên), `phep`.
   - Danh sách công nhân: đang làm, cộng thêm người có công trong ngày, cộng thêm người nghỉ việc từ ngày đó trở đi.
 - **Bảng công tháng** (`GET /api/bang-cong/thang`):
   - `ngay` giữ như cũ (chỉ các ngày có dòng công);
   - **mới** `trang_thai_ngay` {ngày: mã} cho **mọi ngày** trong tháng;
-  - cột tổng: `so_ngay_cong` (theo quy tắc mục 10), `tong_phut`, `so_lan_muon`, và các cột mới `so_lan_muon_khong_phep`, `so_lan_muon_co_phep`, `so_lan_ve_som_khong_phep`, `so_lan_ve_som_co_phep`, `so_ngay_nghi_phep`, `so_ngay_vang`, `so_ngay_thieu_gio_ra`, `tong_phut_ra_ngoai`, `tong_phut_cong_tac`, `tong_cong_quy_doi`.
+  - cột tổng: `so_ngay_cong` (theo quy tắc mục 10), `tong_phut`, `so_lan_muon`, và các cột mới `so_lan_muon_khong_phep`, `so_lan_muon_co_phep`, `so_lan_ve_som_khong_phep`, `so_lan_ve_som_co_phep`, `so_ngay_nghi_phep`, `so_ngay_vang`, `so_ngay_thieu_gio_ra`, `tong_phut_ra_ngoai`, `tong_phut_cong_tac`, `tong_phut_phep_tinh_cong`, `tong_cong_quy_doi`.
 - **Excel:**
-  - sheet "Bang cong": giữ vị trí các cột ngày, thêm 13 cột tổng (từ "Số ngày công" tới "Công quy đổi");
-  - sheet "Chi tiet": trạng thái **bằng chữ tiếng Việt**, thêm Số phiên, Ra ngoài, Công tác, Công quy đổi;
+  - sheet "Bang cong": giữ vị trí các cột ngày, thêm 14 cột tổng (từ "Số ngày công" tới "Công quy đổi", có "Giờ phép tính công");
+  - sheet "Chi tiet": trạng thái **bằng chữ tiếng Việt**, thêm Số phiên, Ra ngoài, Công tác, Phép tính công, Công quy đổi;
   - tô màu ô và ô vắng (Q20) chưa làm.
 - **Test:** T25, P6, `test_bao_cao_thang_tach_co_phep_khong_phep`, `test_bang_cong_thang_va_excel`. **Ví dụ:** [KB 28].
 
@@ -451,7 +460,7 @@ Mỗi mục gồm: loại, công nhân, ngày, mô tả, `attendance_id`.
 
 ## 17. Độ phủ test
 
-Tổng cộng **321 test** (318 chạy, 3 bỏ qua như trước), đạt trên **SQLite** và **MariaDB** (`test_safegate`).
+Tổng cộng **324 test**, đạt trên **SQLite** và **MariaDB** (`test_safegate`).
 
 | Nhóm | Test |
 |---|---|
@@ -462,7 +471,7 @@ Tổng cộng **321 test** (318 chạy, 3 bỏ qua như trước), đạt trên 
 | Ghi đồng thời (SQLite + MariaDB) | T22, T22b |
 | Thời điểm lượt | T23 (worker + GateService) |
 | Tổng quan, tháng, Excel | T24, T25, `BaoCaoTest`, `test_bang_cong_thang_va_excel` |
-| Phép | P1–P7, huỷ phép, xác nhận không phép, tách có / không phép trong báo cáo tháng |
+| Phép | P1–P9, huỷ phép, xác nhận không phép, tách có / không phép trong báo cáo tháng |
 | Ca: chép giờ ca, sửa ca | `test_sua_ca_khong_doi_so_lieu_ngay_cu`, `test_sua_ca_lam_kiem_tra_va_tinh_lai_hom_nay` |
 | API mới, CSDL cũ thiếu cột | `ApiV2Test` |
 | Giao diện hiện tại (Playwright, bản build giao diện v2) | đạt trên máy chủ thử của nhánh này |
@@ -535,7 +544,7 @@ Tổng cộng **321 test** (318 chạy, 3 bỏ qua như trước), đạt trên 
 
 ---
 
-## Phụ lục: kết quả chạy `scripts/kich_ban_cham_cong.py` (nhánh `logic-v2`, 30/10/2026)
+## Phụ lục: kết quả chạy `scripts/kich_ban_cham_cong.py` (nhánh `main`, 31/10/2026)
 
 - Chạy bằng `.venv\Scripts\python.exe scripts\kich_ban_cham_cong.py`.
 - Ngày chính là Thứ Hai 02/11/2026. Mỗi kịch bản dùng một CSDL SQLite mới trong bộ nhớ; [KB 23] dùng tệp SQLite tạm.
@@ -552,7 +561,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [06:55–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 06:55 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 06:55 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 06:55–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -566,10 +575,10 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:30]          CN002 | bảo hộ DAT                        | mặt → CN002          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Trần Thị Bình. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN002 02/11: phiên [07:05–17:00 dong] · muộn 6 · về sớm 0 · làm 534 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 0.99
-      vào 07:04 | ra 17:00 | muộn 0 | về sớm 0 | làm 536 phút (8:56) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:04 | ra 17:00 | muộn 0 | về sớm 0 | làm 536 phút (8:56) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:04–17:00 (dong, vào tu_dong, ra tu_dong)
   → BẢNG CÔNG CN002 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐI MUỘN (di_muon), ngày công 1, công quy đổi 0.99
-      vào 07:05 | ra 17:00 | muộn 6 | về sớm 0 | làm 534 phút (8:54) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:05 | ra 17:00 | muộn 6 | về sớm 0 | làm 534 phút (8:54) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:05–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -579,7 +588,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:06–17:00 dong] · muộn 6 · về sớm 0 · làm 534 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐI MUỘN (di_muon), ngày công 1, công quy đổi 0.99
-      vào 07:06 | ra 17:00 | muộn 6 | về sớm 0 | làm 534 phút (8:54) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:06 | ra 17:00 | muộn 6 | về sớm 0 | làm 534 phút (8:54) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:06–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -591,7 +600,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:10–17:00 dong] · muộn 10 · về sớm 0 · làm 530 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐI MUỘN (di_muon), ngày công 1, công quy đổi 0.98
-      vào 07:10 | ra 17:00 | muộn 10 | về sớm 0 | làm 530 phút (8:50) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:10 | ra 17:00 | muộn 10 | về sớm 0 | làm 530 phút (8:50) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:10–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -602,7 +611,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
                 ↳ bảng công CN001 02/11: phiên [17:00–– mo] · muộn 600 · về sớm 0 · làm 0 · ra ngoài 0
   [02/11 21:00:01] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 1 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: THIẾU GIỜ RA (thieu_gio_ra), ngày công 0, công quy đổi 0.0
-      vào 17:00 | ra – | muộn 600 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: CÓ
+      vào 17:00 | ra – | muộn 600 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: CÓ
       phiên: 17:00–? (thieu_gio_ra, vào tu_dong)
   ! GHI CHÚ: 05:30 bị từ chối (chưa đến giờ vào) là đúng, nhưng lượt lúc 17:00 (người đó ra về) lại được ghi là VÀO (17:00 vẫn trong cửa sổ vào) → phiên mới không bao giờ đóng → 'Thiếu giờ ra', ngày công 0, phải chờ cán bộ xử lý.
 
@@ -612,7 +621,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [06:10–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 06:10 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 06:10 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 06:10–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -622,7 +631,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 16:30:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 16:30" + "Về sớm chưa có phép, vui lòng báo tổ trưởng"
                 ↳ bảng công CN001 02/11: phiên [07:00–16:30 dong] · muộn 0 · về sớm 30 · làm 510 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: VỀ SỚM (ve_som), ngày công 1, công quy đổi 0.94
-      vào 07:00 | ra 16:30 | muộn 0 | về sớm 30 | làm 510 phút (8:30) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 16:30 | muộn 0 | về sớm 30 | làm 510 phút (8:30) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–16:30 (dong, vào tu_dong, ra tu_dong)
   → VIỆC CẦN XỬ LÝ (lúc 02/11 17:30): CN001 2026-11-02 Về sớm 30 phút, chưa có phép
   (không có gì bất thường)
@@ -633,7 +642,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 19:30:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 19:30"
                 ↳ bảng công CN001 02/11: phiên [07:00–19:30 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 19:30 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 19:30 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–19:30 (dong, vào tu_dong, ra tu_dong)
   ! GHI CHÚ: 2 giờ 30 phút ở lại sau 17:00 vẫn không được ghi nhận ở đâu (chưa có tăng ca); chỉ còn giờ ra 19:30.
 
@@ -647,7 +656,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:00–11:30 dong, 12:30–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–11:30 (dong, vào tu_dong, ra tu_dong); 12:30–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -663,7 +672,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:00–11:30 dong, 12:35–17:00 dong] · muộn 0 · về sớm 0 · làm 535 · ra ngoài 5
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 0.99
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 535 phút (8:55) | ra ngoài 5 phút (1 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 535 phút (8:55) | ra ngoài 5 phút (1 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–11:30 (dong, vào tu_dong, ra tu_dong); 12:35–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -675,7 +684,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 07:04:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | bo_qua_trung | XANH: "Nguyễn Văn An: đã ghi giờ vào 07:00, không ghi lặp"
                 ↳ bảng công CN001 02/11: phiên [07:00–– mo] · muộn 0 · về sớm 0 · làm 0 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 09:00: ĐANG LÀM (dang_lam), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–? (mo, vào tu_dong)
   (không có gì bất thường)
 
@@ -684,23 +693,23 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
                 ↳ bảng công CN001 02/11: phiên [07:00–– mo] · muộn 0 · về sớm 0 · làm 0 · ra ngoài 0
   [02/11 20:00:00] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 0 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 20:00: ĐANG LÀM (dang_lam), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–? (mo, vào tu_dong)
   [02/11 21:00:00] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 0 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 21:00: ĐANG LÀM (dang_lam), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–? (mo, vào tu_dong)
   [02/11 21:00:01] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 1 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 21:00: THIẾU GIỜ RA (thieu_gio_ra), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: CÓ
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: CÓ
       phiên: 07:00–? (thieu_gio_ra, vào tu_dong)
   [02/11 21:30:00] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 0 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 21:30: THIẾU GIỜ RA (thieu_gio_ra), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: CÓ
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: CÓ
       phiên: 07:00–? (thieu_gio_ra, vào tu_dong)
   [03/11 06:00:00] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 0 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 03/11 06:00: THIẾU GIỜ RA (thieu_gio_ra), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: CÓ
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: CÓ
       phiên: 07:00–? (thieu_gio_ra, vào tu_dong)
   (sáng hôm sau)
   [03/11 07:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng vao | ghi_vao      | XANH: "Xin chào Nguyễn Văn An. Đã ghi giờ vào 07:00"
@@ -708,7 +717,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [03/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 03/11: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 03/11 (Thứ Ba), xem lúc 03/11 18:00: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–17:00 (dong, vào tu_dong, ra tu_dong)
   → BẢNG CÔNG THÁNG 11: số ngày công 1 | ngày thiếu giờ ra 1 | tổng phút 540
   → VIỆC CẦN XỬ LÝ (lúc 03/11 18:00): CN001 2026-11-02 Phiên vào 07:00 chưa có giờ ra
@@ -732,7 +741,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:00–07:30 dong, 08:00–17:00 dong] · muộn 0 · về sớm 0 · làm 510 · ra ngoài 30
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 0.94
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 510 phút (8:30) | ra ngoài 30 phút (1 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 510 phút (8:30) | ra ngoài 30 phút (1 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–07:30 (dong, vào tu_dong, ra tu_dong); 08:00–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -755,7 +764,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:01:00]          CN001 | bảo hộ KHONG_XAC_DINH             | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:01"
                 ↳ bảng công CN001 02/11: phiên [07:02–17:01 dong] · muộn 0 · về sớm 0 · làm 538 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:02 | ra 17:01 | muộn 0 | về sớm 0 | làm 538 phút (8:58) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:02 | ra 17:01 | muộn 0 | về sớm 0 | làm 538 phút (8:58) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:02–17:01 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -765,7 +774,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ KHONG_CO_NGUOI             | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -775,7 +784,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không | sửa tay
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không | sửa tay
       phiên: 07:00–17:00 (dong, vào thu_cong, ra tu_dong)
   → attendance: ppe_check_id=None, updated_by=1, updated_at=08:00
   → NHẬT KÝ: 02/11 08:00 them_phien: – → 07:00:00–(trống) | lý do "Camera cổng hỏng buổi sáng, tổ trưởng xác nhận" | người sửa 1
@@ -789,7 +798,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 09:05] CHẤM TAY CN001 ngày 02/11: giờ vào (giữ), giờ ra 06:40:00, lý do "Thử nhập giờ ra trước giờ vào" → TỪ CHỐI: Giờ ra phải sau giờ vào
   [02/11 09:10] CHẤM TAY CN001 ngày 02/11: giờ vào (giữ), giờ ra 06:50:00, lý do "Thử nhập giờ ra bằng giờ vào" → TỪ CHỐI: Giờ ra phải sau giờ vào
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 09:15: ĐANG LÀM (dang_lam), ngày công 0, công quy đổi 0.0
-      vào 06:50 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không | sửa tay
+      vào 06:50 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không | sửa tay
       phiên: 06:50–? (mo, vào thu_cong)
   → NHẬT KÝ: 02/11 09:00 sua_vao: 07:00:00 → 06:50:00 | lý do "Đến từ 06:50, camera nhận chậm" | người sửa 1
   (không có gì bất thường)
@@ -801,7 +810,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
                 ↳ bảng công CN001 02/11: phiên [07:00–10:00 dong] · muộn 0 · về sớm 420 · làm 180 · ra ngoài 0
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → KHONG_NHAN_RA  | hướng –   | khong_ghi    | VÀNG: "Chưa nhận diện được, mời nhìn thẳng camera"
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: VỀ SỚM (ve_som), ngày công 1, công quy đổi 0.33
-      vào 07:00 | ra 10:00 | muộn 0 | về sớm 420 | làm 180 phút (3:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không | sửa tay
+      vào 07:00 | ra 10:00 | muộn 0 | về sớm 420 | làm 180 phút (3:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không | sửa tay
       phiên: 07:00–10:00 (dong, vào tu_dong, ra thu_cong)
   → BẢNG CÔNG CN001 ngày 03/11 (Thứ Ba), xem lúc 03/11 23:59: không có dòng nào (không hiện trong bảng công ngày)
   → NHẬT KÝ: 02/11 10:00 dong_khi_nghi_viec: (trống) → 10:00:00 | lý do "Cho nghỉ việc" | người sửa 1
@@ -815,7 +824,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [01/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 01/11: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 01/11 (Chủ nhật), xem lúc 01/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không | làm ngày nghỉ
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không | làm ngày nghỉ
       phiên: 07:00–17:00 (dong, vào tu_dong, ra tu_dong)
   (02/09/2026 là Thứ Tư)
   [02/09 07:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng vao | ghi_vao      | XANH: "Xin chào Nguyễn Văn An. Đã ghi giờ vào 07:00"
@@ -823,7 +832,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/09 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/09: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/09 (Thứ Tư), xem lúc 02/09 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–17:00 (dong, vào tu_dong, ra tu_dong)
   ! GHI CHÚ: 02/09 (Quốc khánh) vẫn tính như ngày thường: chưa có bảng ngày lễ (Q18, đợt 2). Chủ nhật có cờ 'làm ngày nghỉ'.
 
@@ -837,8 +846,8 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
 
 === #23. Hai lượt của cùng một người cách nhau 0,5 giây, gọi song song từ 2 thread (T22) ===
   Chạy 10 lần (mỗi lần CSDL mới), 2 thread bắt đầu cùng lúc (Barrier), mỗi thread 1 session riêng:
-     6 lần: A → bo_qua_trung, B → ghi_vao | 1 dòng attendance, 1 phiên, 2 lượt
-     4 lần: A → ghi_vao, B → bo_qua_trung | 1 dòng attendance, 1 phiên, 2 lượt
+     8 lần: A → ghi_vao, B → bo_qua_trung | 1 dòng attendance, 1 phiên, 2 lượt
+     2 lần: A → bo_qua_trung, B → ghi_vao | 1 dòng attendance, 1 phiên, 2 lượt
   (Mọi lượt chạy dưới khoá theo công nhân + SELECT ... FOR UPDATE; test T22 chạy cả trên MariaDB.)
 
 === #24. Chấm tay giờ ra 17:00 lúc 09:00 cùng ngày (T18) ===
@@ -846,7 +855,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
                 ↳ bảng công CN001 02/11: phiên [07:00–– mo] · muộn 0 · về sớm 0 · làm 0 · ra ngoài 0
   [02/11 09:00] CHẤM TAY CN001 ngày 02/11: giờ vào (giữ), giờ ra 17:00:00, lý do "Nhập trước giờ ra cho cả tổ" → TỪ CHỐI: Không chấm công cho thời điểm chưa tới (17:00 02/11/2026)
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 09:01: ĐANG LÀM (dang_lam), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–? (mo, vào tu_dong)
   (không có gì bất thường)
 
@@ -861,7 +870,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
                 ↳ bảng công CN001 02/11: phiên [07:00–16:30 dong, 16:40–– mo] · muộn 0 · về sớm 0 · làm 510 · ra ngoài 10
   [02/11 21:01:00] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 1 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: THIẾU GIỜ RA (thieu_gio_ra), ngày công 0, công quy đổi 0.94
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 510 phút (8:30) | ra ngoài 10 phút (1 lần) | công tác 0 | thiếu giờ ra: CÓ | sửa tay
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 510 phút (8:30) | ra ngoài 10 phút (1 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: CÓ | sửa tay
       phiên: 07:00–16:30 (dong, vào tu_dong, ra thu_cong); 16:40–? (thieu_gio_ra, vào tu_dong)
   ! GHI CHÚ: Giờ ra chấm tay 16:30 được giữ (không bị xoá như trước), nhưng lượt đi ngang camera lúc 16:40 (đủ 10 phút, còn trong cửa sổ vào) mở 1 phiên mới → ngày thành 'Thiếu giờ ra', ngày công 0 cho tới khi cán bộ huỷ phiên đó.
 
@@ -873,7 +882,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:01:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng vao | bo_qua_trung | XANH: "Nguyễn Văn An: đã ghi giờ ra 17:00, không ghi lặp"
                 ↳ bảng công CN001 02/11: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–17:00 (dong, vào tu_dong, ra tu_dong)
   (biến thể: Bình ra 17:00, 17:01 quay lại nhưng đã tháo mũ)
   [02/11 17:00:30]          CN002 | bảo hộ DAT                        | mặt → CN002          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Trần Thị Bình. Đã ghi giờ ra 17:00"
@@ -881,7 +890,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:01:30]          CN002 | bảo hộ KHONG_DAT (thieu_mu)       | mặt → CN002          | hướng vao | bo_qua_trung | XANH: "Trần Thị Bình: đã ghi giờ ra 17:00, không ghi lặp"
                 ↳ bảng công CN002 02/11: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 539 · ra ngoài 0
   → BẢNG CÔNG CN002 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 539 phút (8:59) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 539 phút (8:59) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -896,10 +905,10 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:10–17:00 dong] · muộn 0 · về sớm 0 · làm 510 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 01/11 (Chủ nhật), xem lúc 02/11 18:00: ĐI MUỘN (di_muon), ngày công 1, công quy đổi 0.98
-      vào 07:10 | ra 17:00 | muộn 10 | về sớm 0 | làm 530 phút (8:50) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không | làm ngày nghỉ
+      vào 07:10 | ra 17:00 | muộn 10 | về sớm 0 | làm 530 phút (8:50) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không | làm ngày nghỉ
       phiên: 07:10–17:00 (dong, vào tu_dong, ra tu_dong)
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 18:00: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:10 | ra 17:00 | muộn 0 | về sớm 0 | làm 510 phút (8:30) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:10 | ra 17:00 | muộn 0 | về sớm 0 | làm 510 phút (8:30) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:10–17:00 (dong, vào tu_dong, ra tu_dong)
   (giờ ca được chép vào dòng công lúc tạo dòng: ngày cũ giữ ca cũ, hôm nay tính lại theo ca mới)
   (không có gì bất thường)
@@ -929,17 +938,17 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
     CN001: ngày công 2 | tổng phút 660 | muộn không phép 0 | vắng 0 | thiếu giờ ra 1 | công quy đổi 1.22 | ngày 1–5: 1:nghi_tuan 2:du_cong 3:thieu_gio_ra 4:ve_som 5:chua_den
     CN002: ngày công 2 | tổng phút 1060 | muộn không phép 2 | vắng 0 | thiếu giờ ra 0 | công quy đổi 1.96 | ngày 1–5: 1:nghi_tuan 2:di_muon 3:du_cong 4:dang_lam 5:chua_den
     CN003: ngày công 0 | tổng phút 0 | muộn không phép 0 | vắng 1 | thiếu giờ ra 0 | công quy đổi 0.0 | ngày 1–5: 1:ngoai_thoi_gian_lam_viec 2:ngoai_thoi_gian_lam_viec 3:vang 4:chua_vao 5:chua_den
-  → EXCEL sheet 'Bang cong': 46 cột = Mã, Họ tên, Tổ đội, 1..30, Số ngày công, Tổng giờ làm, Số lần đi muộn, Muộn không phép, Muộn có phép, Về sớm không phép, Về sớm có phép, Ngày nghỉ phép, Ngày vắng, Ngày thiếu giờ ra, Giờ ra ngoài, Giờ công tác, Công quy đổi
-    CN001: ngày 1–4 = [None, '9:00', '0:00', '2:00'] | tổng = [2, '11:00', 0, 0, 0, 1, 0, 0, 0, 1, '0:00', '0:00', 1.22]
-    CN002: ngày 1–4 = [None, '8:40', '9:00', '0:00'] | tổng = [2, '17:40', 2, 2, 0, 0, 0, 0, 0, 0, '0:00', '0:00', 1.96]
-    CN003: ngày 1–4 = [None, None, None, None] | tổng = [0, '0:00', 0, 0, 0, 0, 0, 0, 1, 0, '0:00', '0:00', 0]
-  → EXCEL sheet 'Chi tiet': cột ['Ngày', 'Mã', 'Họ tên', 'Tổ đội', 'Giờ vào', 'Giờ ra', 'Đi muộn (phút)', 'Về sớm (phút)', 'Số giờ làm', 'Trạng thái', 'Số phiên', 'Ra ngoài (phút)', 'Công tác (phút)', 'Công quy đổi', 'Ghi chú']
-    ['02/11/2026', 'CN001', 'Nguyễn Văn An', None, '07:00', '17:00', 0, 0, '9:00', 'Đủ công', 1, 0, 0, 1]
-    ['03/11/2026', 'CN001', 'Nguyễn Văn An', None, '07:00', None, 0, 0, '0:00', 'Thiếu giờ ra', 1, 0, 0, 0]
-    ['04/11/2026', 'CN001', 'Nguyễn Văn An', None, '07:00', '09:00', 0, 480, '2:00', 'Về sớm', 1, 0, 0, 0.22]
-    ['02/11/2026', 'CN002', 'Trần Thị Bình', None, '07:20', '17:00', 20, 0, '8:40', 'Đi muộn', 1, 0, 0, 0.96]
-    ['03/11/2026', 'CN002', 'Trần Thị Bình', None, '07:00', '17:00', 0, 0, '9:00', 'Đủ công', 1, 0, 0, 1]
-    ['04/11/2026', 'CN002', 'Trần Thị Bình', None, '07:07', None, 7, 0, '0:00', 'Đang làm', 1, 0, 0, 0]
+  → EXCEL sheet 'Bang cong': 47 cột = Mã, Họ tên, Tổ đội, 1..30, Số ngày công, Tổng giờ làm, Số lần đi muộn, Muộn không phép, Muộn có phép, Về sớm không phép, Về sớm có phép, Ngày nghỉ phép, Ngày vắng, Ngày thiếu giờ ra, Giờ ra ngoài, Giờ công tác, Giờ phép tính công, Công quy đổi
+    CN001: ngày 1–4 = [None, '9:00', '0:00', '2:00'] | tổng = [2, '11:00', 0, 0, 0, 1, 0, 0, 0, 1, '0:00', '0:00', '0:00', 1.22]
+    CN002: ngày 1–4 = [None, '8:40', '9:00', '0:00'] | tổng = [2, '17:40', 2, 2, 0, 0, 0, 0, 0, 0, '0:00', '0:00', '0:00', 1.96]
+    CN003: ngày 1–4 = [None, None, None, None] | tổng = [0, '0:00', 0, 0, 0, 0, 0, 0, 1, 0, '0:00', '0:00', '0:00', 0]
+  → EXCEL sheet 'Chi tiet': cột ['Ngày', 'Mã', 'Họ tên', 'Tổ đội', 'Giờ vào', 'Giờ ra', 'Đi muộn (phút)', 'Về sớm (phút)', 'Số giờ làm', 'Trạng thái', 'Số phiên', 'Ra ngoài (phút)', 'Công tác (phút)', 'Phép tính công (phút)', 'Công quy đổi', 'Ghi chú']
+    ['02/11/2026', 'CN001', 'Nguyễn Văn An', None, '07:00', '17:00', 0, 0, '9:00', 'Đủ công', 1, 0, 0, 0, 1]
+    ['03/11/2026', 'CN001', 'Nguyễn Văn An', None, '07:00', None, 0, 0, '0:00', 'Thiếu giờ ra', 1, 0, 0, 0, 0]
+    ['04/11/2026', 'CN001', 'Nguyễn Văn An', None, '07:00', '09:00', 0, 480, '2:00', 'Về sớm', 1, 0, 0, 0, 0.22]
+    ['02/11/2026', 'CN002', 'Trần Thị Bình', None, '07:20', '17:00', 20, 0, '8:40', 'Đi muộn', 1, 0, 0, 0, 0.96]
+    ['03/11/2026', 'CN002', 'Trần Thị Bình', None, '07:00', '17:00', 0, 0, '9:00', 'Đủ công', 1, 0, 0, 0, 1]
+    ['04/11/2026', 'CN002', 'Trần Thị Bình', None, '07:07', None, 7, 0, '0:00', 'Đang làm', 1, 0, 0, 0, 0]
   (không có gì bất thường)
 
 === #29. Ra ăn trưa 11:30, 14:00 mới vào lại (T10) ===
@@ -952,7 +961,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:00–11:30 dong, 14:00–17:00 dong] · muộn 0 · về sớm 0 · làm 450 · ra ngoài 90
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 0.83
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 450 phút (7:30) | ra ngoài 90 phút (1 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 450 phút (7:30) | ra ngoài 90 phút (1 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–11:30 (dong, vào tu_dong, ra tu_dong); 14:00–17:00 (dong, vào tu_dong, ra tu_dong)
   → VIỆC CẦN XỬ LÝ (lúc 02/11 17:30): không có
   (không có gì bất thường)
@@ -965,7 +974,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 07:11:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 07:11" + "Về sớm chưa có phép, vui lòng báo tổ trưởng"
                 ↳ bảng công CN001 02/11: phiên [07:00–07:11 dong] · muộn 0 · về sớm 589 · làm 11 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: VỀ SỚM (ve_som), ngày công 1, công quy đổi 0.02
-      vào 07:00 | ra 07:11 | muộn 0 | về sớm 589 | làm 11 phút (0:11) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 07:11 | muộn 0 | về sớm 589 | làm 11 phút (0:11) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–07:11 (dong, vào tu_dong, ra tu_dong)
   ! GHI CHÚ: Quét lại lúc 07:11 (đã quá 10 phút) là RA (đúng quy tắc). Ngày đó 'Về sớm' vẫn được tính ngày công = 1 dù chỉ làm 11 phút (Q10); công quy đổi 0.02 phản ánh đúng hơn. Có trong Việc cần xử lý sau khi hết ca.
 
@@ -979,7 +988,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:20:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng vao | khong_ghi    | VÀNG: "Đã hết giờ vào ca hôm nay"
                 ↳ bảng công CN001 02/11: phiên [07:00–17:00 dong] · muộn 0 · về sớm 0 · làm 540 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 
@@ -989,7 +998,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 21:00:00] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 0 phiên
   [02/11 21:00:01] TÁC VỤ NỀN đánh dấu thiếu giờ ra → 1 phiên
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 21:05: THIẾU GIỜ RA (thieu_gio_ra), ngày công 0, công quy đổi 0.0
-      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: CÓ
+      vào 07:00 | ra – | muộn 0 | về sớm 0 | làm 0 phút (0:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: CÓ
       phiên: 07:00–? (thieu_gio_ra, vào tu_dong)
   → VIỆC CẦN XỬ LÝ (lúc 02/11 21:05): CN001 2026-11-02 Phiên vào 07:00 chưa có giờ ra
   (sáng hôm sau: vào 07:00; 09:00 cán bộ sửa giờ ra hôm trước thành 17:00)
@@ -997,7 +1006,7 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
                 ↳ bảng công CN001 03/11: phiên [07:00–– mo] · muộn 0 · về sớm 0 · làm 0 · ra ngoài 0
   [03/11 09:00] SỬA PHIÊN hôm trước: giờ ra 17:00, lý do "Tổ trưởng xác nhận" → chấp nhận
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 03/11 09:05: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không | sửa tay
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 540 phút (9:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không | sửa tay
       phiên: 07:00–17:00 (dong, vào tu_dong, ra thu_cong)
   → NHẬT KÝ: 03/11 09:00 sua_ra: (thiếu giờ ra) → 17:00:00 | lý do "Tổ trưởng xác nhận" | người sửa 1
   → VIỆC CẦN XỬ LÝ (lúc 03/11 09:05): không có
@@ -1014,15 +1023,15 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 16:30:00]          CN002 | bảo hộ DAT                        | mặt → CN002          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Trần Thị Bình. Đã ghi giờ ra 16:30" + "Về sớm chưa có phép, vui lòng báo tổ trưởng"
                 ↳ bảng công CN002 02/11: phiên [07:03–16:30 dong] · muộn 0 · về sớm 30 · làm 507 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 17:30: VỀ SỚM CÓ PHÉP (ve_som_co_phep), ngày công 1, công quy đổi 0.78
-      vào 07:02 | ra 15:02 | muộn 0 | về sớm 118 | làm 420 phút (7:00) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:02 | ra 15:02 | muộn 0 | về sớm 118 | làm 420 phút (7:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:02–15:02 (dong, vào tu_dong, ra tu_dong)
   → BẢNG CÔNG CN002 ngày 02/11 (Thứ Hai), xem lúc 02/11 17:30: VỀ SỚM (ve_som), ngày công 1, công quy đổi 0.94
-      vào 07:03 | ra 16:30 | muộn 0 | về sớm 30 | làm 507 phút (8:27) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:03 | ra 16:30 | muộn 0 | về sớm 30 | làm 507 phút (8:27) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:03–16:30 (dong, vào tu_dong, ra tu_dong)
   → VIỆC CẦN XỬ LÝ (lúc 02/11 17:30): CN002 2026-11-02 Về sớm 30 phút, chưa có phép
   [02/11 17:40] THÊM PHÉP CN002 (sau): về sớm từ 16:30 → chấp nhận
   → BẢNG CÔNG CN002 ngày 02/11 (Thứ Hai), xem lúc 02/11 17:45: VỀ SỚM CÓ PHÉP (ve_som_co_phep), ngày công 1, công quy đổi 0.94
-      vào 07:03 | ra 16:30 | muộn 0 | về sớm 30 | làm 507 phút (8:27) | ra ngoài 0 phút (0 lần) | công tác 0 | thiếu giờ ra: không
+      vào 07:03 | ra 16:30 | muộn 0 | về sớm 30 | làm 507 phút (8:27) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:03–16:30 (dong, vào tu_dong, ra tu_dong)
   → VIỆC CẦN XỬ LÝ (lúc 02/11 17:45): không có
   (không có gì bất thường)
@@ -1038,7 +1047,34 @@ Trạng thái ngày: dang_lam = Đang làm, thieu_gio_ra = Thiếu giờ ra, du_
   [02/11 17:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 17:00"
                 ↳ bảng công CN001 02/11: phiên [07:00–09:00 dong, 11:00–17:00 dong] · muộn 0 · về sớm 0 · làm 420 · ra ngoài 0
   → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐỦ CÔNG (du_cong), ngày công 1, công quy đổi 1.0
-      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 420 phút (7:00) | ra ngoài 0 phút (0 lần) | công tác 120 | thiếu giờ ra: không
+      vào 07:00 | ra 17:00 | muộn 0 | về sớm 0 | làm 420 phút (7:00) | ra ngoài 0 phút (0 lần) | công tác 120 | phép tính công 0 | thiếu giờ ra: không
       phiên: 07:00–09:00 (dong, vào tu_dong, ra tu_dong); 11:00–17:00 (dong, vào tu_dong, ra tu_dong)
+  (không có gì bất thường)
+
+=== #35. Phép về sớm / đi muộn có tính công và không tính công (P8, P9) ===
+  [02/11 06:00] THÊM PHÉP CN001: về sớm từ 15:00, CÓ tính công → chấp nhận
+  [02/11 06:00] THÊM PHÉP CN002: về sớm từ 15:00, không tính công → chấp nhận
+  [02/11 06:00] THÊM PHÉP CN003: đi muộn đến 09:00, CÓ tính công → chấp nhận
+  [02/11 07:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng vao | ghi_vao      | XANH: "Xin chào Nguyễn Văn An. Đã ghi giờ vào 07:00"
+                ↳ bảng công CN001 02/11: phiên [07:00–– mo] · muộn 0 · về sớm 0 · làm 0 · ra ngoài 0
+  [02/11 07:01:00]          CN002 | bảo hộ DAT                        | mặt → CN002          | hướng vao | ghi_vao      | XANH: "Xin chào Trần Thị Bình. Đã ghi giờ vào 07:01"
+                ↳ bảng công CN002 02/11: phiên [07:01–– mo] · muộn 0 · về sớm 0 · làm 0 · ra ngoài 0
+  [02/11 08:50:00]          CN003 | bảo hộ DAT                        | mặt → CN003          | hướng vao | ghi_vao      | XANH: "Xin chào Lê Văn Cường. Đã ghi giờ vào 08:50"
+                ↳ bảng công CN003 02/11: phiên [08:50–– mo] · muộn 110 · về sớm 0 · làm 0 · ra ngoài 0
+  [02/11 15:00:00]          CN001 | bảo hộ DAT                        | mặt → CN001          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 15:00 (về sớm có phép)"
+                ↳ bảng công CN001 02/11: phiên [07:00–15:00 dong] · muộn 0 · về sớm 120 · làm 420 · ra ngoài 0
+  [02/11 15:01:00]          CN002 | bảo hộ DAT                        | mặt → CN002          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Trần Thị Bình. Đã ghi giờ ra 15:01 (về sớm có phép)"
+                ↳ bảng công CN002 02/11: phiên [07:01–15:01 dong] · muộn 0 · về sớm 119 · làm 420 · ra ngoài 0
+  [02/11 17:00:00]          CN003 | bảo hộ DAT                        | mặt → CN003          | hướng ra  | ghi_ra       | XANH: "Tạm biệt Lê Văn Cường. Đã ghi giờ ra 17:00"
+                ↳ bảng công CN003 02/11: phiên [08:50–17:00 dong] · muộn 110 · về sớm 0 · làm 430 · ra ngoài 0
+  → BẢNG CÔNG CN001 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: VỀ SỚM CÓ PHÉP (ve_som_co_phep), ngày công 1, công quy đổi 1.0
+      vào 07:00 | ra 15:00 | muộn 0 | về sớm 120 | làm 420 phút (7:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 120 | thiếu giờ ra: không
+      phiên: 07:00–15:00 (dong, vào tu_dong, ra tu_dong)
+  → BẢNG CÔNG CN002 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: VỀ SỚM CÓ PHÉP (ve_som_co_phep), ngày công 1, công quy đổi 0.78
+      vào 07:01 | ra 15:01 | muộn 0 | về sớm 119 | làm 420 phút (7:00) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 0 | thiếu giờ ra: không
+      phiên: 07:01–15:01 (dong, vào tu_dong, ra tu_dong)
+  → BẢNG CÔNG CN003 ngày 02/11 (Thứ Hai), xem lúc 02/11 23:59: ĐI MUỘN CÓ PHÉP (di_muon_co_phep), ngày công 1, công quy đổi 1.0
+      vào 08:50 | ra 17:00 | muộn 110 | về sớm 0 | làm 430 phút (7:10) | ra ngoài 0 phút (0 lần) | công tác 0 | phép tính công 110 | thiếu giờ ra: không
+      phiên: 08:50–17:00 (dong, vào tu_dong, ra tu_dong)
   (không có gì bất thường)
 ```

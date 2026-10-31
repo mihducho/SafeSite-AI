@@ -202,7 +202,8 @@ class San:
               f"đổi {r['cong_quy_doi']}")
         print(f"{'':6}vào {r['gio_vao'] or '–'} | ra {r['gio_ra'] or '–'} | muộn {r['di_muon_phut']} | về sớm "
               f"{r['ve_som_phut']} | làm {lam} | ra ngoài {r['phut_ra_ngoai']} phút ({r['so_lan_ra_ngoai']} lần) | "
-              f"công tác {r['phut_cong_tac']} | thiếu giờ ra: {'CÓ' if r['thieu_gio_ra'] else 'không'}"
+              f"công tác {r['phut_cong_tac']} | phép tính công {r['phut_phep_tinh_cong']} | thiếu giờ ra: "
+              f"{'CÓ' if r['thieu_gio_ra'] else 'không'}"
               + (" | sửa tay" if r["co_sua_tay"] else "") + (" | làm ngày nghỉ" if r["lam_ngay_nghi"] else ""))
         if r["phien"]:
             print(f"{'':6}phiên: " + "; ".join(f"{p['vao']}–{p['ra'] or '?'} ({p['trang_thai']}, vào {p['nguon_vao']}"
@@ -633,7 +634,7 @@ def kb28():
         ct = wb["Chi tiet"]
         print(f"  → EXCEL sheet 'Chi tiet': cột {[c.value for c in ct[1]]}")
         for row in ct.iter_rows(min_row=2, values_only=True):
-            print(f"    {list(row[:14])}")
+            print(f"    {list(row[:15])}")
         k.done()
 
 
@@ -724,6 +725,29 @@ def kb34():
         k.done()
 
 
+def kb35():
+    with San() as k:
+        for ma, ten in (("CN001", "Nguyễn Văn An"), ("CN002", "Trần Thị Bình"), ("CN003", "Lê Văn Cường")):
+            k.cong_nhan(ma, ten)
+
+        def them(ma, mo_ta, loai, tinh_cong, **gio):
+            k.tay(f"THÊM PHÉP {ma}: {mo_ta}", lambda: phep.them_phep(
+                k.s, k.worker(ma), NGAY, loai, "Việc gia đình", k.admin, ATT, tinh_cong=tinh_cong, now=vn(6, 0), **gio),
+                vn(6, 0))
+        them("CN001", "về sớm từ 15:00, CÓ tính công", "ve_som", True, tu_gio=time(15, 0))
+        them("CN002", "về sớm từ 15:00, không tính công", "ve_som", False, tu_gio=time(15, 0))
+        them("CN003", "đi muộn đến 09:00, CÓ tính công", "di_muon", True, den_gio=time(9, 0))
+        k.luot(vn(7, 0))
+        k.luot(vn(7, 1), ma="CN002")
+        k.luot(vn(8, 50), ma="CN003")
+        k.luot(vn(15, 0))
+        k.luot(vn(15, 1), ma="CN002")
+        k.luot(vn(17, 0), ma="CN003")
+        for ma in ("CN001", "CN002", "CN003"):
+            k.ket_qua(ma)
+        k.done()
+
+
 KICH_BAN = [
     (1, "Vào 06:55 đạt, ra 17:00 (T1)", kb1),
     (2, "Vào 07:04 (trong ân hạn), ra 17:00 (T2) — thêm: người thứ hai vào 07:05:59 (T3)", kb2),
@@ -759,6 +783,7 @@ KICH_BAN = [
     (32, "(v2) Thiếu giờ ra được lưu, hôm sau cán bộ sửa (T14)", kb32),
     (33, "(v2) Phép về sớm có trước / thêm sau (P1, P3)", kb33),
     (34, "(v2) Phép ra ngoài công việc 09:00–11:00 tính công (P5)", kb34),
+    (35, "Phép về sớm / đi muộn có tính công và không tính công (P8, P9)", kb35),
 ]
 
 

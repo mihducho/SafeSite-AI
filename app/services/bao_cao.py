@@ -56,6 +56,7 @@ def dong_bang_cong(w: Worker, a: Attendance | None, shift: Shift, ngay: date, no
         "trang_thai_ngay": th.trang_thai_ngay, "ten_trang_thai": tc.TEN_TRANG_THAI[th.trang_thai_ngay],
         "ngay_cong": th.ngay_cong, "cong_quy_doi": th.cong_quy_doi,
         "so_lan_ra_ngoai": th.so_lan_ra_ngoai, "phut_ra_ngoai": th.phut_ra_ngoai, "phut_cong_tac": th.phut_cong_tac,
+        "phut_phep_tinh_cong": th.phut_phep_tinh_cong,
         "co_sua_tay": th.co_sua_tay, "co_ra_ngoai": th.co_ra_ngoai, "lam_ngay_nghi": th.lam_ngay_nghi,
         "muon_co_phep": th.muon_co_phep, "som_co_phep": th.som_co_phep, "can_giai_trinh": th.can_giai_trinh,
         "phien": [phien_json(s, tz) for s in segs],
@@ -131,7 +132,7 @@ def bang_cong_thang(db: Session, nam: int, thang: int, att_cfg: dict, now: datet
         tong = dict.fromkeys(("so_ngay_cong", "tong_phut", "so_lan_muon", "so_lan_muon_khong_phep",
                               "so_lan_muon_co_phep", "so_lan_ve_som_khong_phep", "so_lan_ve_som_co_phep",
                               "so_ngay_nghi_phep", "so_ngay_vang", "so_ngay_thieu_gio_ra", "tong_phut_ra_ngoai",
-                              "tong_phut_cong_tac"), 0)
+                              "tong_phut_cong_tac", "tong_phut_phep_tinh_cong"), 0)
         cong_quy_doi = 0.0
         for d in range(1, so_ngay + 1):
             ngay = date(nam, thang, d)
@@ -144,6 +145,7 @@ def bang_cong_thang(db: Session, nam: int, thang: int, att_cfg: dict, now: datet
             tong["tong_phut"] += r["so_phut_lam"]
             tong["tong_phut_ra_ngoai"] += r["phut_ra_ngoai"]
             tong["tong_phut_cong_tac"] += r["phut_cong_tac"]
+            tong["tong_phut_phep_tinh_cong"] += r["phut_phep_tinh_cong"]
             cong_quy_doi += r["cong_quy_doi"]
             if r["di_muon_phut"] > 0:
                 tong["so_lan_muon"] += 1
@@ -168,7 +170,7 @@ TONG_EXCEL = [("so_ngay_cong", "Số ngày công", None), ("tong_phut", "Tổng 
               ("so_lan_ve_som_co_phep", "Về sớm có phép", None), ("so_ngay_nghi_phep", "Ngày nghỉ phép", None),
               ("so_ngay_vang", "Ngày vắng", None), ("so_ngay_thieu_gio_ra", "Ngày thiếu giờ ra", None),
               ("tong_phut_ra_ngoai", "Giờ ra ngoài", _hm), ("tong_phut_cong_tac", "Giờ công tác", _hm),
-              ("tong_cong_quy_doi", "Công quy đổi", None)]
+              ("tong_phut_phep_tinh_cong", "Giờ phép tính công", _hm), ("tong_cong_quy_doi", "Công quy đổi", None)]
 
 
 def excel_bang_cong_thang(data: dict) -> bytes:
@@ -209,7 +211,8 @@ def excel_bang_cong_thang(data: dict) -> bytes:
 
     ct = wb.create_sheet("Chi tiet")
     cols = ["Ngày", "Mã", "Họ tên", "Tổ đội", "Giờ vào", "Giờ ra", "Đi muộn (phút)", "Về sớm (phút)", "Số giờ làm",
-            "Trạng thái", "Số phiên", "Ra ngoài (phút)", "Công tác (phút)", "Công quy đổi", "Ghi chú"]
+            "Trạng thái", "Số phiên", "Ra ngoài (phút)", "Công tác (phút)", "Phép tính công (phút)", "Công quy đổi",
+            "Ghi chú"]
     ct.append(cols)
     for c in ct[1]:
         c.font, c.fill = bold, fill
@@ -219,8 +222,9 @@ def excel_bang_cong_thang(data: dict) -> bytes:
             ct.append([f"{dd}/{m}/{y}", r["ma"], r["ho_ten"], r["to_doi"] or "", cell["gio_vao"] or "",
                        cell["gio_ra"] or "", cell["di_muon_phut"], cell["ve_som_phut"], _hm(cell["so_phut_lam"]),
                        cell["ten_trang_thai"], sum(p["trang_thai"] != tc.HUY for p in cell["phien"]),
-                       cell["phut_ra_ngoai"], cell["phut_cong_tac"], cell["cong_quy_doi"], cell["ghi_chu"] or ""])
-    for col, width in zip("ABCDEFGHIJKLMNO", (12, 10, 24, 16, 9, 9, 15, 14, 11, 22, 9, 15, 15, 13, 50)):
+                       cell["phut_ra_ngoai"], cell["phut_cong_tac"], cell["phut_phep_tinh_cong"], cell["cong_quy_doi"],
+                       cell["ghi_chu"] or ""])
+    for col, width in zip("ABCDEFGHIJKLMNOP", (12, 10, 24, 16, 9, 9, 15, 14, 11, 22, 9, 15, 15, 20, 13, 50)):
         ct.column_dimensions[col].width = width
     buf = io.BytesIO()
     wb.save(buf)

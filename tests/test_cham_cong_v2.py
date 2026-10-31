@@ -440,14 +440,14 @@ class BaoCaoV2Test(V2Case):
         import io
         ws = load_workbook(io.BytesIO(data))["Bang cong"]
         header = [c.value for c in ws[2]]
-        self.assertEqual(header[-13:-10], ["Số ngày công", "Tổng giờ làm", "Số lần đi muộn"])
-        self.assertIn("Công quy đổi", header)
+        self.assertEqual(header[-14:-11], ["Số ngày công", "Tổng giờ làm", "Số lần đi muộn"])
+        self.assertEqual(header[-3:], ["Giờ công tác", "Giờ phép tính công", "Công quy đổi"])
 
 
 # ============================== P1-P7: phep / giai trinh ==============================
 class PhepTest(V2Case):
-    def phep(self, loai, d=D29, now=None, **kw):
-        return phep.them_phep(self.s, self.an, d, loai, "Tổ trưởng cho phép", self.admin, ATT,
+    def phep(self, loai, d=D29, now=None, worker=None, **kw):
+        return phep.them_phep(self.s, worker or self.an, d, loai, "Tổ trưởng cho phép", self.admin, ATT,
                               now=now or vn(29, 6, 0), **kw)
 
     def test_p1_ve_som_co_phep(self):
@@ -457,7 +457,9 @@ class PhepTest(V2Case):
         self.assertEqual(ev["thong_bao"], "Tạm biệt Nguyễn Văn An. Đã ghi giờ ra 15:02 (về sớm có phép)")
         self.assertTrue(ev["som_co_phep"])
         r = self.ngay()
-        self.assertEqual((r["trang_thai_ngay"], r["ve_som_phut"], r["so_phut_lam"]), (tc.TT_VE_SOM_CO_PHEP, 118, 420))
+        # phep khong tinh cong (mac dinh): cong quy doi theo gio lam thuc te 420 / 540
+        self.assertEqual((r["trang_thai_ngay"], r["ve_som_phut"], r["so_phut_lam"], r["phut_phep_tinh_cong"],
+                          r["cong_quy_doi"]), (tc.TT_VE_SOM_CO_PHEP, 118, 420, 0, 0.78))
         self.assertEqual(self.viec(), [])
 
     def test_p2_ve_som_qua_muc_phep(self):
@@ -511,6 +513,42 @@ class PhepTest(V2Case):
         r = self.ngay()
         self.assertEqual((r["trang_thai_ngay"], r["di_muon_phut"]), (tc.TT_DI_MUON_CO_PHEP, 110))
         self.assertEqual(self.viec(), [])
+
+    def test_p8_ve_som_co_phep_tinh_cong(self):
+        p = self.phep(tc.VE_SOM, tu_gio=time(15, 0), tinh_cong=True)
+        self.assertEqual(phep.mo_ta(p), "Về sớm từ 15:00 (tính công)")
+        self.run_luot(vn(29, 7, 0))
+        self.run_luot(vn(29, 15, 0))
+        r = self.ngay()
+        # 15:00-17:00 nam trong phep -> cong 120: 420 + 120 = 540 (P1 khong tinh cong: 0,78)
+        self.assertEqual((r["trang_thai_ngay"], r["ve_som_phut"], r["so_phut_lam"], r["phut_phep_tinh_cong"],
+                          r["ngay_cong"], r["cong_quy_doi"]), (tc.TT_VE_SOM_CO_PHEP, 120, 420, 120, 1, 1.0))
+        an = next(x for x in bao_cao.bang_cong_thang(self.s, 2026, 10, ATT, vn(29, 23, 0))["ds"] if x["ma"] == "CN001")
+        self.assertEqual((an["tong_phut_phep_tinh_cong"], an["tong_cong_quy_doi"]), (120, 1.0))
+        # Binh ra 14:50 (con trong dung sai 15 phut -> co phep): chi phan tu 15:00 duoc cong, 410 + 120 = 530
+        self.phep(tc.VE_SOM, tu_gio=time(15, 0), tinh_cong=True, worker=self.binh)
+        self.run_luot(vn(29, 7, 0), face_index=1)
+        self.run_luot(vn(29, 14, 50), face_index=1)
+        r = self.ngay(self.binh)
+        self.assertEqual((r["trang_thai_ngay"], r["so_phut_lam"], r["phut_phep_tinh_cong"], r["cong_quy_doi"]),
+                         (tc.TT_VE_SOM_CO_PHEP, 410, 120, 0.98))
+
+    def test_p9_di_muon_co_phep_tinh_cong(self):
+        self.phep(tc.DI_MUON, den_gio=time(9, 0), tinh_cong=True)
+        self.run_luot(vn(29, 8, 50, 30))
+        self.assertEqual(self.ngay(now=vn(29, 10, 0))["phut_phep_tinh_cong"], 0)  # phien con mo: chua cong (nhu phut lam)
+        self.run_luot(vn(29, 17, 0))
+        r = self.ngay()
+        # vang 07:00-08:50:30 (110,5 phut) + lam 429,5 phut: lam tron chung = 540, khong mat 1 phut
+        self.assertEqual((r["trang_thai_ngay"], r["di_muon_phut"], r["so_phut_lam"], r["phut_phep_tinh_cong"],
+                          r["cong_quy_doi"]), (tc.TT_DI_MUON_CO_PHEP, 111, 429, 111, 1.0))
+        # Binh vao 09:10 (trong dung sai): chi 07:00-09:00 duoc cong, 410 + 120 = 530
+        self.phep(tc.DI_MUON, den_gio=time(9, 0), tinh_cong=True, worker=self.binh)
+        self.run_luot(vn(29, 9, 10), face_index=1)
+        self.run_luot(vn(29, 17, 0), face_index=1)
+        r = self.ngay(self.binh)
+        self.assertEqual((r["trang_thai_ngay"], r["so_phut_lam"], r["phut_phep_tinh_cong"], r["cong_quy_doi"]),
+                         (tc.TT_DI_MUON_CO_PHEP, 410, 120, 0.98))
 
     def test_xac_nhan_khong_phep_roi_khoi_danh_sach(self):
         self.run_luot(vn(29, 7, 30))  # muon 30 phut, khong phep

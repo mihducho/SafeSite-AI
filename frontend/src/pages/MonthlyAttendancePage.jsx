@@ -34,6 +34,8 @@ function DayCell({ code, c, iso }) {
     c?.di_muon_phut > 0 ? `Đi muộn ${c.di_muon_phut} phút${c.muon_co_phep ? ' (có phép)' : ''}` : '',
     c?.ve_som_phut > 0 && c?.gio_ra ? `Về sớm ${c.ve_som_phut} phút${c.som_co_phep ? ' (có phép)' : ''}` : '',
     c?.phut_ra_ngoai > 0 ? `Ra ngoài ${c.phut_ra_ngoai} phút` : '',
+    c?.phut_cong_tac > 0 ? `Công tác ${c.phut_cong_tac} phút` : '',
+    c?.phut_phep_tinh_cong > 0 ? `Phép tính công ${c.phut_phep_tinh_cong} phút` : '',
     ...(c?.phep ?? []).map((p) => `Phép: ${p.mo_ta}`),
     c?.co_sua_tay ? 'Có chấm thủ công' : '',
   ].filter(Boolean).join('\n')
@@ -124,7 +126,7 @@ export default function MonthlyAttendancePage() {
                       })}
                       <th className="mstick-r r6" title="Số ngày được tính công">Ngày công</th>
                       <th className="mstick-r r5" title="Tổng giờ làm (giờ:phút)">Tổng giờ</th>
-                      <th className="mstick-r r4" title="(Phút làm + phút công tác) / phút chuẩn của ca">Công quy đổi</th>
+                      <th className="mstick-r r4" title="(Phút làm + phút công tác + phút phép tính công) / phút chuẩn của ca">Công quy đổi</th>
                       <th className="mstick-r r3">Vắng</th>
                       <th className="mstick-r r2">Thiếu giờ ra</th>
                       <th className="mstick-r r1" title="Số lần đi muộn / về sớm KHÔNG có phép">Muộn / sớm không phép</th>

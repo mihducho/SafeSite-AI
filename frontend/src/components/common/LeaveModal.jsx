@@ -16,6 +16,12 @@ const GIAI_THICH = {
   ra_ngoai_cong_viec: 'Thời gian ra ngoài trong khoảng này không tính là ra ngoài; có tính công thì cộng vào phút công tác.',
   nghi_ca_ngay: 'Ngày đó tính là nghỉ phép, không tính vắng.',
 }
+/** Ô "Có tính công": không tích thì công quy đổi theo giờ làm thực tế; nghỉ cả ngày không có ô này */
+const TINH_CONG = {
+  ve_som: 'Có tính công (từ giờ được về đến hết ca vẫn được tính vào công quy đổi)',
+  di_muon: 'Có tính công (từ đầu ca đến giờ dự kiến đến vẫn được tính vào công quy đổi)',
+  ra_ngoai_cong_viec: 'Có tính công (thời gian ra ngoài trong khoảng này được cộng vào công quy đổi)',
+}
 
 /**
  * Form thêm phép (dùng trong modal Thêm phép và tab Phép của modal ngày công).
@@ -91,9 +97,9 @@ export function LeaveForm({ worker, defaults = {}, lockDate = false, onDone, onC
           </>
         )}
       </div>
-      {loai !== 'nghi_ca_ngay' && (
+      {TINH_CONG[loai] && (
         <Form.Check className="mb-3" id="p-tinh-cong" checked={tinhCong} onChange={(e) => setTinhCong(e.target.checked)}
-          label="Có tính công (thời gian vắng mặt trong phép được cộng vào công)" />
+          label={TINH_CONG[loai]} />
       )}
       <Form.Group>
         <Form.Label htmlFor="p-ly-do">Lý do (bắt buộc)</Form.Label>

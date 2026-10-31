@@ -25,9 +25,9 @@ def mo_ta(p: Phep) -> str:
     """Chu de doc cho nhat ky / danh sach, vd "Về sớm từ 15:00"."""
     ten = TEN_LOAI.get(p.loai, p.loai)
     if p.loai == VE_SOM:
-        return f"{ten} từ {p.tu_gio:%H:%M}"
+        return f"{ten} từ {p.tu_gio:%H:%M}" + (" (tính công)" if p.tinh_cong else "")
     if p.loai == DI_MUON:
-        return f"{ten} đến {p.den_gio:%H:%M}"
+        return f"{ten} đến {p.den_gio:%H:%M}" + (" (tính công)" if p.tinh_cong else "")
     if p.loai == RA_NGOAI_CONG_VIEC:
         return f"{ten} {p.tu_gio:%H:%M}–{p.den_gio:%H:%M}" + ("" if p.tinh_cong else " (không tính công)")
     return ten

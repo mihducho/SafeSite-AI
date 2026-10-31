@@ -26,6 +26,7 @@ function DaySummary({ r }) {
     r.ve_som_phut && r.gio_ra ? `Về sớm ${r.ve_som_phut} phút` : null,
     r.phut_ra_ngoai ? `Ra ngoài ${r.phut_ra_ngoai} phút (${r.so_lan_ra_ngoai} lần)` : null,
     r.phut_cong_tac ? `Công tác ${r.phut_cong_tac} phút` : null,
+    r.phut_phep_tinh_cong ? `Phép tính công ${r.phut_phep_tinh_cong} phút` : null,
     r.cong_quy_doi ? `Công quy đổi ${soVN(r.cong_quy_doi)}` : null,
   ].filter(Boolean)
   return <div className="small muted num">{parts.join(' · ') || 'Chưa có số liệu công'}</div>
