@@ -507,3 +507,11 @@ cho dễ đọc khi chiếu máy chiếu; không đổi module gọi API, hook l
   **không** tích: công quy đổi theo giờ làm thực tế. Có tích: phần vắng nằm trong phép (đầu ca → giờ được phép đến, giờ được
   phép về → hết ca, trừ giờ nghỉ) được cộng vào công quy đổi, như phép ra ngoài công việc.
 - Thêm trường `phut_phep_tinh_cong` (bảng công ngày / tháng) và cột "Giờ phép tính công" trong Excel. Không thêm cột CSDL.
+
+**2026-11-01 (theo yêu cầu của tôi, ngoại lệ của quy tắc 5 mục 14): dọn dự án trước khi bảo vệ TTTN**, chỉ giữ tài liệu
+khớp hệ thống hiện tại.
+- Xoá hẳn `_old/` (code hướng cũ, còn trong lịch sử git; 3 model COCO tải lại được), `docs/RA_SOAT.md`,
+  `docs/hoc_hieu_he_thong.md`, `docs/huong_dan_camera_dien_thoai.md` (cách dùng điện thoại làm camera chuyển vào README).
+- Xoá dữ liệu không có trong git: kết quả chạy thử cũ (`runs/safety`, `runs/detect`, `runs/checkpoint`, `runs/gate`), ảnh
+  giao diện trước v2 trong `docs/anh_giao_dien/`, CSDL SQLite cũ `data/safegate.db` (đã chuyển sang MariaDB).
+- Giữ: `runs/eval` (số liệu đánh giá cho báo cáo), `docs/anh_giao_dien/v2/`, model, video demo, toàn bộ code và test.

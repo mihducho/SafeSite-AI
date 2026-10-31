@@ -8,12 +8,12 @@ file cần bàn giao sau khi train.
 
 Model gốc `yolo11n.pt` / `yolo11s.pt` (huấn luyện trên COCO) chỉ biết "người",
 không biết nón bảo hộ hay áo phản quang. Cần fine-tune một model YOLO để phát
-hiện thêm các vật này. Model sau khi train sẽ được dùng trong
-`scripts/run_safety_demo.py` (hướng cũ, nay ở `_old/scripts/`) để:
+hiện thêm các vật này. Model sau khi train được dùng ở bước kiểm tra bảo hộ tại cổng
+(`src/checkpoint/`, `src/ppe/compliance.py`) để:
 
-- phát hiện người, nón bảo hộ, áo phản quang trên từng frame;
+- phát hiện người, nón bảo hộ, áo phản quang trên từng khung hình;
 - gán nón vào vùng đầu, áo vào vùng thân của từng người;
-- báo vi phạm "KHONG NON" / "KHONG AO".
+- kết luận lượt kiểm tra đạt, thiếu mũ bảo hộ hay thiếu áo phản quang.
 
 ## 2. Yêu cầu về dataset
 

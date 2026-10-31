@@ -9,13 +9,13 @@ Mô tả đầy đủ, phạm vi, các giai đoạn nước rút F1–F4 nằm �
 
 ## Trạng thái
 
-- [x] Giai đoạn 0: rà soát code cũ, xem [docs/RA_SOAT.md](docs/RA_SOAT.md)
-- [x] Giai đoạn 1a: dọn code hướng cũ vào `_old/`, file cấu hình chung, tra lớp theo tên, ghim thư viện
+- [x] Giai đoạn 0: rà soát code cũ
+- [x] Giai đoạn 1a: dọn code hướng cũ (đã xoá hẳn ngày 01/11, còn trong lịch sử git), file cấu hình chung, tra lớp theo
+      tên, ghim thư viện
 - [ ] Giai đoạn 1b: dịch vụ AI chế độ cổng
   - [x] 1b-1: `evaluate_frames` (thuật toán mục 5) + test bằng box giả
   - [x] 1b-2: luồng đọc camera, `check`, vùng kiểm tra tỷ lệ 0–1, script chạy thử; chạy thật với webcam
-  - [x] Đọc được camera điện thoại qua Wi-Fi (DroidCam 1280x720: ~18 khung/lượt, ~85 ms/khung), xem
-        [docs/huong_dan_camera_dien_thoai.md](docs/huong_dan_camera_dien_thoai.md)
+  - [x] Đọc được camera điện thoại qua Wi-Fi (DroidCam 1280x720: ~18 khung/lượt, ~85 ms/khung)
   - [x] Chạy thử tại cổng với điện thoại dựng dọc (`--rotate 90`): đủ đồ, thiếu mũ, thiếu áo, 2 người, mũ két
   - [ ] Quay video các tình huống (dùng lại cho Giai đoạn 2); kéo mép vùng sát mép hình trong `define_zone.py` (để sau)
 - [ ] Giai đoạn 2: script đánh giá trên video
@@ -152,7 +152,9 @@ vùng đầu/thân, các ngưỡng của thuật toán kiểm tra tại cổng, 
 .\demo
 ```
 
-Dùng điện thoại làm camera: [docs/huong_dan_camera_dien_thoai.md](docs/huong_dan_camera_dien_thoai.md).
+Dùng điện thoại làm camera: cài DroidCam (hoặc IP Webcam), điện thoại và máy tính chung một mạng Wi-Fi, rồi nhập URL
+dạng `http://<IP điện thoại>:4747/video` vào ô "Nguồn camera" ở trang Cấu hình cổng. URL có mật khẩu thì đặt
+`GATE_SOURCE` trong `.env`.
 
 ## Cấu trúc
 
@@ -169,8 +171,7 @@ src/       config.py, checkpoint/ (kiểm tra bảo hộ: camera, evaluate, chec
            đầu/thân), zone/, evaluation/, utils/
 scripts/   công cụ chạy thử, vẽ vùng, đánh giá, tạo dữ liệu demo, train
 tests/     kiểm thử tự động (unittest)
-docs/      rà soát, hướng dẫn train, kết quả model
+docs/      logic chấm công (LOGIC_CHAM_CONG.md), hướng dẫn train, kết quả model, kết quả đánh giá tại cổng
 weights/   model đã train (không commit)
-data/      video, ảnh lượt (anh_luot), ảnh mẫu mặt (anh_mau_mat), CSDL SQLite: không commit
-_old/      code và file của hướng cũ (giám sát toàn công trường), không dùng nữa
+data/      video, ảnh lượt (anh_luot), ảnh mẫu mặt (anh_mau_mat), CSDL SQLite nếu dùng: không commit
 ```
