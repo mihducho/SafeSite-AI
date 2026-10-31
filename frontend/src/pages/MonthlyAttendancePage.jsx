@@ -13,7 +13,7 @@ import { toast } from '../lib/toast.js'
 // Màu ô ngày theo TRẠNG THÁI BACKEND (chú thích ngay trên bảng). Giao diện không tự tính "Vắng".
 const LEGEND = [
   ['du', 'Đủ công'], ['muon', 'Đi muộn / về sớm'], ['phep', 'Có phép'], ['thieu', 'Thiếu giờ ra'], ['vang', 'Vắng'],
-  ['nghi', 'Nghỉ tuần'], ['nghiphep', 'Nghỉ phép'], ['dang', 'Đang làm'],
+  ['nghi', 'Nghỉ tuần'], ['nghiphep', 'Nghỉ phép'], ['dang', 'Đang làm'], ['sua', 'Can thiệp thủ công'],
 ]
 
 function doiThang(ym, n) {
@@ -26,6 +26,7 @@ function doiThang(ym, n) {
 function DayCell({ code, c, iso }) {
   const [label, , kind] = TRANG_THAI_NGAY[code] ?? ['', 'neutral', 'trong']
   const hours = c?.so_phut_lam ? soVN(Math.round((c.so_phut_lam / 60) * 10) / 10, 1).replace(/,0$/, '') : ''
+  const soHuy = (c?.phien ?? []).filter((p) => p.trang_thai === 'huy').length
   const tip = [
     `${thuNgay(iso)}: ${c?.ten_trang_thai ?? label}`,
     ...(c?.phien ?? []).filter((p) => p.trang_thai !== 'huy')
@@ -37,7 +38,7 @@ function DayCell({ code, c, iso }) {
     c?.phut_cong_tac > 0 ? `Công tác ${c.phut_cong_tac} phút` : '',
     c?.phut_phep_tinh_cong > 0 ? `Phép tính công ${c.phut_phep_tinh_cong} phút` : '',
     ...(c?.phep ?? []).map((p) => `Phép: ${p.mo_ta}`),
-    c?.co_sua_tay ? 'Có chấm thủ công' : '',
+    c?.co_sua_tay ? `Có can thiệp thủ công${soHuy ? ` (đã huỷ ${soHuy} phiên)` : ''}, xem Nhật ký sửa` : '',
   ].filter(Boolean).join('\n')
   return (
     <span className={`mcell ${kind}${c?.co_sua_tay ? ' sua' : ''}`} title={tip}>
@@ -165,7 +166,7 @@ export default function MonthlyAttendancePage() {
                 </table>
               </div>
             )}
-        <div className="sg-card__foot"><span>Mỗi ô ghi số giờ làm (P: nghỉ phép; góc chấm: có chấm thủ công). Rê chuột lên ô để xem các phiên và phép; bấm vào ô để mở ngày công đó.</span></div>
+        <div className="sg-card__foot"><span>Mỗi ô ghi số giờ làm (P: nghỉ phép; chấm đen ở góc: có can thiệp thủ công, tức là thêm, sửa hoặc huỷ phiên). Rê chuột lên ô để xem các phiên và phép; bấm vào ô để mở ngày công đó.</span></div>
       </Card>
     </div>
   )

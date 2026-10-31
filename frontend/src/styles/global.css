@@ -568,6 +568,7 @@ a.person:hover .person__name { color: var(--text); text-decoration: underline; t
 .mcell-dot.thieu { background: var(--bad-dot); } .mcell-dot.vang { background: var(--bad-bg); border: 1px dashed var(--bad-dot); }
 .mcell-dot.phep { background: var(--info-bg); border: 1px solid var(--info-dot); } .mcell-dot.nghiphep { background: var(--info-dot); }
 .mcell-dot.dang { background: #FFFFFF; border: 1px solid var(--info-dot); }
+.mcell-dot.sua { width: 8px !important; height: 8px !important; border-radius: 50%; background: var(--text); }
 .mcell-dot.nghi { background: repeating-linear-gradient(135deg, #F4F4F5 0 2px, #D4D4D8 2px 3px); border: 1px solid #D4D4D8; }
 
 /* ─── Login Page (60% Real Construction CCTV View / 40% Precision Enterprise Form) ─── */

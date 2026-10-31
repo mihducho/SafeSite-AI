@@ -5,7 +5,7 @@ import { CircleAlert, ClipboardList, DoorClosed, FileClock, Pencil, Plus, Timer,
 import { huyPhep, huyPhien, layDanhSachCongNhan, layNgayCong, suaPhien, themPhien } from '../../api/endpoints.js'
 import { useLamMoiCong } from '../../hooks/useLamMoiCong.js'
 import { gio, gioPhutChu, hhmm, ngay as ngayVN, soVN, thuNgay } from '../../lib/format.js'
-import { NHAT_KY, trangThaiNgay } from '../../lib/labels.js'
+import { NHAT_KY, SUA_TAY_TIP, trangThaiNgay } from '../../lib/labels.js'
 import { toast } from '../../lib/toast.js'
 import { LeaveForm } from './LeaveModal.jsx'
 import SessionList from './SessionList.jsx'
@@ -160,7 +160,7 @@ export default function ManualAttendanceModal({ worker, ngay, gioVao = '', gioRa
               <div className="d-flex gap-1 justify-content-end flex-wrap">
                 <Pill tone={stTone}>{stText}</Pill>
                 {(r.muon_co_phep || r.som_co_phep || phepHieuLuc.length > 0) && <Pill tone="info" className="no-dot">Có phép</Pill>}
-                {r.co_sua_tay && <Pill tone="neutral" className="no-dot">Sửa tay</Pill>}
+                {r.co_sua_tay && <Pill tone="neutral" className="no-dot" title={SUA_TAY_TIP}>Sửa tay</Pill>}
               </div>
               <DaySummary r={r} />
             </div>

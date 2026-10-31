@@ -31,9 +31,9 @@ export function StatusBadge({ map, value, className = '' }) {
 }
 
 /** Badge tự đặt chữ + tông: <Pill tone="warn">+12 phút</Pill> */
-export function Pill({ tone = 'neutral', icon: Icon, children, className = '' }) {
+export function Pill({ tone = 'neutral', icon: Icon, children, className = '', title }) {
   return (
-    <span className={`pill ${tone} ${Icon ? 'no-dot' : ''} ${className}`}>
+    <span className={`pill ${tone} ${Icon ? 'no-dot' : ''} ${className}`} title={title}>
       {Icon && <Icon size={13} strokeWidth={1.5} />}{children}
     </span>
   )

@@ -86,6 +86,8 @@ export const TRANG_THAI_PHIEN = {
   huy: ['Đã huỷ', 'neutral'],
 }
 export const NGUON = { tu_dong: 'Tự động', thu_cong: 'Thủ công' }
+// co_sua_tay (backend): ngày có phiên thêm / sửa tay hoặc có phiên bị huỷ; dấu này giữ luôn, kể cả khi đã huỷ phiên tay
+export const SUA_TAY_TIP = 'Có can thiệp thủ công: thêm, sửa hoặc huỷ phiên. Xem Nhật ký sửa để biết ai sửa, lúc nào, lý do.'
 
 export const LOAI_PHEP = {
   ve_som: 'Về sớm',
